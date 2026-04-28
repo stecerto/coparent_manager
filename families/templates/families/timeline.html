@@ -1,0 +1,36 @@
+
+
+
+<h1>⚖️ Timeline Legale Famiglia</h1>
+
+<ul class="list-group">
+
+    {% for log in logs %}
+        <li class="list-group-item">
+
+            <strong>{{ log.user.username }}</strong>
+
+            <span class="badge bg-primary">
+                {{ log.get_action_display }}
+            </span>
+
+            <br>
+
+            {{ log.description }}
+
+            <br>
+
+            <small class="text-muted">
+                {{ log.created_at|date:"d/m/Y H:i" }}
+            </small>
+
+            {% if log.document %}
+                <a href="{% url 'documents:detail' log.document.id %}">
+                    📄 documento
+                </a>
+            {% endif %}
+
+        </li>
+    {% endfor %}
+
+</ul>

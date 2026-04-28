@@ -1,0 +1,67 @@
+<nav class="navbar navbar-expand-lg navbar-light bg-light shadow-sm mb-4">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="{% url 'families:dashboard' %}">
+            CoParent Manager
+        </a>
+
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav me-auto">
+
+                <!-- DASHBOARD -->
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'families:dashboard' %}">
+                        Dashboard
+                    </a>
+                </li>
+
+                <!-- EXPENSES -->
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'expenses:list' %}">
+                        Spese
+                    </a>
+                </li>
+
+                <!-- SOLO GENITORI -->
+                {% if membership.role == "parent_a" or membership.role == "parent_b" %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'families:invite' membership.role %}">
+                            Inviti
+                        </a>
+                    </li>
+                {% endif %}
+
+                <!-- SOLO AVVOCATI -->
+                {% if membership.role == "lawyer_a" or membership.role == "lawyer_b" %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">
+                            Pratica legale
+                        </a>
+                    </li>
+                {% endif %}
+
+                <!-- SOLO PARENT A -->
+                {% if membership.role == "parent_a" %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="#">
+                            Coniuge
+                        </a>
+                    </li>
+                {% endif %}
+            </ul>
+
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'accounts:summary' %}">
+                        Profilo
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" href="{% url 'accounts:logout' %}">
+                        Logout
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>

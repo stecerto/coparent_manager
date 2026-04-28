@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block content %}
+
+<div class="card p-3 mb-2 shadow custom-card text-center">
+        <h4>Calendario famiglia</h4>
+</div>
+
+    <div class="card-body">
+        <div class="card p-3 mb-2 shadow custom-card">
+            <div id="calendar" class="mb-4"></div>
+
+                <div class="modal fade" id="eventModal" tabindex="-1">
+                          <div class="modal-dialog">
+                            <div class="modal-content p-3">
+
+                              <h5>Modifica evento</h5>
+
+                              <input type="hidden" id="eventId">
+
+                              <input type="text" id="modalTitle" class="form-control mb-2">
+
+                              <textarea id="modalDescription" class="form-control mb-2"></textarea>
+
+                              <input type="datetime-local" id="modalStart" class="form-control mb-2">
+                              <input type="datetime-local" id="modalEnd" class="form-control mb-2">
+
+                              <label>Figli</label>
+                              <select id="modalChildren" multiple class="form-control mb-2">
+                                {% for child in family.children.all %}
+                                <option value="{{ child.id }}">{{ child.name }}</option>
+                                {% endfor %}
+                              </select>
+
+                              <div class="d-flex justify-content-between">
+                                <button class="btn btn-danger" id="deleteEvent">Elimina</button>
+                                <button class="btn btn-primary" id="saveEvent">Salva</button>
+                              </div>
+
+                            </div>
+                          </div>
+                        </div>
+                    
+
+                    <hr>
+
+                    {% for event in events %}
+                    <div class="card mt-2">
+                        <div class="card-body">
+                            <strong>{{ event.title }}</strong>
+                            <p>{{ event.description }}</p>
+                            <small>{{ event.start_time }} → {{ event.end_time }}</small>
+                            <p>
+                                <strong>Figli:</strong>
+                                {% for child in event.children.all %}
+                                    {{ child.name }}{% if not forloop.last %}, {% endif %}
+                                {% empty %}
+                                    Nessuno
+                                {% endfor %}
+                            </p>
+
+
+                        </div>
+                    </div>
+                    {% empty %}
+                    <p>Nessun evento</p>
+                    {% endfor %}
+
+
+                </div>
+            </div>
+
+
+        {% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/pages/calendar.js' %}"></script>
+{% endblock %}

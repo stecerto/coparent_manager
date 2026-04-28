@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+{% load static %}
+{% block content %}
+
+<div class="card p-3 mb-2 shadow custom-card text-center">
+        <h2 class="mb-0">Lista Figli</h2>
+</div>
+
+                <!-- bottone a destra -->
+                <div style="flex: 1;" class="d-flex justify-content-end">
+                    <a href="{% url 'children:child_form' %}"
+                       class="btn btn-success btn-style">
+                        Aggiungi Figlio
+                    </a>
+                </div>
+
+            <br>
+            <div class="card-body">
+                <div class="card p-3 mb-2 shadow custom-card">
+                   <!--  <div style="max-width:600px; margin:auto; padding:20px;"> -->
+
+
+                    <ul>
+                        {% for child in children %}
+                        <div class="card p-3 mb-2 shadow custom-card">
+
+                            <h4>{{ child.name }}</h4>
+
+                            <ul class="list-group">
+
+                                <li class="list-group-item">
+                                    🔄 Spese attive:
+                                    <strong>{{ child.active_total|default:0 }} €</strong>
+                                </li>
+
+                                <li class="list-group-item">
+                                    ✅ Spese già sostenute:
+                                    <strong>{{ child.approved_total|default:0 }} €</strong>
+                                </li>
+
+                                <li class="list-group-item">
+                                    💰 Mantenimento mensile:
+                                    <strong>
+                                        {% if child.current_support %}
+                                            {{ child.current_support }} €
+                                        {% else %}
+                                            Non definito
+                                        {% endif %}
+                                    </strong>
+                                </li>
+
+                                <li class="list-group-item">
+                                    ⚖️ Saldo spese:
+                                    <strong>
+                                        {% if child.maintenance_balance > 0 %}
+                                            Parent B deve {{ child.maintenance_balance }} €
+                                        {% elif child.maintenance_balance < 0 %}
+                                            Parent A deve {{ child.maintenance_balance|floatformat:2|cut:"-" }} €
+                                        {% else %}
+                                            Pari
+                                        {% endif %}
+                                    </strong>
+                                </li>
+
+                            </ul>
+                                <div class="d-flex justify-content-end gap-2">
+
+                                    <a href="{% url 'children:child_edit' child.id %}"
+                                       class="btn btn-success btn-style">
+                                        ✏️ Dettagli Figlio
+                                    </a>
+
+                                    <a href="{% url 'children:child_confirm_delete' child.id %}"
+                                       class="btn btn-danger mt-1">
+                                         🗑️ Elimina
+                                    </a>
+                                    &nbsp;&nbsp;
+                                    <a href="{% url 'children:child_pdf' child.id %}"
+                                       class="btn btn-success btn-style">
+                                        Genera PDF
+                                    </a>
+
+                                </div>
+                        </div>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/pages/children.js' %}"></script>
+{% endblock %}

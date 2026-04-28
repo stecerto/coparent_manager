@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block title %}Setup Profilo{% endblock %}
+
+{% block content %}
+<div class="card p-3 mb-2 shadow custom-card text-center">
+        {% if is_edit_mode %}
+                    <h2>Modifica dati</h2>
+                {% else %}
+                    <h2>Configurazione Profilo</h2>
+                {% endif %}
+</div>
+
+
+
+
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+<!-- Dati personali User -->
+
+        <div class="card p-3 mb-2 shadow custom-card">
+                <h4>Dati personali</h4>
+            <div class="child-form card p-2 mb-2 border">
+                {{ form_user.first_name|as_crispy_field }}
+                {{ form_user.last_name|as_crispy_field }}
+                {{ form_user.email|as_crispy_field }}
+                {% if form_profile.phone %}
+                    {{ form_profile.phone|as_crispy_field }}
+                {% endif %}
+                {{ form_profile.address|as_crispy_field }}
+                {{ form_profile.birth_place|as_crispy_field }}
+            </div>
+        </div>
+
+    <!-- Numero figli
+        <div class="card p-3 mb-2">
+            <h4>Figlio {{ forloop.counter }}</h4>
+            <label for="id_number_of_children">Numero figli:</label>
+            <input type="number" name="number_of_children" id="id_number_of_children" min="0" max="10" value="{{ formset.total_form_count }}" required>
+        </div>  -->
+
+        <!-- Formset figli -->
+        <div class="card p-3 mb-2 shadow custom-card">
+            <h4>Dati figli</h4>
+            {{ formset.management_form }}
+            <div id="children-forms">
+                {% for form in formset %}
+                <div class="child-form card p-2 mb-2 border">
+                        {% for field in form.visible_fields %}
+                            {{ field|as_crispy_field }}
+                        {% endfor %}
+
+                        {{ form.DELETE }}   <!-- IMPORTANTE -->
+
+                        <button type="button" class="btn btn-danger remove-child mt-2">
+                            ❌ Cancella figlio
+                        </button>
+
+                </div>
+                {% empty %}
+                <!-- Qui il js aggiungerà i form -->
+                {% endfor %}
+            </div>
+
+                 <div id="empty-form-template" style="display:none;">
+                    <div class="child-form card p-2 mb-2 border">
+                        {% for field in formset.empty_form.visible_fields %}
+                            {% if field.name %}
+                                {{ field|as_crispy_field }}
+                            {% endif %}
+                        {% endfor %}
+
+                        {{ formset.empty_form.DELETE }}
+                    </div>
+                </div>
+            <!-- </div> -->
+            <div class="d-flex gap-2 content link">
+                <button type="button" id="add-child" class="btn btn-success btn-style">
+                    ➕ Aggiungi figlio
+                </button>
+            </div>
+        </div>
+
+        <!-- SOLO GENITORI -->
+
+        <div class="d-flex gap-2">
+                {% if membership.role == "parent_a" or membership.role == "parent_b" %}
+
+                        <a class="btn btn-success btn-style" href="{% url 'families:invite_member' %}">
+                            Invita Avvocato
+                        </a>
+
+                {% endif %}
+
+        <!-- SOLO AVVOCATI -->
+                {% if membership.role == "lawyer_a" or membership.role == "lawyer_b" %}
+
+                        <a class="btn btn-success btn-style" href="{% url 'families:invite_member' %}">
+                            Pratica legale
+                        </a>
+
+                {% endif %}
+
+                <!-- SOLO PARENT A -->
+                {% if membership.role == "parent_a" %}
+
+                        <a class="btn btn-success btn-style" href="{% url 'families:invite_member' %}">
+                            Coniuge
+                        </a>
+
+                {% endif %}
+
+            <button type="submit" class="btn btn-success btn-style">Salva e continua</button>
+            </div>
+
+
+
+
+        </form>
+<!-- Empty Form per js -->
+
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/pages/children.js' %}"></script>
+{% endblock  %}

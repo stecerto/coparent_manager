@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block content %}
+
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header text-center">
+        <h2>{{ child.name }}</h2>
+    </div>
+    <div class="card-body">
+        <div class="card p-3 mb-2 shadow custom-card">
+            <div style="max-width:600px; margin:auto; padding:20px;">
+
+
+                <div class="card p-3 mb-4">
+
+                    <h5>💰 Mantenimento attuale</h5>
+
+                    {% if current_support %}
+                        <p><strong>{{ current_support.amount }} €</strong></p>
+                    {% else %}
+                        <p>Non definito</p>
+                    {% endif %}
+
+                </div>
+
+
+                <div class="card p-3">
+
+                    <h5>📜 Storico mantenimento</h5>
+
+                    <ul class="list-group">
+                        {% for support in supports_history %}
+                            <li class="list-group-item">
+                                {{ support.amount }} €
+                                (dal {{ support.start_date }}
+                                {% if support.end_date %}
+                                    al {{ support.end_date }}
+                                {% else %}
+                                    - attuale
+                                {% endif %})
+                            </li>
+                        {% empty %}
+                            <li class="list-group-item">Nessun dato</li>
+                        {% endfor %}
+                    </ul>
+                    <a href="{% url 'child_pdf' child.id %}" class="btn btn-primary">
+                        📄 Scarica PDF
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% extra_js %}
+
+
+<canvas id="supportChart"></canvas>
+
+<script>
+    const data = JSON.parse('{{ support_data|escapejs }}');
+
+    const labels = data.map(d => d.date);
+    const values = data.map(d => d.amount);
+
+    new Chart(document.getElementById("supportChart"), {
+        type: "line",
+        data: {
+            labels: labels,
+            datasets: [{
+                label: "Mantenimento (€)",
+                data: values
+            }]
+        }
+    });
+</script>
+{% endblock extra_js %}
+{% endblock %}

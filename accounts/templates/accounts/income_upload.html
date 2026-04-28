@@ -1,0 +1,28 @@
+<h3>Carica documenti reddito</h3>
+
+<form method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
+
+    <select name="type">
+        <option value="payslip">Busta paga</option>
+        <option value="tax_return">Dichiarazione redditi</option>
+    </select>
+
+    <input type="number" name="year" placeholder="Anno">
+
+    <input type="file" name="files" multiple>
+
+    <button type="submit">Carica</button>
+    {% if not valid %}
+        <div class="alert alert-warning">
+        Devi caricare almeno 3 buste paga e 3 dichiarazioni dei redditi.
+        </div>
+    {% endif %}
+
+</form>
+
+<hr>
+
+{% for doc in docs %}
+    <p>{{ doc.document_type }} - {{ doc.reference_year }}</p>
+{% endfor %}

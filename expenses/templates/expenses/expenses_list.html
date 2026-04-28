@@ -1,0 +1,196 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block content %}
+{% csrf_token %}
+<input type="hidden" id="csrfToken" value="{{ csrf_token }}">
+ <!-- Grafico -->
+    <div class="card p-3 mb-2 shadow custom-card">
+        <form method="get" class="card p-3 mb-4 shadow-sm">
+
+            <div class="row g-3 mb-1">
+                <div class="col-md-2">
+                    <label class="form-label">{{ form.child.label }}</label>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">{{ form.status.label }}</label>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">{{ form.expense_type.label }}</label>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">{{ form.date_from.label }}</label>
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">{{ form.date_to.label }}</label>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <div class="col-md-2">
+                    {{ form.child }}
+                </div>
+                <div class="col-md-2">
+                    {{ form.status }}
+                </div>
+                <div class="col-md-2">
+                    {{ form.expense_type }}
+                </div>
+                <div class="col-md-2">
+                    {{ form.date_from }}
+                </div>
+                <div class="col-md-2">
+                    {{ form.date_to }}
+                </div>
+            </div>
+
+            <br>
+
+            <div class="d-flex gap-2">
+                <button class="btn btn-primary btn-sm">
+                    🔎 Filtra
+                </button>
+
+                <a href="{% url 'expenses:expenses_list' %}" class="btn btn-secondary btn-sm">
+                    Reset
+                </a>
+            </div>
+        </form>
+
+        <p class="text-muted small"><strong>Totale:
+            {{ total_expenses }} € </strong>
+        </p>
+    </div>
+<div class="card p-3 mb-2 shadow custom-card">
+        <!-- Tabella -->
+        <h3>📄 {{ page_title }}</h3>
+            <table class="table table-striped mt-4 ">
+                <thead>
+                <tr>
+                    <th>Figlio</th>
+                    <th>Data</th>
+                    <th>Categoria</th>
+                    <th>Importo</th>
+                    <th>Creato da</th>
+                   <!-- <th>Stato</th> -->
+                    <th class="text-left">Azioni</th>
+                </tr>
+                </thead>
+                <tbody>
+                {% for expense in expenses %}
+                <tr>
+                    <td>{{ expense.child }}</td>
+                    <td>{{ expense.expense_date }}</td>
+                    <td>{{ expense.expense_type.name }}</td>
+                    <td>{{ expense.amount }}€</td>
+                    <td>{{ expense.created_by }}</td>
+
+                    <td class="align-middle">
+                        <div class="d-flex flex-column w-100">
+                            <div class="d-flex gap-1 justify-content-start">
+
+                                <button class="btn btn-sm status-btn {% if expense.status == 'pending' %}active{% endif %}"
+                                        data-id="{{ expense.id }}" data-status="pending">🟡</button>
+
+                                <button class="btn btn-sm status-btn {% if expense.status == 'accepted' %}active{% endif %}"
+                                        data-id="{{ expense.id }}" data-status="accepted">🔵</button>
+
+                                <button class="btn btn-sm status-btn {% if expense.status == 'paid' %}active{% endif %}"
+                                        data-id="{{ expense.id }}" data-status="paid">🟢</button>
+
+                                <button class="btn btn-sm status-btn {% if expense.status == 'rejected' %}active{% endif %}"
+                                        data-id="{{ expense.id }}" data-status="rejected">🔴</button>
+
+                            </div>
+                            <div class="w-100 d-flex justify-content-center mt-1">
+                                <span class="badge
+                                    {% if expense.status == 'pending' %}bg-warning
+                                    {% elif expense.status == 'accepted' %}bg-primary
+                                    {% elif expense.status == 'paid' %}bg-success
+                                    {% elif expense.status == 'rejected' %}bg-danger
+                                    {% endif %}">
+                                    {{ expense.get_status_display }}
+                                </span>
+                            </div>
+                        </div>
+
+                    </td>
+
+                    <td>
+                        {% if expense.created_by == request.user %}
+                            <a href="{% url 'expenses:edit_expense' expense.id %}">✏️</a>
+                            <a href="{% url 'expenses:delete_expense' expense.id %}">🗑️</a>
+                        {% endif %}
+                    </td>
+
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5">Nessuna spesa trovata</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+
+
+    </div>
+
+
+{% endblock content%}
+
+{% block extra_js %}
+
+
+
+<script src="{% static 'js/pages/expenses_dashboard.js' %}"></script>
+<script>
+    document.querySelectorAll(".status-btn").forEach(btn => {
+    btn.addEventListener("click", function () {
+
+        const expenseId = this.dataset.id;
+        const status = this.dataset.status;
+        const csrfToken = document.getElementById("csrfToken").value;
+        const statusMap = {
+            pending: "In sospeso",
+            accepted: "Accettata",
+            paid: "Pagata",
+            rejected: "Rifiutata"
+        };
+
+        fetch(`/expenses/update-status/${expenseId}/`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": csrfToken
+            },
+            body: JSON.stringify({ status: status })
+        })
+        .then(response => response.json())
+        .then(data => {
+            // aggiorna badge senza reload
+            const row = btn.closest("tr");
+
+            const badge = row.querySelector(".badge");
+
+            badge.className = "badge";
+
+            if (status === "pending") badge.classList.add("bg-warning");
+            if (status === "accepted") badge.classList.add("bg-primary");
+            if (status === "paid") badge.classList.add("bg-success");
+            if (status === "rejected") badge.classList.add("bg-danger");
+
+            badge.innerText = statusMap[status];
+
+            // evidenzia bottone attivo
+            row.querySelectorAll(".status-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+        });
+    });
+
+});
+</script>
+
+
+{% endblock  %}
+
+

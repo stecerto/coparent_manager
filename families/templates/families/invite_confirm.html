@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header text-center">
+        <h2 class="mb-0">✅ Invito confermato</h2>
+    </div>
+    <div class="card-body">
+
+        <div class="card p-3 mb-2 shadow custom-card text-center">
+
+            <p>
+                Ora puoi accedere o registrarti
+                per entrare nella famiglia
+                <strong>{{ invitation.family.name }}</strong>.
+            </p>
+
+            <div class="d-flex justify-content-center gap-2">
+                <a href="{% url 'login' %}"
+                   class="btn btn-primary">
+                    🔐 Accedi
+                </a>
+
+                <a href="{% url 'register' %}"
+                   class="btn btn-success">
+                    📝 Registrati
+                </a>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

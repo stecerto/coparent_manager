@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+
+    <h2>Riepilogo dati famiglia</h2>
+
+    <hr>
+
+    <h4>Genitore A</h4>
+    <p><strong>Nome:</strong> {{ request.user.first_name }}</p>
+    <p><strong>Cognome:</strong> {{ request.user.last_name }}</p>
+    <p><strong>Email:</strong> {{ request.user.email }}</p>
+    <p><strong>Telefono:</strong> {{ profile.phone }}</p>
+    <p><strong>Indirizzo:</strong> {{ profile.address }}</p>
+
+    <hr>
+
+    {% if profile.parent_b_name %}
+    <h4>Genitore B</h4>
+    <p><strong>Nome:</strong> {{ profile.parent_b_name }}</p>
+    <p><strong>Cognome:</strong> {{ profile.parent_b_surname }}</p>
+    <p><strong>Email:</strong> {{ profile.parent_b_email }}</p>
+    <p><strong>Telefono:</strong> {{ profile.parent_b_phone }}</p>
+    {% endif %}
+
+    <hr>
+
+    {% if profile.lawyer_a %}
+    <h4>Avvocato A</h4>
+    <p><strong>Nome:</strong> {{ profile.lawyer_a.name }}</p>
+    <p><strong>Email:</strong> {{ profile.lawyer_a.email }}</p>
+    <p><strong>Telefono:</strong> {{ profile.lawyer_a.phone }}</p>
+    {% endif %}
+
+    {% if profile.lawyer_b %}
+    <h4>Avvocato B</h4>
+    <p><strong>Nome:</strong> {{ profile.lawyer_b.name }}</p>
+    <p><strong>Email:</strong> {{ profile.lawyer_b.email }}</p>
+    <p><strong>Telefono:</strong> {{ profile.lawyer_b.phone }}</p>
+    {% endif %}
+
+    <hr>
+
+    <h4>👶 Figli</h4>
+
+    <div class="row">
+        {% for child in children %}
+            <div class="col-md-4">
+                <div class="card mb-3 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">{{ child.name }} {{ child.surname }}</h5>
+                        <p class="card-text">
+                            <strong>Data di nascita:</strong> {{ child.birth_date|date:"d/m/Y" }}<br>
+                            <strong>Età:</strong> {{ child.age }} anni
+                        </p>
+                        <a href="{% url 'child_edit' child.id %}" class="btn btn-sm btn-warning">✏️ Modifica</a>
+                        <a href="{% url 'child_delete' child.id %}" class="btn btn-sm btn-danger">🗑️ Elimina</a>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-12">
+                <p class="text-muted">Nessun figlio inserito</p>
+            </div>
+        {% endfor %}
+    </div>
+
+    <hr>
+
+    <div class="mt-4">
+        <a href="{% url 'families:setup' %}?edit=1" class="btn btn-warning">
+            Modifica dati
+        </a>
+
+        <a href="{% url 'families:family_dashboard' %}" class="btn btn-success">
+            Conferma e continua
+        </a>
+    </div>
+
+</div>
+{% endblock %}

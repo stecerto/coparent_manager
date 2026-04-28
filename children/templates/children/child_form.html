@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% if form.instance.pk %}Modifica{% else %}Nuovo{% endif %} Figlio{% endblock %}
+
+{% block content %}
+<div class="card p-3 mb-2 shadow custom-card text-center">
+    <h2>{% if form.instance.pk %}Modifica{% else %}Nuovo{% endif %} Figlio</h2>
+</div>
+    <!-- Dati figlio -->
+        <div class="card p-3 mb-2 shadow custom-card">
+            <form method="POST">
+                {% csrf_token %}
+                {{ form|crispy }}
+                <button type="submit" class="btn btn-success btn-style">
+                    {% if form.instance.pk %}Salva Modifiche{% else %}Aggiungi Figlio{% endif %}
+                </button>
+                <a href="{% url 'children:children_list' %}" class="btn btn-secondary mt-1">Annulla</a>
+            </form>
+        </div>
+
+</div>
+{% endblock %}

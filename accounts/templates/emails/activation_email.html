@@ -1,0 +1,40 @@
+<div style="max-width:600px; margin:auto; padding:20px; font-family:Arial, sans-serif;">
+    <h2>Attivazione Email Family Balance</h2>
+
+    <h4>Ciao {{ user.first_name|default:user.username }},</h4>
+
+    <p>Clicca sul pulsante qui sotto per attivare il tuo account:</p>
+
+    <div style="margin-top:20px; margin-bottom:20px;">
+        <a href="{{ activation_link }}"
+           style="
+                  background:#006400;
+                  color:#ffffff;
+                  padding:14px 28px;
+                  border-radius:8px;
+                  text-decoration:none;
+                  font-size:16px;
+                  font-weight:600;
+                  display:inline-block;">
+           Attiva il tuo account
+        </a>
+
+    </div>
+
+    <p style="font-size:14px;">
+        Link diretto:
+        <br>
+        <p> href="{{ activation_link }}" </p>
+    </p>
+
+    <p style="font-size:12px; color:#666;">
+        Se il pulsante non funziona, copia e incolla il link sopra nel browser.
+    </p>
+</div>
+<script>
+    setTimeout(function() {
+        window.location.href = "{% url 'login' %}";
+    }, 3000);
+</script>
+
+

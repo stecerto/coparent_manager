@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina Figlio{% endblock %}
+
+{% block content %}
+<div class="card p-3 mb-2 shadow custom-card text-center">
+    <h2>Conferma eliminazione</h2>
+</div>
+    <!-- Filtro figlio -->
+        <div class="card p-3 mb-2 shadow custom-card text-center">
+
+
+            <p>Sei sicuro di voler eliminare <strong>{{ child.name }} {{ child.surname }}</strong>?</p>
+
+            <form method="POST">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">Elimina</button>
+                <a href="{% url 'children:children_list' %}" class="btn btn-secondary">Annulla</a>
+            </form>
+
+</div>
+{% endblock %}

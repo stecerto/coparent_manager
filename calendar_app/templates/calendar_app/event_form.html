@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block content %}
+
+<div class="card p-3 mb-3 text-center">
+    <h4>
+        {% if is_edit %}
+            ✏️ Modifica evento
+        {% else %}
+            ➕ Crea evento
+        {% endif %}
+    </h4>
+</div>
+
+<form method="POST">
+    {% csrf_token %}
+    <label>Categoria</label>
+        <select name="event_type" class="form-control mb-2">
+            <option value="expense">Spesa</option>
+            <option value="medical">Medico</option>
+            <option value="school">Scuola</option>
+            <option value="sport">Sport</option>
+            <option value="other">Altro</option>
+        </select>
+
+<input type="number" name="amount" class="form-control mb-2" placeholder="Importo (solo spese)">
+
+    <input type="text" name="title" class="form-control mb-2"
+           value="{{ event.title|default:'' }}" placeholder="Titolo">
+
+    <textarea name="description" class="form-control mb-2">
+        {{ event.description|default:'' }}
+    </textarea>
+
+    <label>Inizio</label>
+    <input type="datetime-local" name="start_time"
+           class="form-control mb-2"
+           value="{% if event %}{{ event.start_time|date:'Y-m-d\\TH:i' }}{% elif start %}{{ start|slice:":16" }}{% endif %}">
+
+    <label>Fine</label>
+    <input type="datetime-local" name="end_time"
+           class="form-control mb-2"
+           value="{% if event %}{{ event.end_time|date:'Y-m-d\\TH:i' }}{% elif end %}{{ end|slice:":16" }}{% endif %}">
+
+    <label>Figli</label>
+    <select name="children" multiple class="form-control mb-3">
+        {% for child in family.children.all %}
+        <option value="{{ child.id }}"
+            {% if event and child in event.children.all %}selected{% endif %}>
+            {{ child.name }}
+        </option>
+        {% endfor %}
+    </select>
+
+    <button class="btn btn-success">
+        {% if is_edit %}Aggiorna{% else %}Crea{% endif %}
+    </button>
+
+</form>
+
+{% if is_edit %}
+<form method="POST" action="{% url 'calendar:event_delete' event.id %}">
+    {% csrf_token %}
+    <button class="btn btn-danger mt-2">Elimina evento</button>
+</form>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{% static 'js/pages/calendar.js' %}"></script>
+{% endblock %}

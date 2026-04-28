@@ -1,0 +1,13 @@
+
+<h6>{{ date }}</h6>
+
+<ul class="list-group">
+    {% for expense in expenses %}
+        <li class="list-group-item d-flex justify-content-between">
+            <span>{{ expense.description }}</span>
+            <strong>{{ expense.amount }} €</strong>
+        </li>
+    {% empty %}
+        <li class="list-group-item">Nessuna spesa</li>
+    {% endfor %}
+</ul>

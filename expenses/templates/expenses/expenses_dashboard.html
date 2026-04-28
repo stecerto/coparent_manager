@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Family Bilance Dashboard Spese{% endblock title %}
+
+{%block content %}
+
+
+<div class="card p-3 mb-2 shadow custom-card text-center">
+    <h2>📊 Dashboard Spese</h2>
+</div>
+
+<div class="d-flex gap-2">
+    <a href="{% url 'expenses:expenses_riepilogo_spese' %}" class="btn btn-success btn-style">
+        Riepilogo Spese
+    </a>
+</div>
+
+<div class="col-md-12">
+
+    <div class="card p-3 mb-2 shadow custom-card">
+        <h4>📅 Calendario spese</h4>
+
+        
+
+        <div id="calendar"
+             style="max-width: 100%; margin-bottom:20px;">
+
+        </div>
+    </div>
+    <div class="card p-3 mb-2 shadow custom-card">
+        {% csrf_token %}
+        <!--{{ form|crispy }}
+         Totale -->
+        <p><strong>Totale spese:</strong> {{ total_expenses }} €</p>
+
+        <!-- Bottone aggiunta -->
+        <div class="d-flex gap-2">
+            <a href="{% url 'expenses:add_expense' %}" class="btn btn-success btn-style">
+                ➕ Aggiungi Spesa
+            </a>
+            <a href="{% url 'expenses:expenses_list' %}" class="btn btn-primary">
+                📄 Vedi tutte le spese
+            </a>
+
+        </div>
+    </div>
+
+
+
+
+
+
+    <div class="row justify-content-center">
+
+    <!-- CATEGORY -->
+    <div class="col-12 col-md-6 col-lg-4 mb-3">
+        <div class="card p-3 shadow custom-card h-100">
+
+            <h5 class="text-center">Spese per categoria</h5>
+
+            <!-- WRAPPER STABILE -->
+            <div class="d-flex w-100 align-items-stretch">
+
+                <!-- LEGENDA SINISTRA -->
+                <div id="categoryLegend" class="d-flex flex-column gap-2 me-3">
+                    {% for c in category_summary %}
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="legend-dot"
+                                  style="background: {{ c.expense_type__color|default:'#6f42c1' }}"></span>
+                            <small>{{ c.expense_type__name }}</small>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <!-- GRAFICO DESTRA -->
+                <div class="flex-grow-1 d-flex justify-content-center align-items-center"
+                     style="height:250px; width:100%;">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+
+            </div>
+
+        </div>
+    </div>
+
+    <!-- PARENT -->
+    <div class="col-12 col-md-6 col-lg-4 mb-3">
+        <div class="card p-3 shadow custom-card h-100">
+
+            <h5 class="text-center">Spese per genitore</h5>
+
+            <div style="height:250px;">
+                <canvas id="parentChart"></canvas>
+            </div>
+
+        </div>
+    </div>
+
+</div>
+
+        <!-- PDF -->
+        <a href="{% url 'expenses:download_expense_pdf' %}" class="btn btn-success btn-style">
+            📄 Scarica PDF
+        </a>
+
+
+        <hr style="border: 1px solid #ccc; width: 50%; margin: 20px auto;">
+
+    </div>
+    <!-- MODAL SPESE GIORNO -->
+    <div id="dayModal" class="custom-modal" style="display:none;">
+        <div class="custom-modal-content">
+            <span id="closeModal" class="close-btn">&times;</span>
+
+            <h5>Spese del giorno</h5>
+
+            <div id="modalContent">
+                Caricamento...
+            </div>
+        </div>
+    </div>
+
+{% endblock content%}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="{% static 'js/pages/expenses_dashboard.js' %}"></script>
+<script>
+window.categoryChartData = {
+    labels: [
+        {% for c in category_summary %}
+            "{{ c.expense_type__name|escapejs }}",
+        {% endfor %}
+    ],
+    datasets: [{
+        data: [
+            {% for c in category_summary %}
+                Number("{{ c.total|default:'0' }}"),
+            {% endfor %}
+        ],
+        backgroundColor: [
+            {% for c in category_summary %}
+                "{{ c.expense_type__color|default:'#6f42c1' }}",
+            {% endfor %}
+        ]
+        }]
+    };
+
+
+
+    window.parentChartData = {
+        labels: ["Parent A", "Parent B"],
+        datasets: [{
+            data: [
+                Number("{{ parent_a_total|default:'0' }}"),
+                Number("{{ parent_b_total|default:'0' }}")
+            ]
+        }]
+    };
+</script>
+<script>
+    document.addEventListener("click", function (e) {
+        const modal = document.getElementById("dayModal");
+        const content = document.querySelector(".custom-modal-content");
+
+        // ✅ chiusura con X (robusta)
+        if (e.target.closest("#closeModal")) {
+            modal.style.display = "none";
+        }
+
+        // ✅ chiusura cliccando fuori dal contenuto
+        if (modal.style.display === "flex" && !content.contains(e.target)) {
+            modal.style.display = "none";
+        }
+    });
+</script>
+
+{% endblock  %}
+

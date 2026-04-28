@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Bilance Family Conferma cancellazione{% endblock title %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+             <h2>Conferma cancellazionet</h2>
+            <div class="card p-4 shadow custom-card">
+                <p>Sei sicuro di voler cancellare la spesa: {{ expense.category }} - {{ expense.amount }} €?</p>
+                <form method="POST">
+                    {% csrf_token %}
+
+
+                    <button type="submit">Conferma</button>
+                    <a href="{% url 'expenses:expenses_dashboard' %}">Annulla</a>
+                </form>
+
+
+                <hr style="border: 1px solid #ccc; width: 50%; margin: 20px auto;">
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+{% block scripts %}
+
+{% endblock scripts%}
+
+

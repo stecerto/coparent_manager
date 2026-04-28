@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% block content %}
+
+
+<div class="card p-3 mb-2 shadow custom-card text-center">
+    <h2> Chat</h2>
+</div>
+
+    <div class="card p-3 mb-2 shadow custom-card">
+
+        <h4 class="mt-4">💬 Chat famiglia</h4>
+
+        <div class="card p-3 mb-2 shadow custom-card">
+
+
+            <a href="{% url 'documents:documents_list' %}" class="btn btn-outline-secondary">
+                📁 Archivio documenti
+            </a>
+            <!-- FORM INVIO -->
+            <form method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <div class="mb-3">
+                            <textarea
+                                    name="message"
+                                    class="form-control"
+                                    rows="3"
+                                    placeholder="Scrivi messaggio..."
+                                    required
+                            ></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <input type="file" name="attachments" multiple class="form-control">
+                </div>
+
+                <!-- evento calendario -->
+                <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox"
+                           name="create_event"
+                           id="createEventCheck"
+                           onchange="toggleEventFields()">
+
+                    <label class="form-check-label" for="createEventCheck">
+                        📅 Crea evento nel calendario
+                    </label>
+                </div>
+
+                <div id="eventFields" style="display:none;" class="mt-3">
+                    <input type="text"
+                           name="event_title"
+                           placeholder="Titolo evento"
+                           class="form-control mb-2">
+
+                    <input type="datetime-local"
+                           name="event_start"
+                           class="form-control mb-2">
+
+                    <input type="datetime-local"
+                           name="event_end"
+                           class="form-control mb-2">
+
+                    <textarea
+                            name="event_description"
+                            placeholder="Descrizione evento"
+                            class="form-control"></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-success btn-style">
+                    Invia
+                </button>
+            </form>
+
+            <input type="hidden" name="reply_to" id="replyToInput">
+
+            <div id="replyPreview" class="alert alert-info mb-3" style="display:none;">
+                <strong>↩️ Stai rispondendo a:</strong>
+                <span id="replyText"></span>
+            </div>
+        </div>
+
+        <hr>
+        <div class="card p-3 mb-2 shadow custom-card">
+            <!-- LISTA MESSAGGI -->
+            {% for msg in messages %}
+            <div class="card mt-2 shadow-sm">
+                <div class="card-body">
+                    <strong>{{ msg.sender }}</strong>
+                    <small class="text-muted">
+                        {{ msg.created_at|date:"d/m/Y H:i" }}
+                    </small>
+
+
+                    <p class="mt-2">{{ msg.content }}</p>
+                    {% if msg.reply_to %}
+                    <div class="alert alert-light p-2 mb-2">
+                        ↩️ Risposta a:
+                        <strong>{{ msg.reply_to.sender }}</strong><br>
+                        {{ msg.reply_to.content|truncatechars:80 }}
+                    </div>
+                    {% endif %}
+
+                    <a href="{% url 'chat:delete_message' msg.id %}" class="btn btn-sm btn-danger">
+                        🗑️
+                    </a>
+
+                    <a href="{% url 'chat:message_history' msg.id %}"
+                       class="btn btn-sm {% if msg.version > 1 or msg.deleted_at %}btn-warning{% else %}btn-secondary{% endif %}">
+                        🕘 Cronologia
+                    </a>
+
+                    {% if msg.linked_event %}
+                    <small>📅 Evento collegato: {{ msg.linked_event.title }}</small>
+                    {% endif %}
+
+                    {% if msg.attachments.all %}
+                    <hr>
+                    <strong>Allegati:</strong>
+                    <ul>
+                        {% for file in msg.attachments.all %}
+                        <li>
+                            <a href="{{ file.file.url }}" target="_blank">
+                                {{ file.file.name|slice:":40" }}
+                            </a>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+
+                    <button
+                            class="btn btn-sm btn-outline-primary"
+                            onclick="replyToMessage('{{ msg.id }}', '{{ msg.content|escapejs }}')">
+                        ↩️ Rispondi
+                    </button>
+                </div>
+            </div>
+            {% empty %}
+            <p>Nessun messaggio</p>
+            {% endfor %}
+
+        </div>
+    </div>
+
+
+
+{% block extra_js %}
+<script>
+    function toggleEventFields() {
+        const checkbox = document.getElementById("createEventCheck");
+        const fields = document.getElementById("eventFields");
+
+        fields.style.display = checkbox.checked ? "block" : "none";
+    }
+
+    function replyToMessage(messageId, content) {
+        document.getElementById("replyToInput").value = messageId;
+        document.getElementById("replyText").innerText = content;
+        document.getElementById("replyPreview").style.display = "block";
+
+        // scroll automatico verso il form
+        window.scrollTo({
+            top: 0,
+            behavior: "smooth"
+        });
+    }
+</script>
+{% endblock extra_js %}
+{% endblock %}

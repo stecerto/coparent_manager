@@ -1,0 +1,35 @@
+<div style="max-width:600px; margin:auto; padding:20px; font-family:Arial, sans-serif;">
+    <h2>Invito alla gestione familiare</h2>
+
+    <p>
+        Sei stato invitato da
+        <strong>{{ nome_genitore }} {{ cognome_genitore }}</strong>
+        a partecipare alla gestione condivisa della famiglia.
+    </p>
+
+    <p>Clicca qui per registrarti:</p>
+
+    <div style="margin-top:20px; margin-bottom:20px;">
+        <a href="{{ invite_link }}"
+           style="
+              background:#006400;
+              color:#ffffff;
+              padding:14px 28px;
+              border-radius:8px;
+              text-decoration:none;
+              font-size:16px;
+              font-weight:600;
+              display:inline-block;
+
+           ">
+           Accetta l'invito
+        </a>
+    </div>
+
+    <p style="font-size:12px; color:#666;">
+        Se il pulsante non funziona, copia e incolla questo link nel browser:
+        <br>
+        {{ invite_link }}
+    </p>
+</div>
+

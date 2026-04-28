@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina Messaggio{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Conferma eliminazione</h2>
+    <p>Sei sicuro di voler eliminare
+        <strong>
+            {{ message.sender }}
+            {{ msg.created_at|date:"d/m/Y H:i" }}
+            contenuto {{ msg.content }}
+        </strong>?
+    </p>
+
+    <form method="POST">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Elimina</button>
+        <a href="{% url 'chat:chat_home' %}" class="btn btn-secondary">Annulla</a>
+    </form>
+</div>
+<script>
+document.querySelector("form").addEventListener("submit", function () {
+    sessionStorage.setItem("scrollToChat", window.scrollY);
+});
+</script>
+{% endblock %}

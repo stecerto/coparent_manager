@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Bilance Family Dashboard Spese{% endblock title %}
+
+{%block content %}
+<div class="container-fluid mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+             <h2>Dashboard</h2>
+            <div class="card p-4 shadow custom-card">
+                <form method="POST">
+                    {% csrf_token %}
+                    {% load crispy_forms_tags %}
+                    <p>Totale spese: {{ total_expenses }} €</p>
+
+<!-- Grafico spese per categoria -->
+                    <canvas id="categoryChart" width="200" height="100"></canvas>
+                    
+
+                    <hr style="border: 1px solid #e9d5ff; width: 50%; margin: 20px auto;">
+
+                    <h3>Mantenimento per figli</h3>
+                    <table border="1" cellpadding="5">
+                    <tr>
+                        <th>Figlio</th>
+                        <th>Età</th>
+                        <th>Pagatore</th>
+                        <th>Mantenimento (€)</th>
+                        <th>Spese condivise (€)</th>
+                    </tr>
+                    {% for child, info in maintenance_info.items %}
+                    <tr>
+                        <td>{{ child }}</td>
+                        <td>{{ info.age }}</td>
+                        <td>{{ info.payer }}</td>
+                        <td>{{ info.amount }}</td>
+                        <td>{{ info.shared_expenses }}</td>
+                    </tr>
+                    {% endfor %}
+                    </table>
+
+<!-- Bottone per PDF -->
+                    <br>
+                    <a href="{% url 'expenses:download_expense_pdf' %}" class="btn btn-primary">📄 Scarica report PDF</a><br>
+                    <br>
+                    <a href="{% url 'expenses:add_expense' %}">➕ Aggiungi Spesa</a>
+                    <table border="1" cellpadding="5">
+                    <tr>
+                        <th>Data</th>
+                        <th>Categoria</th>
+                        <th>Importo (€)</th>
+                        <th>Creato da</th>
+                        <th>Azioni</th>
+                    </tr>
+                    {% for expense in expenses %}
+                    <tr>
+                        <td>{{ expense.date }}</td>
+                        <td>{{ expense.category }}</td>
+                        <td>{{ expense.amount }}</td>
+                        <td>{{ expense.created_by.username }}</td>
+                        <td>
+                            <a href="{% url 'expenses:edit_expense' expense.pk %}">✏️ Modifica</a>
+                            <a href="{% url 'expenses:delete_expense' expense.pk %}">🗑️ Elimina</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                    </table>
+
+                </form>
+                <hr style="border: 1px solid #ccc; width: 50%; margin: 20px auto;">
+
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}
+{% block scripts %}
+<script src="{% static 'js/coparentmanager.js' %}"></script>
+{% endblock scripts %}
+
+
+
+
+

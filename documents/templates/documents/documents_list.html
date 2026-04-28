@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% block content %}
+
+
+<div class="card p-3 mb-2 shadow custom-card text-center">
+
+        {% if role == "lawyer_a" or role == "lawyer_b" %}
+            <h2>Documenti del mio assistito</h2>
+        {% else %}
+            <h2>I miei documenti privati</h2>
+        {% endif %}
+    </div>
+
+    <div class="card-body">
+        <div class="card p-3 mb-2 shadow custom-card">
+            <!-- <div style="max-width:600px; margin:auto; padding:20px;"> -->
+              <a href="{% url 'documents:documents_upload' %}" class="btn btn-success btn-style">
+                    Carica documento
+                </a>
+                <br>
+
+            <div class="child-form p-2 mb-2 border">
+                    <h4>Documenti essenziali anno {{ checklist.current_year }}</h4>
+
+                    <div class="card-body">
+
+                        <h6>Buste paga anno {{ checklist.current_year }}</h6>
+
+                        <p>
+                            Caricate:
+                            <strong>{{ checklist.payslips_uploaded }}/3</strong>
+                        </p>
+
+                        {% if checklist.payslips_missing > 0 %}
+                            <p class="text-danger">
+                                Mancano {{ checklist.payslips_missing }} buste paga
+                            </p>
+                        {% else %}
+                            <p class="text-success">
+                                ✓ Tutte le buste paga caricate
+                            </p>
+                        {% endif %}
+
+                        <hr>
+
+                        <h6>Dichiarazione redditi {{ checklist.required_tax_year }}</h6>
+
+                        {% if checklist.tax_uploaded %}
+                            <p class="text-success">
+                                ✓ Presente
+                            </p>
+                        {% else %}
+                            <p class="text-danger">
+                                Documento mancante
+                            </p>
+                        {% endif %}
+                    </div>
+                </div>
+
+
+
+                <ul class="list-group mb-4">
+                    {% for doc in private_docs %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>
+                              {{ doc.title }}
+                              <span class="badge bg-secondary">
+                                  v{{ doc.version }}
+                              </span>
+                              <span class="badge bg-info ms-2">
+                                    {{ doc.get_status_display }}
+                              </span>
+                            </span>
+
+                            <div>
+                                {% if doc.is_signed_by_user %}
+                                    <span class="text-success small me-2">✔ Firmato</span>
+                                {% else %}
+                                    <a href="{% url 'documents:sign' doc.id %}"
+                                       class="btn btn-sm btn-dark">
+                                        ✍️ Firma
+                                    </a>
+                                {% endif %}
+
+                                <button class="btn btn-sm btn-outline-primary"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#previewPrivateModal{{ doc.id }}">
+                                    Preview
+                                </button>
+
+                                <a href="{% url 'documents:documents_download' doc.id %}"
+                                   class="btn btn-sm btn-success">
+                                    Download
+                                </a>
+
+                                <a href="{% url 'documents:documents_versions' doc.id %}"
+                                   class="btn btn-sm btn-warning">
+                                    Versioni
+                                </a>
+                                <a href="{% url 'documents:documents_detail' doc.id %}"
+                                   class="btn btn-sm btn-outline-secondary">
+                                    Dettaglio
+                                </a>
+                            </div>
+                        </li>
+
+                        <!-- Modal -->
+                        <div class="modal fade" id="previewPrivateModal{{ doc.id }}" tabindex="-1">
+                            <div class="modal-dialog modal-xl">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">{{ doc.title }} - v{{ doc.version }}</h5>
+                                        <button type="button"
+                                                class="btn-close"
+                                                data-bs-dismiss="modal"
+                                                data-bs-target="#privatePreviewModal{{ doc.id }}">
+                                        </button>
+                                    </div>
+
+                                    <div class="modal-body">
+                                        <iframe src="{{ doc.file.url }}"
+                                                width="100%"
+                                                height="700px"
+                                                style="border:none;">
+                                        </iframe>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </ul>
+
+                <a href="{% url 'documents:documents_upload_shared' %}"
+                   class="btn btn-success btn-style">
+                    Carica documento condiviso
+                </a>
+                <br>
+                <div class="card p-3 mb-2 shadow custom-card">
+                    <h4>Documenti condivisi famiglia {{ checklist.current_year }}</h4>
+                    <div class="child-form p-2 mb-2 border">
+
+
+                <ul class="list-group">
+                    {% for doc in shared_docs %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>
+                              {{ doc.title }}
+                              <span class="badge bg-secondary">
+                                  v{{ doc.version }}
+                              </span>
+                              <span class="badge bg-info ms-2">
+                                  {{ doc.get_status_display }}
+                              </span>
+                            </span>
+
+                            <div>
+                                {% if doc.is_signed_by_user %}
+                                    <span class="text-success small me-2">✔ Firmato</span>
+                                {% else %}
+                                    <a href="{% url 'documents:sign' doc.id %}"
+                                       class="btn btn-sm btn-dark">
+                                        ✍️ Firma
+                                    </a>
+                                {% endif %}
+
+                                <button class="btn btn-sm btn-outline-primary"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#sharedpreviewModal{{ doc.id }}">
+                                    Preview
+                                </button>
+
+                                <a href="{% url 'documents:documents_download' doc.id %}"
+                                   class="btn btn-sm btn-success">
+                                    Download
+                                </a>
+
+                                <a href="{% url 'documents:documents_versions' doc.id %}"
+                                   class="btn btn-sm btn-warning">
+                                    Versioni
+                                </a>
+                                <a href="{% url 'documents:documents_detail' doc.id %}"
+                                   class="btn btn-sm btn-outline-secondary">
+                                    Dettaglio
+                                </a>
+                            </div>
+                        </li>
+
+                        <!-- Modal -->
+                        <div class="modal fade" id="sharedpreviewModal{{ doc.id }}" tabindex="-1">
+                            <div class="modal-dialog modal-xl">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h5 class="modal-title">{{ doc.title }} - v{{ doc.version }}</h5>
+                                        <button type="button"
+                                                class="btn-close"
+                                                data-bs-dismiss="modal"
+                                                data-bs-target="#sharedPreviewModal{{ doc.id }}">
+                                        </button>
+                                    </div>
+
+                                    <div class="modal-body">
+                                        <iframe src="{{ doc.file.url }}"
+                                                width="100%"
+                                                height="700px"
+                                                style="border:none;">
+                                        </iframe>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

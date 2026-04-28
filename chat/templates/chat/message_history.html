@@ -1,0 +1,73 @@
+# `chat/message_history.html` — Timeline verticale stile audit log
+
+```html
+{% extends "base.html" %}
+{% block content %}
+
+<div class="container mt-4">
+    <h2 class="mb-4">🕘 Cronologia messaggio</h2>
+
+    <div class="timeline">
+        {% for version in history %}
+        <div class="timeline-item mb-4">
+            <div class="card shadow-sm border-0">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <strong>Versione {{ version.version }}</strong>
+
+                        {% if version.deleted_at %}
+                            <span class="badge bg-danger">Eliminato</span>
+                        {% elif version.edited_at %}
+                            <span class="badge bg-warning text-dark">Modificato</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Originale</span>
+                        {% endif %}
+                    </div>
+
+                    <small class="text-muted d-block">
+                        Creato: {{ version.created_at|date:"d/m/Y H:i" }}
+                    </small>
+
+                    {% if version.edited_at %}
+                    <small class="text-muted d-block">
+                        Modificato: {{ version.edited_at|date:"d/m/Y H:i" }}
+                    </small>
+                    {% endif %}
+
+                    {% if version.deleted_at %}
+                    <small class="text-danger d-block">
+                        Eliminato: {{ version.deleted_at|date:"d/m/Y H:i" }}
+                    </small>
+                    {% endif %}
+
+                    <hr>
+                    <p class="mb-0">{{ version.content }}</p>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock %}
+```
+
+## Miglioria consigliata nella chat
+
+Per il pulsante cronologia usa:
+
+```html
+<a href="{% url 'message_history' msg.id %}"
+   class="btn btn-sm {% if msg.version > 1 or msg.deleted_at or msg.new_versions.exists %}btn-warning{% else %}btn-secondary{% endif %}">
+   🕘 Cronologia
+</a>
+```
+
+<!-- Così diventa giallo anche quando esistono versioni successive.
+
+ <a href="{% url 'message_history' msg.id %}"
+   class="btn btn-sm {% if msg.version > 1 or msg.deleted_at or msg.new_versions.exists %}btn-warning{% else %}btn-secondary{% endif %}">
+   🕘 Cronologia
+</a>
+
+ -->

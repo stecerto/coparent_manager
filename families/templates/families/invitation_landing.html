@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+Invito famiglia
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+
+            <div class="card shadow-sm border-0 rounded-4">
+                <div class="card-body p-4">
+
+                    <div class="text-center mb-4">
+                        <h2 class="fw-bold">
+                            📩 Invito ricevuto
+                        </h2>
+                        <p class="text-muted mb-0">
+                            Sei stato invitato a partecipare a
+                            <strong>{{ invitation.family.name }}</strong>
+                        </p>
+                    </div>
+
+                    <hr>
+
+                    <div class="mb-3">
+                        <p class="mb-2">
+                            <strong>Ruolo:</strong>
+                            <span class="badge bg-secondary">
+                                {{ invitation.get_role_display }}
+                            </span>
+                        </p>
+
+                        {% if invitation.invited_by %}
+                        <p class="mb-2">
+                            <strong>Invitato da:</strong>
+                            {{ invitation.invited_by.get_full_name|default:invitation.invited_by.username }}
+                        </p>
+                        {% endif %}
+
+                        {% if invitation.email %}
+                        <p class="mb-2">
+                            <strong>Email:</strong>
+                            {{ invitation.email }}
+                        </p>
+                        {% endif %}
+
+                        {% if invitation.phone %}
+                        <p class="mb-2">
+                            <strong>Telefono:</strong>
+                            {{ invitation.phone }}
+                        </p>
+                        {% endif %}
+                    </div>
+
+                    <hr>
+
+                    <div class="d-flex justify-content-center gap-2">
+                        <a href="{% url 'families:invite_confirm' invitation.token %}"
+                           class="btn btn-primary btn-lg">
+                            ✅ Conferma invito
+                        </a>
+</div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

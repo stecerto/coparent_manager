@@ -1,0 +1,34 @@
+<{% extends "base.html" %}
+{% block content %}
+
+<h2>Spese famiglia</h2>
+
+<a href="{% url 'create_expense' %}" class="btn btn-success btn-style">Nuova spesa</a>
+
+<hr>
+
+{% for expense in expenses %}
+<div class="card mt-3 p-3">
+
+    <h5>{{ expense.description }}</h5>
+
+    <p>Importo: € {{ expense.amount }}</p>
+    <p>Categoria: {{ expense.category }}</p>
+    <p>Data: {{ expense.date }}</p>
+
+    <p>
+        Parent A: {{ expense.approved_by_parent_a|yesno:"✔️,❌" }} |
+        Parent B: {{ expense.approved_by_parent_b|yesno:"✔️,❌" }}
+    </p>
+
+    {% if expense.documents.all %}
+        <p>Documenti:</p>
+        {% for doc in expense.documents.all %}
+            <a href="{{ doc.file.url }}">Scarica</a><br>
+        {% endfor %}
+    {% endif %}
+
+</div>
+{% endfor %}
+
+{% endblock %}

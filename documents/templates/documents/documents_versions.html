@@ -1,0 +1,18 @@
+
+
+
+
+<h2>Storico versioni - {{ document.title }}</h2>
+
+<ul class="list-group">
+    <li class="list-group-item">
+        Versione attuale: v{{ document.version }}
+    </li>
+
+    {% for version in versions %}
+        <li class="list-group-item">
+            v{{ version.version }}
+            - {{ version.created_at }}
+        </li>
+    {% endfor %}
+</ul>

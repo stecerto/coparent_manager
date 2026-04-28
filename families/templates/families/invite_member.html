@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="card shadow-sm mb-4">
+    <div class="card-header text-center">
+        <h2>Invita alla Gestione Familiare</h2>
+    </div>
+    <div class="card-body">
+        <div class="card p-3 mb-2 shadow custom-card">
+            <div style="max-width:600px; margin:auto; padding:20px;">
+
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div style="margin-bottom:15px;">
+                        <label>Nome destinatario (opzionale)</label>
+                        {{ form.display_name }}
+                        {{ form.display_name.errors }}
+                    </div>
+
+                    <div style="margin-bottom:15px;">
+                        <label>Ruolo</label>
+                        {{ form.role }}
+                        {{ form.role.errors }}
+                    </div>
+
+                    <div style="margin-bottom:15px;">
+                        <label>Canale</label>
+                        {{ form.channel }}
+                        {{ form.channel.errors }}
+                    </div>
+
+                    <div style="margin-bottom:15px;">
+                        <label>Email</label>
+                        {{ form.email }}
+                        {{ form.email.errors }}
+                    </div>
+
+                    <div style="margin-bottom:15px;">
+                        <label>Telefono / WhatsApp</label>
+                        {{ form.phone }}
+                        {{ form.phone.errors }}
+                    </div>
+
+                    <button type="submit"
+                            style="background:#0d6efd; color:white; padding:10px 20px; border:none; border-radius:8px;">
+                        Invia invito
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
