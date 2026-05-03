@@ -17,8 +17,8 @@
     <p>Data: {{ expense.date }}</p>
 
     <p>
-        Parent A: {{ expense.approved_by_parent_a|yesno:"✔️,❌" }} |
-        Parent B: {{ expense.approved_by_parent_b|yesno:"✔️,❌" }}
+        Genitore A: {{ expense.approved_by_parent_a|yesno:"✔️,❌" }} |
+        Genitore B: {{ expense.approved_by_parent_b|yesno:"✔️,❌" }}
     </p>
 
     {% if expense.documents.all %}

@@ -8,8 +8,8 @@ from django.db.models import F
 
 class Family(models.Model):
     CREATOR_ROLE_CHOICES = [
-        ("parent_a", "Parent A"),
-        ("lawyer_a", "Lawyer A"),
+        ("parent_a", "Genitore A"),
+        ("lawyer_a", "Avvocato A"),
     ]
 
     name = models.CharField(max_length=255)
@@ -38,10 +38,10 @@ class Family(models.Model):
 
 class FamilyMember(models.Model):
     ROLE_CHOICES = [
-        ("parent_a", "Parent A"),
-        ("parent_b", "Parent B"),
-        ("lawyer_a", "Lawyer A"),
-        ("lawyer_b", "Lawyer B"),
+        ("parent_a", "Genitore A"),
+        ("parent_b", "Genitore B"),
+        ("lawyer_a", "Avvocato A"),
+        ("lawyer_b", "Avvocato B"),
     ]
 
     family = models.ForeignKey(

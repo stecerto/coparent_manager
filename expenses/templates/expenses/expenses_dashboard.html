@@ -48,10 +48,6 @@
     </div>
 
 
-
-
-
-
     <div class="row justify-content-center">
 
     <!-- CATEGORY -->
@@ -69,7 +65,7 @@
                         <div class="d-flex align-items-center gap-2">
                             <span class="legend-dot"
                                   style="background: {{ c.expense_type__color|default:'#6f42c1' }}"></span>
-                            <small>{{ c.expense_type__name }}</small>
+                            <small>{{ c.expense_type__display_name }}</small>
                         </div>
                     {% endfor %}
                 </div>
@@ -131,7 +127,7 @@
 window.categoryChartData = {
     labels: [
         {% for c in category_summary %}
-            "{{ c.expense_type__name|escapejs }}",
+            "{{ c.expense_type__display_name|escapejs }}",
         {% endfor %}
     ],
     datasets: [{
@@ -151,7 +147,7 @@ window.categoryChartData = {
 
 
     window.parentChartData = {
-        labels: ["Parent A", "Parent B"],
+        labels: ["Genitore A", "Genitore B"],
         datasets: [{
             data: [
                 Number("{{ parent_a_total|default:'0' }}"),

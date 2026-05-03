@@ -1,92 +1,102 @@
+{% extends "base.html" %}
+{% block content %}
 
-
-
-<h2>{{ document.title }}</h2>
-
-<span class="badge bg-info">
-    {{ document.get_status_display }}
-</span>
-
-<hr>
-
-<div class="row">
-
-    <!-- DOCUMENTO -->
-    <div class="col-md-8">
-
-        <iframe src="{{ document.file.url }}"
-                width="100%"
-                height="700px"
-                style="border:1px solid #ddd;">
-        </iframe>
-
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ document.title }}</h2>
+        <span class="badge bg-info fs-6">{{ document.get_status_display }}</span>
     </div>
 
-    <!-- SIDEBAR -->
-    <div class="col-md-4">
+    <div class="row">
 
-        <div class="card mb-3">
-            <div class="card-header">
-                Stato documento
-            </div>
-            <div class="card-body">
-                <h5>{{ document.get_status_display }}</h5>
-
-                {% if document.status != "signed" %}
-                    <a href="{% url 'documents:sign' document.id %}"
-                       class="btn btn-dark w-100">
-                        ✍️ Firma documento
+        <!-- COLONNA SINISTRA: ANTEPRIMA PDF -->
+        <div class="col-md-8">
+            
+            <!-- ✅ INSERISCI QUI IL NUOVO BLOCCO -->
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                    <span>📄 Anteprima Documento</span>
+                    <!-- Link di sicurezza se l'iframe non dovesse caricare -->
+                    <a href="{% url 'documents:document_preview' document.id %}" 
+                       target="_blank" class="btn btn-sm btn-outline-primary">
+                        ↗️ Apri in nuova scheda
                     </a>
-                {% else %}
-                    <div class="alert alert-success">
-                        ✔ Documento firmato
-                    </div>
-                {% endif %}
+                </div>
+                <div class="card-body p-0">
+                    <iframe src="{% url 'documents:document_preview' document.id %}"
+                            width="100%" height="800px"
+                            style="border:none; background:#f8f9fa;"
+                            loading="lazy"
+                            title="Anteprima {{ document.title }}">
+                        <div class="p-5 text-center">
+                            <p>Il tuo browser non supporta l'anteprima.</p>
+                            <a href="{% url 'documents:document_preview' document.id %}" class="btn btn-secondary">
+                                Scarica il file
+                            </a>
+                        </div>
+                    </iframe>
+                </div>
             </div>
+            <!-- FINE BLOCCO ANTEPRIMA -->
+
         </div>
 
-        <div class="card">
-            <div class="card-header">
-                Firme
+        <!-- COLONNA DESTRA: SIDEBAR INFO E FIRME -->
+        <div class="col-md-4">
+
+            <!-- Stato e Azioni -->
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header">⚙️ Stato Documento</div>
+                <div class="card-body">
+                    <h5 class="card-title">{{ document.get_status_display }}</h5>
+                    
+                    {% if document.status != "signed" %}
+                        <a href="{% url 'documents:sign' document.id %}" class="btn btn-dark w-100 mb-2">
+                            ✍️ Firma documento
+                        </a>
+                    {% else %}
+                        <div class="alert alert-success text-center">
+                            ✔ Documento firmato
+                        </div>
+                    {% endif %}
+                </div>
             </div>
 
-            <div class="card-body">
-
-                {% if signatures %}
-                    <ul class="list-group">
-                        {% for sig in signatures %}
-                            <li class="list-group-item">
-                                <strong>{{ sig.user.username }}</strong><br>
-                                <small>{{ sig.role }}</small><br>
-                                <small class="text-muted">
-                                    {{ sig.signed_at|date:"d/m/Y H:i" }}
-                                </small>
-                            </li>
-                        {% endfor %}
-                    </ul>
-                {% else %}
-                    <p>Nessuna firma ancora presente</p>
-                {% endif %}
-
+            <!-- Lista Firme -->
+            <div class="card mb-3 shadow-sm">
+                <div class="card-header">🖊️ Firme Apposte</div>
+                <div class="card-body">
+                    {% if signatures %}
+                        <ul class="list-group list-group-flush">
+                            {% for sig in signatures %}
+                                <li class="list-group-item d-flex justify-content-between align-items-start">
+                                    <div>
+                                        <strong>{{ sig.user.username }}</strong><br>
+                                        <small class="text-muted">{{ sig.get_role_display }}</small>
+                                    </div>
+                                    <small class="text-muted text-end">{{ sig.signed_at|date:"d/m/Y H:i" }}</small>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-muted text-center">Nessuna firma ancora presente</p>
+                    {% endif %}
+                </div>
             </div>
+
         </div>
+    </div>
 
+    <!-- WORKFLOW LEGALE -->
+    <div class="card shadow-sm mt-3">
+        <div class="card-header">⚖️ Workflow Legale</div>
+        <div class="card-body d-flex justify-content-between align-items-center">
+            <p class="mb-0"><strong>Stato attuale:</strong> {{ document.get_status_display }}</p>
+            <a href="{% url 'documents:approve' document.id %}" class="btn btn-primary">
+                Approva documento
+            </a>
+        </div>
     </div>
 </div>
 
-<div class="card mt-3">
-    <div class="card-header">
-        Workflow legale
-    </div>
-
-    <div class="card-body">
-
-        <p><strong>Stato:</strong> {{ document.get_status_display }}</p>
-
-        <a href="{% url 'documents:approve' document.id %}"
-           class="btn btn-primary">
-            Approva documento
-        </a>
-
-    </div>
-</div>
+{% endblock content %}

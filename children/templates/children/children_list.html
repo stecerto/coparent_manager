@@ -54,9 +54,9 @@
                                     ⚖️ Saldo spese:
                                     <strong>
                                         {% if child.maintenance_balance > 0 %}
-                                            Parent B deve {{ child.maintenance_balance }} €
+                                            Genitore B deve {{ child.maintenance_balance }} €
                                         {% elif child.maintenance_balance < 0 %}
-                                            Parent A deve {{ child.maintenance_balance|floatformat:2|cut:"-" }} €
+                                            Genitore A deve {{ child.maintenance_balance|floatformat:2|cut:"-" }} €
                                         {% else %}
                                             Pari
                                         {% endif %}

@@ -48,6 +48,8 @@ class ExpenseForm(forms.ModelForm):
                 # 🔥 UX migliore
         self.fields["child"].empty_label = "Seleziona figlio"
 
+
+
 class ExpenseFilterForm(forms.Form):
 
     child = forms.ModelChoiceField(

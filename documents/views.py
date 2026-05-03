@@ -1,21 +1,21 @@
-from django.shortcuts import render
+import mimetypes
+from pathlib import Path
 
-from chat.models import FamilyMessage
-from calendar_app.models import CalendarEvent
-from .services.documents_checklist_service import get_essential_checklist
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect, get_object_or_404
-from django.http import FileResponse, HttpResponseForbidden
-from .services.documents_signature_service import sign_document
-from .permissions import can_access_document
-from .models import Document, DocumentAuditLog, DocumentVersion,DocumentSignature
-from .forms import DocumentUploadForm
-from .permissions import can_access_document
-from families.utils import get_family_of_user
-from pathlib import Path
-from pathlib import Path
 from django.db import transaction
+from django.http import FileResponse, HttpResponseForbidden
+from django.shortcuts import get_object_or_404
+from django.shortcuts import render, redirect
+
+from calendar_app.models import CalendarEvent
+from chat.models import FamilyMessage
 from families.models import FamilyMember
+from families.utils import get_family_of_user
+from .forms import DocumentUploadForm
+from .models import Document, DocumentAuditLog, DocumentVersion, DocumentSignature
+from .permissions import can_access_document
+from .services.documents_checklist_service import get_essential_checklist
+from .services.documents_signature_service import sign_document
 from .services.workflow_service import approve_document
 
 
@@ -69,7 +69,7 @@ def document_list_view(request):
 
     checklist = get_essential_checklist(request.user, family)
 
-    # 🔥 PRELOAD FIRME UTENTE (IMPORTANTISSIMO)
+    # 🔥 PRELOAD FIRME UTENTE
     signed_docs = set(
         DocumentSignature.objects.filter(
             user=request.user,
@@ -77,7 +77,6 @@ def document_list_view(request):
         ).values_list("document_id", flat=True)
     )
 
-    # annotiamo i documenti
     for doc in private_docs:
         doc.is_signed_by_user = doc.id in signed_docs
 
@@ -90,6 +89,27 @@ def document_list_view(request):
         "checklist": checklist,
         "role": role,
     })
+
+
+@login_required
+def document_preview_view(request, doc_id):
+    doc = get_object_or_404(Document, id=doc_id)
+
+    if not can_access_document(request.user, doc):
+        return HttpResponseForbidden("Permessi insufficienti.")
+
+    mime_type, _ = mimetypes.guess_type(doc.file.name)
+    content_type = mime_type or 'application/octet-stream'
+
+    response = FileResponse(doc.file.open('rb'), content_type=content_type, as_attachment=False)
+    response['Content-Disposition'] = f'inline; filename="{doc.file.name}"'
+
+    # ✅ Permetti esplicitamente il framing stessa origine
+    response['X-Frame-Options'] = 'SAMEORIGIN'
+    response['Access-Control-Allow-Origin'] = request.build_absolute_uri('/').rstrip('/')
+
+    return response
+
 
 @login_required
 def upload_document_view(request):
@@ -128,17 +148,18 @@ def upload_document_view(request):
                     ).first()
 
                     if existing_doc:
-                        # salva vecchia versione
+                        # 💡 doc.version qui è un INTERO (es. 1)
+                        # Salviamo lo STATO ATTUALE come versione archiviata
                         DocumentVersion.objects.create(
                             document=existing_doc,
                             file=existing_doc.file,
-                            version=existing_doc.version,
+                            version=existing_doc.version,  # ✅ Passa l'intero corrente
                             uploaded_by=request.user
                         )
 
-                        # aggiorna documento principale
+                        # Aggiorna documento principale
                         existing_doc.file = uploaded_file
-                        existing_doc.version += 1
+                        existing_doc.version += 1  # ✅ Incrementa l'intero
                         existing_doc.category = category
                         existing_doc.scope = scope
                         existing_doc.reference_year = reference_year
@@ -177,6 +198,7 @@ def upload_document_view(request):
         "form": form
     })
 
+
 @login_required
 def upload_shared_document_view(request):
     family = get_family_of_user(request.user)
@@ -187,8 +209,6 @@ def upload_shared_document_view(request):
         title_prefix = request.POST.get("title", "").strip()
 
         for index, uploaded_file in enumerate(files, start=1):
-            from pathlib import Path
-
             original_name = Path(uploaded_file.name).stem
 
             if title_prefix:
@@ -224,6 +244,7 @@ def upload_shared_document_view(request):
         "documents/documents_upload_shared.html"
     )
 
+
 @login_required
 def download_document_view(request, doc_id):
     doc = get_object_or_404(Document, id=doc_id)
@@ -239,6 +260,7 @@ def download_document_view(request, doc_id):
 
     return FileResponse(doc.file.open("rb"), as_attachment=True)
 
+
 @login_required
 def document_versions_view(request, doc_id):
     doc = get_object_or_404(Document, id=doc_id)
@@ -246,12 +268,15 @@ def document_versions_view(request, doc_id):
     if not can_access_document(request.user, doc):
         return HttpResponseForbidden()
 
-    versions = doc.version.all().order_by("-version")
+    # 🔍 CORRETTO: doc.versions è il RelatedManager (QuerySet) delle versioni storiche
+    # doc.version sarebbe stato l'INTEGER della versione corrente (causava l'errore)
+    versions = doc.version_history.all().order_by("-version")
 
     return render(request, "documents/documents_versions.html", {
         "document": doc,
         "versions": versions
     })
+
 
 @login_required
 def sign_document_view(request, doc_id):
@@ -270,17 +295,16 @@ def sign_document_view(request, doc_id):
 
     role = membership.role
 
-    # firma
     sign_document(document, request.user, role)
 
     return redirect("documents:documents_list")
+
 
 @login_required
 def document_detail_view(request, doc_id):
     document = get_object_or_404(Document, id=doc_id)
     family = get_family_of_user(request.user)
 
-    # sicurezza base
     if document.family != family:
         return HttpResponseForbidden()
 
@@ -294,6 +318,7 @@ def document_detail_view(request, doc_id):
             "signatures": signatures
         }
     )
+
 
 @login_required
 def approve_document_view(request, doc_id):
@@ -314,6 +339,7 @@ def approve_document_view(request, doc_id):
     approve_document(document, request.user, membership.role)
 
     return redirect("documents:documents_detail", doc_id=doc_id)
+
 
 @login_required
 def family_dossier_view(request):

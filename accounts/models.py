@@ -24,6 +24,11 @@ class User(AbstractUser):
     def __str__(self):
         return self.email
 
+    @property
+    def display_name(self):
+        """Restituisce il primo nome disponibile tra first_name, username ed email"""
+        return self.first_name or self.username or self.email
+
 # =========================
 # 🔹 USER PROFILE
 # =========================

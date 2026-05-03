@@ -18,32 +18,33 @@
 <div class="card p-3 mb-2 shadow custom-card">
     <h4 class="mt-4">👶 Figli</h4>
 
+    <!-- 🟢 Contenitore GRID: 1 colonna su mobile, 2 su tablet, 3 su desktop -->
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+        {% for child in children %}
+        <div class="col">
+            <!-- h-100 garantisce altezza uniforme nella stessa riga -->
+            <div class="card p-3 shadow-sm h-100 custom-card">
+                <h5>{{ child.name }} {{ child.surname }}</h5>
+                <p>
+                    <strong>Data di nascita:</strong> {{ child.birth_date|date:"d/m/Y" }}<br>
+                    <strong>Età:</strong> {{ child.age }} anni
+                </p>
+                <!-- mt-auto spinge i pulsanti in fondo alla card -->
+                <div class="d-flex gap-2 mt-auto">
+                    <a href="{% url 'children:child_edit' child.id %}" class="btn btn-sm btn-warning">✏️ Modifica</a>
+                    <a href="{% url 'children:child_confirm_delete' child.id %}" class="btn btn-sm btn-danger">🗑️ Elimina</a>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <p class="text-muted">Nessun figlio inserito</p>
+        </div>
+        {% endfor %}
+    </div>
 
-                {% for child in children %}
-                    <div class="card p-3 mb-2 shadow custom-card">
-                        <h5>{{ child.name }} {{ child.surname }}</h5>
-                        <p>
-                            <strong>Data di nascita:</strong> {{ child.birth_date|date:"d/m/Y" }}<br>
-                            <strong>Età:</strong> {{ child.age }} anni
-                        </p>
-                        <div class="d-flex gap-2">
-                            <a href="{% url 'children:child_edit' child.id %}" class="btn btn-sm btn-warning">✏️ Modifica</a>
-                            <a href="{% url 'children:child_confirm_delete' child.id %}" class="btn btn-sm btn-danger">🗑️ Elimina</a>
-                        </div>
-                    </div>
-
-
-                {% empty %}
-                <p class="text-muted">Nessun figlio inserito</p>
-                <hr>
-                {% endfor %}
-
-
-
-         <br>
-        <a href="{% url 'children:child_form' %}" class="btn btn-success btn-style">➕ Aggiungi Figlio</a>
-
-
+    <br>
+    <a href="{% url 'children:child_form' %}" class="btn btn-success btn-style">➕ Aggiungi Figlio</a>
 </div>
 
 
@@ -63,7 +64,7 @@
                     </option>
                 {% endfor %}
             </select>
-
+            <br>
             <!-- Grafico -->
             <div class="chart-box">
                 <canvas id="categoryChart"></canvas>
@@ -75,6 +76,22 @@
             </button>
         </div>
         <div class="child-form">
+            <!-- ✅ LEGENDA STATO SPESE -->
+            <div class="d-flex flex-wrap justify-content-center gap-3 mb-3 p-2 bg-light border rounded shadow-sm">
+                <span class="fw-bold text-secondary small me-2">Legenda Stato:</span>
+                <span class="d-flex align-items-center gap-1" title="In attesa di approvazione">
+                    <span style="font-size: 1.3rem;">🟡</span> <small class="text-dark">In Sospeso</small>
+                </span>
+                <span class="d-flex align-items-center gap-1" title="Confermata dai genitori">
+                    <span style="font-size: 1.3rem;">🔵</span> <small class="text-dark">Accettata</small>
+                </span>
+                <span class="d-flex align-items-center gap-1" title="Pagamento effettuato">
+                    <span style="font-size: 1.3rem;">🟢</span> <small class="text-dark">Pagata</small>
+                </span>
+                <span class="d-flex align-items-center gap-1" title="Respinta o da rivedere">
+                    <span style="font-size: 1.3rem;">🔴</span> <small class="text-dark">Rifiutata</small>
+                </span>
+            </div>
             <!-- Tabella -->
             <table class="table table-striped mt-3">
                 <thead>
@@ -83,34 +100,18 @@
                         <th>Categoria</th>
                         <th>Importo (€)</th>
                         <th>Creato da</th>
-                        <th>Azioni</th>
+                        <th>Stato</th>
                     </tr>
                 </thead>
                 <tbody id="expensesTableBody">
-                    {% for expense in expenses %}
+                    <!-- ✅ JS popolerà qui all'avvio. Nessun ciclo Django qui. -->
                     <tr>
-                        <td>{{ expense.expense_date|date:"d/m/Y" }}</td>
-                        <td>
-                            <span class="badge" style="background-color:{{ expense.expense_type__color }}">
-                                {{ expense.expense_type__name }}
-                            </span>
-                        </td>
-                        <td>{{ expense.amount }}</td>
-                        <td>{{ expense.created_by }}</td>
-                        <td>
-                            <a href="{% url 'expenses:edit_expense' expense.id %}">✏️</a>
-                            <a href="{% url 'expenses:delete_expense' expense.id %}">🗑️</a>
-                        </td>
+                        <td colspan="5" class="text-center text-muted py-4">Caricamento spese...</td>
                     </tr>
-                    {% empty %}
-                    <tr>
-                        <td colspan="5">Nessuna spesa trovata</td>
-                    </tr>
-                    {% endfor %}
                 </tbody>
             </table>
 
-            <p><strong>Totale spese:</strong> {{ total_expenses }} €</p>
+            <p><strong>Totale spese:</strong> <span id="totalExpensesDisplay">0.00</span> €</p>
 
             <div class="d-flex gap-2">
                 <a href="{% url 'expenses:add_expense' %}" class="btn btn-success btn-style">➕ Aggiungi Spesa</a>
@@ -172,18 +173,69 @@
 
 
 {% block extra_js %}
-<!-- 👇 JS ESTERNO -->
-<script src="{% static 'js/pages/families.js' %}"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-
-
-<!-- 👇 DATI DAL BACKEND -->
-
+<!-- ✅ PASSA I PERCORSI BASE (non URL completi con placeholder) -->
 <script>
-    window.expensesByChildUrl = "{% url 'families:expenses_by_child' %}";
+    window.DJANGO_URLS = {
+        expensesByChild: "{% url 'families:expenses_by_child' %}",
+        // ✅ Solo il percorso base, l'ID lo aggiungiamo in JS
+        expenseEditBase: "/expenses/edit/",
+        expenseDeleteBase: "/expenses/delete/",
+        expenseUpdateStatusBase: "/expenses/update-status/"
+    };
 </script>
 
+<!-- 👇 JS esterno DOPO aver definito le variabili -->
+<script src="{% static 'js/pages/families.js' %}"></script>
 
+<!-- Script per i pulsanti stato -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.status-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const expenseId = this.dataset.id;
+            const newStatus = this.dataset.status;
 
+            // ✅ Costruisci URL con percorso base + ID + slash finale
+            const url = `${window.DJANGO_URLS.expenseUpdateStatusBase}${expenseId}/`;
 
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ status: newStatus })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    location.reload();
+                } else {
+                    alert('Errore: ' + data.error);
+                }
+            })
+            .catch(err => console.error('Errore update status:', err));
+        });
+    });
+
+    // Helper CSRF per Django
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie) {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                cookie = cookie.trim();
+                if (cookie.startsWith(name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.slice(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
+</script>
 {% endblock %}

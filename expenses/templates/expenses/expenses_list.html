@@ -4,7 +4,7 @@
 {% block content %}
 {% csrf_token %}
 <input type="hidden" id="csrfToken" value="{{ csrf_token }}">
- <!-- Grafico -->
+ <!-- tabella ricerca spesa -->
     <div class="card p-3 mb-2 shadow custom-card">
         <form method="get" class="card p-3 mb-4 shadow-sm">
 
@@ -64,6 +64,15 @@
 <div class="card p-3 mb-2 shadow custom-card">
         <!-- Tabella -->
         <h3>📄 {{ page_title }}</h3>
+    <!-- ✅ LEGENDA STATO SPESE -->
+            <!-- ✅ LEGENDA STATO -->
+        <div class="d-flex flex-wrap justify-content-center gap-3 mb-3 p-2 bg-light border rounded shadow-sm">
+            <span class="fw-bold text-secondary small me-2">Legenda Stato:</span>
+            <span class="d-flex align-items-center gap-1"><span style="font-size:1.3rem">🟡</span> <small>In Sospeso</small></span>
+            <span class="d-flex align-items-center gap-1"><span style="font-size:1.3rem">🔵</span> <small>Accettata</small></span>
+            <span class="d-flex align-items-center gap-1"><span style="font-size:1.3rem">🟢</span> <small>Pagata</small></span>
+            <span class="d-flex align-items-center gap-1"><span style="font-size:1.3rem">🔴</span> <small>Rifiutata</small></span>
+        </div>
             <table class="table table-striped mt-4 ">
                 <thead>
                 <tr>
@@ -78,119 +87,207 @@
                 </thead>
                 <tbody>
                 {% for expense in expenses %}
-                <tr>
-                    <td>{{ expense.child }}</td>
-                    <td>{{ expense.expense_date }}</td>
-                    <td>{{ expense.expense_type.name }}</td>
-                    <td>{{ expense.amount }}€</td>
-                    <td>{{ expense.created_by }}</td>
+                    <!-- ✅ AGGIUNGI data-attributes per esporre lo stato al JS -->
+                    <tr data-expense-id="{{ expense.id }}"
+                        data-is-creator="{% if expense.created_by == request.user %}true{% else %}false{% endif %}"
+                        data-status="{{ expense.status }}"
+                        data-payment-state="{{ expense.payment_status|default:'unpaid' }}"
+                        data-amount="{{ expense.amount }}">
 
-                    <td class="align-middle">
-                        <div class="d-flex flex-column w-100">
-                            <div class="d-flex gap-1 justify-content-start">
+                        <td>{{ expense.child }}</td>
+                        <td>{{ expense.expense_date|date:"d/m/Y" }}</td>
+                        <td>{{ expense.expense_type }}</td>
+                        <td>{{ expense.amount }} €</td>
+                        <td>{{ expense.created_by }}</td>
 
-                                <button class="btn btn-sm status-btn {% if expense.status == 'pending' %}active{% endif %}"
-                                        data-id="{{ expense.id }}" data-status="pending">🟡</button>
-
-                                <button class="btn btn-sm status-btn {% if expense.status == 'accepted' %}active{% endif %}"
-                                        data-id="{{ expense.id }}" data-status="accepted">🔵</button>
-
-                                <button class="btn btn-sm status-btn {% if expense.status == 'paid' %}active{% endif %}"
-                                        data-id="{{ expense.id }}" data-status="paid">🟢</button>
-
-                                <button class="btn btn-sm status-btn {% if expense.status == 'rejected' %}active{% endif %}"
-                                        data-id="{{ expense.id }}" data-status="rejected">🔴</button>
-
+                        <td class="status-col text-center">
+                            <div class="d-flex flex-column align-items-center">
+                                <div class="d-flex gap-1 mb-1">
+                                    <button class="btn btn-sm status-btn btn-pending" data-status="pending" disabled>🟡</button>
+                                    <button class="btn btn-sm status-btn btn-accepted" data-status="accepted">🔵</button>
+                                    <button class="btn btn-sm status-btn btn-rejected" data-status="rejected">🔴</button>
+                                    <button class="btn btn-sm status-btn btn-paid-trigger" data-status="paid">🟢</button>
+                                </div>
+                                <span class="badge status-text-badge bg-secondary">-</span>
                             </div>
-                            <div class="w-100 d-flex justify-content-center mt-1">
-                                <span class="badge
-                                    {% if expense.status == 'pending' %}bg-warning
-                                    {% elif expense.status == 'accepted' %}bg-primary
-                                    {% elif expense.status == 'paid' %}bg-success
-                                    {% elif expense.status == 'rejected' %}bg-danger
-                                    {% endif %}">
-                                    {{ expense.get_status_display }}
-                                </span>
-                            </div>
-                        </div>
+                        </td>
 
-                    </td>
-
-                    <td>
-                        {% if expense.created_by == request.user %}
-                            <a href="{% url 'expenses:edit_expense' expense.id %}">✏️</a>
-                            <a href="{% url 'expenses:delete_expense' expense.id %}">🗑️</a>
-                        {% endif %}
-                    </td>
-
-                </tr>
+                        <td class="actions-col">
+                            {% if expense.created_by == request.user %}
+                                <a href="{% url 'expenses:edit_expense' expense.id %}" class="btn btn-sm btn-outline-primary btn-edit-action" title="Modifica">✏️</a>
+                                <a href="{% url 'expenses:delete_expense' expense.id %}" class="btn btn-sm btn-outline-primary btn-delete-action" title="Elimina">🗑️</a>
+                            {% else %}
+                                <button class="btn btn-sm btn-outline-secondary disabled" disabled title="Solo il creatore può modificare/eliminare">✏️</button>
+                                <button class="btn btn-sm btn-outline-secondary disabled" disabled title="Solo il creatore può modificare/eliminare">🗑️</button>
+                            {% endif %}
+                        </td>
+                    </tr>
                 {% empty %}
                 <tr>
                     <td colspan="5">Nessuna spesa trovata</td>
                 </tr>
                 {% endfor %}
                 </tbody>
-            </table>
-
-
+    </table>
+</div>
+                <!-- 🟢 MODALE PAGAMENTO (UNA SOLA VOLTA) -->
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header bg-light">
+        <h5 class="modal-title">💸 Completa Pagamento</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3">Importo da corrispondere: <strong id="modalAmount" class="fs-5 text-primary"></strong></p>
+        <form id="paymentForm" enctype="multipart/form-data">
+          <input type="hidden" id="modalExpenseId">
+          <div class="mb-3">
+            <label class="form-label">Carica ricevuta / bonifico</label>
+            <input type="file" class="form-control" name="proof_file" accept="image/*,.pdf" required>
+            <div class="form-text">JPG, PNG, PDF (max 5MB)</div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+        <button type="button" id="confirmPaymentBtn" class="btn btn-success">📤 Conferma e Salva</button>
+      </div>
     </div>
+  </div>
+</div>
+{% endblock %}
 
-
-{% endblock content%}
 
 {% block extra_js %}
-
-
-
 <script src="{% static 'js/pages/expenses_dashboard.js' %}"></script>
+
+
 <script>
-    document.querySelectorAll(".status-btn").forEach(btn => {
-    btn.addEventListener("click", function () {
+document.addEventListener("DOMContentLoaded", function() {
+    const modalEl = document.getElementById("paymentModal");
+    const modal = new bootstrap.Modal(modalEl);
+    const confirmBtn = document.getElementById("confirmPaymentBtn");
+    const csrfToken = document.querySelector("[name=csrfmiddlewaretoken]")?.value;
+    let currentRow = null;
 
-        const expenseId = this.dataset.id;
-        const status = this.dataset.status;
-        const csrfToken = document.getElementById("csrfToken").value;
-        const statusMap = {
-            pending: "In sospeso",
-            accepted: "Accettata",
-            paid: "Pagata",
-            rejected: "Rifiutata"
-        };
+    // 🔹 RENDER UI in base agli attributi data-*
+    function renderRow(row) {
+        const isCreator = row.dataset.isCreator === 'true';
+        const status = row.dataset.status;
+        const payState = row.dataset.paymentState;
+        const badge = row.querySelector(".status-text-badge");
+        const btns = row.querySelectorAll(".status-btn");
+        const editBtn = row.querySelector(".btn-edit-action");
+        const deleteBtn = row.querySelector(".btn-delete-action");
 
-        fetch(`/expenses/update-status/${expenseId}/`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                "X-CSRFToken": csrfToken
-            },
-            body: JSON.stringify({ status: status })
-        })
-        .then(response => response.json())
-        .then(data => {
-            // aggiorna badge senza reload
-            const row = btn.closest("tr");
+        // Reset
+        btns.forEach(b => { b.classList.remove("active", "half-blue", "half-green"); b.disabled = true; });
+        badge.className = "badge status-text-badge";
+        if(editBtn) editBtn.innerHTML = "✏️";
+        if(deleteBtn) deleteBtn.disabled = true;
 
-            const badge = row.querySelector(".badge");
+        // 🎨 STATO INIZIALE CREATORE: metà blu + metà verde, non cliccabili
+        if (isCreator && status === "pending") {
+            badge.classList.add("badge-pending"); badge.textContent = "In Sospeso";
+            row.querySelector(".btn-accepted").classList.add("half-blue");
+            row.querySelector(".btn-paid-trigger").classList.add("half-green");
+            // 🟢 e 🔵 restano disabilitati finché l'altro genitore non interagisce
+            return; // Esce, stato gestito
+        }
 
-            badge.className = "badge";
+        // 🔄 STATI SUCCESSIVI (Accepted, Rejected, Paid)
+        if (status === "accepted") {
+            badge.classList.add("badge-accepted"); badge.textContent = "Accettata";
+            row.querySelector(".btn-accepted").classList.add(payState === "partial" ? "half-blue" : "active");
+        } else if (status === "rejected") {
+            badge.classList.add("badge-rejected"); badge.textContent = "Rifiutata";
+            row.querySelector(".btn-rejected").classList.add("active");
+            if(isCreator && editBtn) editBtn.innerHTML = `✏️ <small class="text-muted">(Rifiutata)</small>`;
+        } else if (status === "paid") {
+            badge.classList.add("badge-paid"); badge.textContent = "Pagata";
+            btns.forEach(b => b.disabled = true);
+            if(editBtn) editBtn.outerHTML = `<button class="btn btn-sm btn-outline-secondary disabled" disabled>✏️ <small>(Pagata)</small></button>`;
+            return;
+        }
 
-            if (status === "pending") badge.classList.add("bg-warning");
-            if (status === "accepted") badge.classList.add("bg-primary");
-            if (status === "paid") badge.classList.add("bg-success");
-            if (status === "rejected") badge.classList.add("bg-danger");
+        // 🔓 ABILITAZIONI PER L'ALTRO GENITORE
+        if (!isCreator) {
+            if (status === "pending") {
+                row.querySelector(".btn-accepted").disabled = false;
+                row.querySelector(".btn-rejected").disabled = false;
+            } else if (status === "accepted") {
+                // Se il creatore ha già caricato la prova, 🟢 è a metà verde e cliccabile
+                if (payState === "partial") {
+                    row.querySelector(".btn-paid-trigger").classList.add("half-green");
+                    row.querySelector(".btn-paid-trigger").disabled = false;
+                }
+            }
+        }
+    }
 
-            badge.innerText = statusMap[status];
+    // 🚀 Init righe
+    document.querySelectorAll("tr[data-expense-id]").forEach(renderRow);
 
-            // evidenzia bottone attivo
-            row.querySelectorAll(".status-btn").forEach(b => b.classList.remove("active"));
-            btn.classList.add("active");
+    // 🔵🔴 AJAX Cambio Stato
+    document.querySelectorAll(".btn-accepted, .btn-rejected").forEach(btn => {
+        btn.addEventListener("click", async function() {
+            if(this.disabled) return;
+            const row = this.closest("tr");
+            try {
+                const res = await fetch("{% url 'expenses:update_status' %}", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "X-CSRFToken": csrfToken },
+                    body: JSON.stringify({ expense_id: row.dataset.expenseId, status: this.dataset.status })
+                });
+                const data = await res.json();
+                if(data.success) {
+                    row.dataset.status = data.new_status;
+                    renderRow(row);
+                } else alert(data.error);
+            } catch(e) { alert("Errore di rete"); }
         });
     });
 
+    // 🟢 Click → Modal
+    document.querySelectorAll(".btn-paid-trigger").forEach(btn => {
+        btn.addEventListener("click", function() {
+            if(this.disabled) return;
+            currentRow = this.closest("tr");
+            const amount = parseFloat(currentRow.dataset.amount) / 2;
+            document.getElementById("modalAmount").textContent = `€ ${amount.toFixed(2)}`;
+            document.getElementById("modalExpenseId").value = currentRow.dataset.expenseId;
+            modal.show();
+        });
+    });
+
+    // ❌ Annulla Modal
+    modalEl.addEventListener("hidden.bs.modal", () => document.getElementById("paymentForm").reset());
+
+    // ✅ Conferma Pagamento (AJAX)
+    confirmBtn.addEventListener("click", async function() {
+        if(!currentRow) return;
+        const fileInput = document.querySelector("#paymentForm input[name='proof_file']");
+        if(!fileInput?.files.length) return alert("Carica un documento!");
+
+        const formData = new FormData(document.getElementById("paymentForm"));
+        formData.append("expense_id", currentRow.dataset.expenseId);
+
+        confirmBtn.disabled = true; confirmBtn.textContent = "⏳ Salvataggio...";
+        try {
+            const res = await fetch("{% url 'expenses:upload_payment_proof' %}", {
+                method: "POST", headers: { "X-CSRFToken": csrfToken }, body: formData
+            });
+            const data = await res.json();
+            if(data.success) {
+                currentRow.dataset.status = data.new_status;
+                currentRow.dataset.paymentState = data.payment_state;
+                modal.hide();
+                renderRow(currentRow);
+            } else alert(data.error);
+        } catch(e) { alert("Errore di rete"); }
+        finally { confirmBtn.disabled = false; confirmBtn.textContent = "📤 Conferma e Salva"; }
+    });
 });
 </script>
-
-
-{% endblock  %}
-
-
+{% endblock %}

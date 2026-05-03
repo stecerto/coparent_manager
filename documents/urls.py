@@ -10,7 +10,8 @@ urlpatterns = [
     path("versions/<int:doc_id>/", views.document_versions_view, name="documents_versions"),
     path("upload-shared/",views.upload_shared_document_view,name="documents_upload_shared"),
     path("sign/<int:doc_id>/", views.sign_document_view, name="sign"),
-    path("<int:doc_id>/", views.document_detail_view, name="documents_detail"),
+    path("<int:doc_id>/detail/", views.document_detail_view, name="documents_detail"),
+    path('<int:doc_id>/preview/', views.document_preview_view, name='document_preview'),
     path("<int:doc_id>/approve/", views.approve_document_view, name="approve"),
     path("dossier/", views.family_dossier_view, name="dossier"),
 ]

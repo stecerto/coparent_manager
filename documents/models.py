@@ -22,6 +22,7 @@ class Document(models.Model):
         ("chat", "Documento chat"),
         ("agreement", "Accordo"),
         ("minutes", "Verbale"),
+        ("payment_proof", "Prova di pagamento"),
         ("generic", "Documento generico"),
     ]
     STATUS_CHOICES = [
@@ -82,7 +83,8 @@ class Document(models.Model):
         blank=True
     )
 
-    version = models.IntegerField(default=1)
+    versions = models.IntegerField(default=1)
+    #current_version = models.IntegerField(default=1, db_column='version')  # mantiene il nome DB
 
     is_active = models.BooleanField(default=True)
 
@@ -106,14 +108,14 @@ class Document(models.Model):
     )
 
     def __str__(self):
-        return f"{self.title} - v{self.version}"
+        return f"{self.title} - v{self.versions}"
 
 
 class DocumentVersion(models.Model):
     document = models.ForeignKey(
         Document,
         on_delete=models.CASCADE,
-        related_name="versions"
+        related_name="version_history"
     )
 
     file = models.FileField(upload_to=family_document_path)

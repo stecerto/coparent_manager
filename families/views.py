@@ -14,7 +14,7 @@ from families.services.balance_service import calculate_family_balance
 
 from django.db.models import Sum
 from documents.models import AuditLog, Document
-from expenses.models import Expense, ExpenseDocument
+from expenses.models import Expense
 from families.forms import InvitationForm
 from families.models import FamilyMember, Invitation
 from families.services.expense_service import create_expense
@@ -133,12 +133,17 @@ def create_expense_view(request):
         files = request.FILES.getlist("documents")
 
         for f in files:
-            ExpenseDocument.objects.create(
+            Document.objects.create(
                 family=family,
+                owner=request.user,
+                uploaded_by=request.user,
                 expense=expense,
                 file=f,
-                uploaded_by=request.user,
-                title=f.name
+                title=f.name,
+                category="payment_proof",  # o "generic" se non hai aggiunto la choice
+                scope="shared",
+                status="approved",
+                is_active=True
             )
 
         return redirect("families:expenses")
@@ -326,7 +331,7 @@ def cancel_invitation_view(request, invitation_id):
 def dashboard_view(request):
 
     family = get_family_of_user(request.user)
-    expenses = family.expenses.all().order_by("-expense_date")
+    expenses = family.expenses.all().order_by("-expense_date")[:5]
     events = get_family_events(family)[:5]
     balance = calculate_family_balance(family)
     children = family.children.filter(is_active=True)
@@ -375,42 +380,70 @@ def dashboard_view(request):
 
 @login_required
 def expenses_by_child(request):
-    child_id = request.GET.get("child_id")
-    category_id = request.GET.get("category")
+    family = get_family_of_user(request.user)
+    if not family:
+        return JsonResponse({"error": "Nessuna famiglia"}, status=400)
 
+    expenses = Expense.objects.filter(family=family, is_active=True)
 
-    expenses = Expense.objects.all()
+    # Filtri opzionali
+    if request.GET.get("child_id"):
+        expenses = expenses.filter(child_id=request.GET["child_id"])
+    if request.GET.get("category"):
+        # ✅ Ora filtriamo per il nome visibile (quello che arriva dal grafico)
+        expenses = expenses.filter(expense_type__display_name=request.GET["category"])
 
-
-    if child_id:
-        expenses = expenses.filter(child_id=child_id)
-
-    if category_id:
-        expenses = expenses.filter(expense_type__name=category_id)
-
+    # 📊 Dati per il grafico
     summary = (
         expenses
-        .values("expense_type_id","expense_type__name", "expense_type__color")
+        .values("expense_type_id", "expense_type__display_name", "expense_type__color")  # ✅ MODIFICATO
         .annotate(total=Sum("amount"))
-        .order_by("expense_type__name")
+        .order_by("expense_type__display_name")
     )
 
+    # 📋 Dati per la tabella
+    expenses_list = list(expenses.values(
+        "id",
+        "expense_date",
+        "amount",
+        "expense_type__display_name",
+        "expense_type__color",
+        #"created_by__first_name",
+        "created_by__email",
+        "created_by__username",
+        "status",
+        "approved_by_parent_a",
+        "approved_by_parent_b"
+    ))
+
+    # Formattazione sicura
+    for exp in expenses_list:
+        exp["expense_date"] = exp["expense_date"].strftime("%d/%m/%Y") if exp["expense_date"] else "-"
+        if not exp.get("expense_type__display_name"):
+            exp["expense_type__display_name"] = "N/D"
+        status_labels = {
+            "pending": "In Sospeso",
+            "accepted": "Accettata",
+            "paid": "Pagata",
+            "rejected": "Rifiutata"
+        }
+        exp["status_display"] = status_labels.get(exp["status"], exp["status"])
+
+        exp["created_by_display"] = (
+                #exp.get("created_by__first_name") or
+                exp.get("created_by__email") or
+                exp.get("created_by__username") or
+                "Utente"
+        )
+
     data = {
-        "labels": [s["expense_type__name"] for s in summary],
-        "colors": [s["expense_type__color"] for s in summary],
-        "ids": [s["expense_type_id"] for s in summary],
-        "data": [float(s["total"]) for s in summary],
-        "expenses": list(expenses.values(
-            "id",
-            "expense_date",
-            "amount",
-            "expense_type__name",
-            "created_by__username"
-        ))
+        "labels": [s["expense_type__display_name"] or "N/D" for s in summary],
+        "colors": [s["expense_type__color"] or "#6f42c1" for s in summary],
+        "data": [float(s["total"] or 0) for s in summary],
+        "expenses": expenses_list
     }
 
     return JsonResponse(data)
-
 
 # =========================
 # SUMMARY VIEW
