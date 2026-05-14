@@ -1,0 +1,247 @@
+
+/* 💬 CHAT WHATSAPP-STYLE */
+.chat-container {
+    max-height: 60vh;
+    overflow-y: auto;
+    scroll-behavior: smooth;
+}
+
+/* 📦 MESSAGGIO BASE */
+.chat-message {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    margin-bottom: 16px;
+    max-width: 85%;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 👤 MESSAGGI ALTRI (sinistra) */
+.chat-message.other {
+    margin-right: auto;
+    flex-direction: row;
+}
+.chat-message.other .message-bubble {
+    background: #ffffff;
+    border: 1px solid #e9ecef;
+    border-radius: 18px 18px 18px 4px;
+    box-shadow: 0 6px 18px rgba(139,0,139,0.25) !important;
+}
+.chat-message.other .sender-avatar {
+    background: #0d6efd;
+    color: white;
+    order: 1;
+}
+
+/* 👤 MIEI MESSAGGI (destra) */
+.chat-message.mine {
+    margin-left: auto;
+    flex-direction: row-reverse;
+}
+.chat-message.mine .message-bubble {
+    background: #dcf8c6;  /* Verde WhatsApp */
+    border: 1px solid #b8e6a4;
+    border-radius: 18px 18px 4px 18px;
+    box-shadow: 0 6px 18px rgba(139,0,139,0.25) !important;
+}
+.chat-message.mine .sender-avatar {
+    background: #198754;
+    color: white;
+    order: 1;
+}
+.chat-message.mine .message-meta {
+    text-align: right;
+}
+
+/* 🎈 BUBBLE MESSAGGIO */
+.message-bubble {
+    padding: 10px 14px;
+    border-radius: 12px;
+    box-shadow: 0 6px 18px rgba(139,0,139,0.25) !important;
+    word-wrap: break-word;
+}
+.message-bubble p {
+    margin: 0 0 4px 0;
+    white-space: pre-wrap;
+    line-height: 1.4;
+}
+
+/* 🕐 METADATI */
+.message-meta {
+    font-size: 0.7rem;
+    color: #6c757d;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* 👤 AVATAR */
+.sender-avatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+    box-shadow: 0 6px 18px rgba(139,0,139,0.25) !important;
+}
+
+/* ↩️ RISPOSTA */
+.message-reply {
+    background: rgba(0,0,0,0.05);
+    border-left: 3px solid #0d6efd;
+    padding: 6px 10px;
+    margin: 4px 0 8px;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+.chat-message.mine .message-reply {
+    border-left-color: #198754;
+    background: rgba(25,135,84,0.1);
+}
+
+/* 📎 ALLEGATI */
+.message-attachments {
+    margin-top: 8px;
+}
+.message-attachments a {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.85rem;
+    color: #0d6efd;
+    text-decoration: none;
+}
+.message-attachments a:hover {
+    text-decoration: underline;
+}
+
+/* 🚫 RIFIUTO SPESA */
+.message-reject-justification {
+    border-left: 4px solid #dc3545;
+    background: #fff5f5;
+    padding: 8px 12px;
+    margin: 0 0 8px 0;
+    border-radius: 4px;
+    font-size: 0.85rem;
+}
+.message-reject-justification::before {
+    content: "🔴 Rifiuto spesa";
+    display: block;
+    font-weight: 600;
+    color: #dc3545;
+    margin-bottom: 4px;
+}
+
+/* 🔘 PULSANTI AZIONE */
+.message-actions {
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+.chat-message:hover .message-actions {
+    opacity: 1;
+}
+.message-actions .btn-link {
+    font-size: 0.85rem;
+    padding: 0 4px;
+}
+
+/* 🎨 PREVIEW RISPOSTA */
+#replyPreview {
+    animation: slideDown 0.2s ease;
+}
+@keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* 🖱️ HOVER EFFECTS */
+.chat-message:hover .message-bubble {
+    box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+}
+
+/* 🔄 Evidenzia spese con versione > 1 */
+tr[data-version]:not([data-version="1"]) {
+    border-left: 3px solid #ffc107;
+    background: rgba(255, 193, 7, 0.05);
+}
+
+/* 🕘 Badge versione */
+.badge-version {
+    font-size: 0.7rem;
+    background: #6c757d;
+    padding: 0.2em 0.4em;
+    border-radius: 4px;
+}
+
+/* ... (il tuo CSS precedente rimane) ... */
+
+/* 👤 AVATAR STILIZZATO */
+.sender-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden; /* Assicura che l'SVG resti nel cerchio */
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+}
+
+/* SVG dentro l'avatar */
+.sender-avatar svg {
+    width: 22px;
+    height: 22px;
+}
+
+/* 🎨 COLORI AVATAR (Abbinati al Logo) */
+/* Messaggio dell'altro -> Blu */
+.other-avatar {
+    background-color: #e3f2fd; /* Azzurro chiaro */
+    color: #0d6efd;            /* Blu intenso */
+}
+
+/* Messaggio mio -> Verde */
+.mine-avatar {
+    background-color: #d1e7dd; /* Verde chiaro */
+    color: #198754;            /* Verde intenso */
+}
+
+/* 🔍 Highlight ricerca */
+mark.bg-warning {
+    background-color: #ffeb3b !important;
+    padding: 0 2px;
+    border-radius: 2px;
+}
+
+/* 📎 Sidebar documenti */
+.list-group-item-action:hover {
+    background-color: #f8f9fa;
+    transition: background-color 0.2s;
+}
+
+/* 💬 Chat container con spazio per sidebar */
+@media (min-width: 992px) {
+    .chat-container {
+        max-height: 600px;
+        overflow-y: auto;
+    }
+}
+
+/* 🔍 Highlight risultati ricerca */
+.message-content mark {
+    background-color: #ffeb3b !important;
+    color: #000 !important;
+    padding: 0 3px;
+    border-radius: 2px;
+    font-weight: 500;
+}

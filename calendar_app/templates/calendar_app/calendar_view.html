@@ -4,7 +4,12 @@
 {% block content %}
 
 <div class="card p-3 mb-2 shadow custom-card text-center">
-        <h4>Calendario famiglia</h4>
+        <h2 class="mb-0">🗓️ Calendario Famiglia</h2>
+        <!-- ✅ Sottotitolo con hint visivo -->
+        <small class="text-muted d-block mt-1">
+            <i class="bi bi-info-circle"></i>
+           ℹ️ Clicca su un giorno per <strong>creare</strong> un evento, o su un evento esistente per <strong>modificarlo</strong>.
+        </small>
 </div>
 
     <div class="card-body">
@@ -40,10 +45,11 @@
 
                             </div>
                           </div>
-                        </div>
+                </div>
+        </div>
                     
 
-                    <hr>
+         <div class="card p-3 mb-2 shadow custom-card">
 
                     {% for event in events %}
                     <div class="card mt-2">

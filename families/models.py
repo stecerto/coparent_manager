@@ -2,9 +2,10 @@ import uuid
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.db.models import F
-
+from core.choices import RoleChoices
 
 class Family(models.Model):
     CREATOR_ROLE_CHOICES = [
@@ -31,18 +32,27 @@ class Family(models.Model):
 
     is_active = models.BooleanField(default=True)
 
+    @property
+    def surname(self):
+        """
+        Restituisce il cognome della famiglia.
+        Priorità: cognome del creatore → ultima parola di `name` → stringa vuota.
+        """
+        if self.created_by and self.created_by.last_name:
+            return self.created_by.last_name
+        # Fallback: estrae l'ultima parola da "Famiglia Rossi" → "Rossi"
+        return self.name.split()[-1] if self.name else ""
+
     def __str__(self):
         return self.name
 
 
 
 class FamilyMember(models.Model):
-    ROLE_CHOICES = [
-        ("parent_a", "Genitore A"),
-        ("parent_b", "Genitore B"),
-        ("lawyer_a", "Avvocato A"),
-        ("lawyer_b", "Avvocato B"),
-    ]
+    role = models.CharField(
+        max_length=20,
+        choices=RoleChoices.choices,
+    )
 
     family = models.ForeignKey(
         Family,
@@ -56,7 +66,6 @@ class FamilyMember(models.Model):
         related_name="family_memberships"
     )
 
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
 
     is_primary = models.BooleanField(default=False)
     joined_at = models.DateTimeField(auto_now_add=True)
@@ -79,7 +88,58 @@ class FamilyMember(models.Model):
             )
 
     def __str__(self):
-        return f"{self.family.name} - {self.user.email} - {self.role}"
+        family_surname = self.family.surname if self.family else "N/D"
+        return f"{family_surname} - {self.family.name if self.family else 'N/D'} - {self.user.email} - {self.role}"
+
+
+class ChildSupportAgreement(models.Model):
+    family = models.ForeignKey("Family", on_delete=models.CASCADE, related_name="support_agreements")
+
+    # 📜 Dati Sentenza
+    decree_number = models.CharField("Numero sentenza/accordo", max_length=100, blank=True)
+    decree_date = models.DateField("Data sentenza", null=True, blank=True)
+    decree_file = models.FileField("File sentenza", upload_to="legal/decrees/", null=True, blank=True)
+
+    #  Termini Pagamento
+    monthly_amount = models.DecimalField("Importo mensile totale", max_digits=10, decimal_places=2)
+    split_pct_parent_a = models.DecimalField(
+        "% a carico Genitore A", max_digits=5, decimal_places=2,
+        default=50.00, validators=[MinValueValidator(0), MaxValueValidator(100)]
+    )
+    payment_day = models.PositiveIntegerField(
+        "Giorno del mese", validators=[MinValueValidator(1), MaxValueValidator(31)],
+        help_text="Es: 5 per il 5 di ogni mese"
+    )
+    start_date = models.DateField("Decorrenza")
+    end_date = models.DateField("Scadenza (opzionale)", null=True, blank=True,
+                                help_text="Di default fino al compimento della maggiore età")
+
+    # 👶 Figli coinvolti
+    children = models.ManyToManyField("children.ChildProfile", related_name="support_agreements")
+
+    # 🔄 Versioning & Stato
+    is_active = models.BooleanField(default=True)
+    version = models.PositiveIntegerField(default=1)
+    previous_version = models.ForeignKey("self", on_delete=models.SET_NULL, null=True, blank=True,
+                                         related_name="new_versions")
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+
+    def save(self, *args, **kwargs):
+        # ✅ Aggiorna automaticamente il default sul profilo figlio
+        super().save(*args, **kwargs)
+        # ✅ Aggiorna SOLO i figli che NON hanno un override esplicito
+        self.children.filter(override_split_pct__isnull=True).update(
+            contribution_pct_parent_a=self.split_pct_parent_a
+        )
+        #self.children.update(contribution_pct_parent_a=self.split_pct_parent_a)
+
+        # 📅 Genera eventi calendario
+        from .services.agreement_service import generate_support_calendar_events
+        generate_support_calendar_events(self)
+
+    def __str__(self):
+        return f"Mantenimento {self.decree_number or 'senza num.'} - €{self.monthly_amount}"
 
 
 # =========================
@@ -90,17 +150,15 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
+from core.choices import RoleChoices
 
 
 class Invitation(models.Model):
-    ROLE_CHOICES = [
-        ("parent_a", "Genitore A"),
-        ("parent_b", "Genitore B"),
-        ("lawyer_a", "Avvocato A"),
-        ("lawyer_b", "Avvocato B"),
-        ("mediator", "Mediatore"),
-        ("consultant", "Consulente"),
-    ]
+    role = models.CharField(
+        max_length=20,
+        choices=RoleChoices.choices,  # ✅ Centralizzato
+        # ...
+    )
 
     STATUS_CHOICES = [
         ("pending", "In attesa"),
@@ -140,10 +198,6 @@ class Invitation(models.Model):
 
     display_name = models.CharField(max_length=255, blank=True, null=True)
 
-    role = models.CharField(
-        max_length=30,
-        choices=ROLE_CHOICES
-    )
 
     token = models.UUIDField(
         default=uuid.uuid4,

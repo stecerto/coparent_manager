@@ -15,10 +15,11 @@ from families.services.email_service import send_invitation_email
 
 
 @login_required
-def handle_setup(request,  mode="setup"):
+def handle_setup(request, mode="setup"):
     user = request.user
-    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    profile, _ = UserProfile.objects.get_or_create(user=user)
 
+    # 🔍 Cerca famiglia esistente (da invito o già creata)
     family = get_family_of_user(user)
 
     child_formset = build_child_formset(
@@ -29,41 +30,37 @@ def handle_setup(request,  mode="setup"):
     if request.method == "POST":
         if child_formset.is_valid():
 
+            # ✅ LOGICA DI SICUREZZA: Non creare nuova famiglia se l'utente è già membro
             if not family:
-                creator_role = (
-                    "lawyer_a"
-                    if profile.role == "lawyer"
-                    else "parent"
-                )
+                # Fallback: cerca membership esistente ma non linkata correttamente
+                existing_membership = FamilyMember.objects.filter(user=user).first()
+                if existing_membership:
+                    family = existing_membership.family
+                else:
+                    # 🆕 Crea famiglia SOLO per registrazioni DIRETTE (senza invito)
+                    creator_role = "lawyer_a" if profile.role.startswith("lawyer") else "parent_a"
+                    family = Family.objects.create(
+                        name=f"Famiglia {user.last_name or 'Nuova'}",
+                        created_by=user,
+                        creator_role=creator_role
+                    )
+                    FamilyMember.objects.create(
+                        family=family,
+                        user=user,
+                        role=creator_role,
+                        is_primary=True
+                    )
 
-                family = Family.objects.create(
-                    name=f"Family {user.last_name}",
-                    created_by=user,
-                    creator_role=creator_role
-                )
+            # 🔄 Sincronizza ruolo profilo con quello effettivo del membership
+            member = FamilyMember.objects.filter(family=family, user=user).first()
+            if member and profile.role != member.role:
+                profile.role = member.role
+                profile.save()
 
-                member_role = (
-                    "lawyer_a"
-                    if profile.role == "lawyer"
-                    else "parent_a"
-                )
-
-                FamilyMember.objects.create(
-                    family=family,
-                    user=user,
-                    role=member_role,
-                    is_primary=True
-                )
-
-            save_children(
-                child_formset,
-                family,
-                user
-            )
-
+            save_children(child_formset, family, user)
             complete_setup(profile)
 
-            return redirect("families:summary")
+            return redirect("families:family_dashboard")  # o summary, in base al tuo routing
 
     return {
         "context": {
@@ -71,9 +68,9 @@ def handle_setup(request,  mode="setup"):
             "form_profile": UserProfileForm(instance=profile),
             "formset": child_formset,
             "is_setup": True,
+            "family": family  # Utile per il template
         }
     }
-
 
 
 

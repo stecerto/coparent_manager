@@ -1,32 +1,35 @@
-import token
-from datetime import timedelta
-
+from django.contrib.auth.decorators import user_passes_test
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth.models import User
 from django.db import transaction
-from django.utils import timezone
-from django.contrib.auth.decorators import login_required
+from django.db.models import Sum
+from django.forms import modelformset_factory
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render, redirect
-from django.http import JsonResponse
-from django.contrib.auth.decorators import login_required
-
-from families.services.balance_service import calculate_family_balance
-
-from django.db.models import Sum
+from django.utils import timezone
+from django.contrib import messages
+from accounts.forms import UserForm, UserProfileForm
+from accounts.models import UserProfile
+from calendar_app.services.calendar_service import get_family_events
+from children.forms import ChildForm
+from children.models import ChildProfile
 from documents.models import AuditLog, Document
 from expenses.models import Expense
-from families.forms import InvitationForm
-from families.models import FamilyMember, Invitation
-from families.services.expense_service import create_expense
-from families.services.invitation_service import create_invitation, send_invitation_email, accept_invitation, \
-    generate_token, build_whatsapp_link
+from families.forms import InvitationForm, ChildSupportAgreementForm
+from families.models import FamilyMember, Invitation, ChildSupportAgreement, Family
+from families.services.balance_service import calculate_family_balance
+from expenses.services.expences_service import create_expense, update_expense
+from families.services.invitation_service import create_invitation, accept_invitation, \
+    build_whatsapp_link
 from families.utils import get_family_of_user, is_lawyer
-from accounts.models import UserProfile
-from families.services.setup_service import handle_setup
-from django.contrib.auth.decorators import user_passes_test
-
 from families.utils import is_parent
-from calendar_app.services.calendar_service import get_family_events
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.forms import modelformset_factory
+from children.models import ChildProfile
+from children.forms import ChildFormSet
 
 
 @user_passes_test(is_lawyer)
@@ -38,19 +41,37 @@ def lawyer_dashboard(request):
 def family_dashboard(request):
     pass
 
-
+# families/views.py - setup_view
 @login_required
 def setup_view(request):
-    result = handle_setup(request)
-    redirect_url = result.get("redirect")
-    if redirect_url:
-        return redirect(redirect_url)
+    family = get_family_of_user(request.user)
+    if not family:
+        messages.warning(request, "Nessuna famiglia associata.")
+        return redirect("families:family_dashboard")
 
-    return render(
-        request,
-        "families/setup.html",
-        result.get("context", {})
-    )
+    # ✅ PRE-CALCOLA I FIGLI ATTIVI (così il template è semplice)
+    active_children = family.children.filter(is_active=True).order_by("birth_date", "name")
+
+    form_user = UserForm(request.POST or None, instance=request.user)
+    form_profile = UserProfileForm(request.POST or None, instance=request.user.userprofile)
+
+    if request.method == "POST":
+        if form_user.is_valid() and form_profile.is_valid():
+            form_user.save()
+            form_profile.save()
+            messages.success(request, "✅ Dati personali salvati!")
+            return redirect("families:family_dashboard")
+        else:
+            messages.error(request, "⚠️ Correggi gli errori evidenziati")
+
+    return render(request, "families/setup.html", {
+        "form_user": form_user,
+        "form_profile": form_profile,
+        "family": family,
+        "active_children": active_children,  # ✅ PASSA QUESTO AL TEMPLATE
+        "is_edit_mode": True,
+        "membership": FamilyMember.objects.filter(family=family, user=request.user).first()
+    })
 
 
 def invitation_landing_view(request, token):
@@ -185,59 +206,56 @@ from families.services.email_service import (
 @transaction.atomic
 def invite_member_view(request):
     family = get_family_of_user(request.user)
-
     if not family:
+        messages.error(request, "⚠️ Nessuna famiglia associata")
         return redirect("families:setup")
 
     profile = request.user.userprofile
 
+    # ✅ DEBUG: Stampa cosa sta succedendo
+    membership = FamilyMember.objects.filter(family=family, user=request.user).first()
+    user_role = membership.role if membership else None
+    #print(f"🔍 DEBUG INVITO:")
+    #print(f"  - User: {request.user.email}")
+    #print(f"  - Family: {family.name if family else None}")
+    #print(f"  - Membership: {membership.role if membership else 'NONE'}")
+    #print(f"  - Occupied roles: {set(family.members.values_list('role', flat=True)) if family else set()}")
+
+    # ✅ Passa family e user_role al form
     form = InvitationForm(
         request.POST or None,
-        user_role=profile.role
+        user_role=profile.role,
+        family=family  # 🔑 Fondamentale per filtrare i ruoli
     )
 
     if request.method == "POST" and form.is_valid():
-
         display_name = form.cleaned_data.get("display_name")
 
-        invitation = None
-
         with transaction.atomic():
-            invitation = create_invitation(
+            # ✅ Il form ha già calcolato il ruolo corretto → usalo direttamente
+            invitation = form.save(
+                commit=False,
                 family=family,
-                role=form.cleaned_data["role"],
-                channel=form.cleaned_data["channel"],
-                email=form.cleaned_data.get("email"),
-                phone=form.cleaned_data.get("phone"),
-                sender=request.user,
-                expire_at=timezone.now() + timezone.timedelta(days=7),
-                display_name=display_name
+                sender=request.user
             )
+            invitation.display_name = display_name
+            invitation.save()
 
-        # 🔥 OUTSIDE TRANSACTION (IMPORTANT)
+        # 🔥 OUTSIDE TRANSACTION
         if invitation.channel == "email":
+            email_context = build_invitation_context(request, invitation, family)
+            send_invitation_email(request, invitation, context_extra=email_context)
 
-            email_context = build_invitation_context(
-                request,
-                invitation,
-                family
-            )
-
-            send_invitation_email(
-                request,
-                invitation,
-                context_extra=email_context
-            )
-
+            role_label = dict(Invitation.ROLE_CHOICES).get(invitation.role, invitation.role)
+            messages.success(request, f"✅ Invito inviato a {invitation.email} come {role_label}")
             return redirect("families:family_dashboard")
 
         if invitation.channel == "whatsapp":
             wa_link = build_whatsapp_link(request, invitation)
+            messages.success(request, "✅ Invito inviato!")
             return redirect(wa_link)
 
-    return render(request, "families/invite_member.html", {
-        "form": form
-    })
+    return render(request, "families/invite_member.html", {"form": form})
 
 
 # =========================
@@ -331,6 +349,8 @@ def cancel_invitation_view(request, invitation_id):
 def dashboard_view(request):
 
     family = get_family_of_user(request.user)
+    if not family:
+        return redirect("families:setup")
     expenses = family.expenses.all().order_by("-expense_date")[:5]
     events = get_family_events(family)[:5]
     balance = calculate_family_balance(family)
@@ -352,6 +372,58 @@ def dashboard_view(request):
 
     return render(request, "families/family_dashboard.html", context)
 
+
+@login_required
+def create_support_agreement_view(request):
+    family = get_family_of_user(request.user)
+    if not family: return redirect("families:setup")
+
+    if request.method == "POST":
+        form = ChildSupportAgreementForm(request.POST, request.FILES)
+        if form.is_valid():
+            agreement = form.save(commit=False)
+            agreement.family = family
+            agreement.modified_by = request.user
+            agreement.save()  # Il save() triggera la generazione eventi
+            messages.success(request,
+                             f"✅ Accordo salvato. Generati {agreement.calendar_events.count()} eventi nel calendario.")
+            return redirect("calendar:calendar_view")
+    else:
+        form = ChildSupportAgreementForm()
+        form.fields["children"].queryset = family.children.filter(is_active=True)
+
+    return render(request, "families/support_agreement_form.html", {"form": form, "family": family})
+
+@login_required
+def edit_support_agreement_view(request, agreement_id):
+    family = get_family_of_user(request.user)
+    agreement = get_object_or_404(ChildSupportAgreement, pk=agreement_id, family=family)
+
+    if request.method == "POST":
+        form = ChildSupportAgreementForm(request.POST, request.FILES, instance=agreement)
+        if form.is_valid():
+            form.save()  # Il save() triggera rigenerazione eventi
+            messages.success(request, "✅ Accordo aggiornato e eventi rigenerati.")
+            return redirect("calendar:calendar_view")
+    else:
+        form = ChildSupportAgreementForm(instance=agreement)
+        form.fields["children"].queryset = family.children.filter(is_active=True)
+
+    return render(request, "families/support_agreement_form.html", {"form": form, "family": family, "is_edit": True})
+
+
+@login_required
+def delete_support_agreement_view(request, agreement_id):
+    family = get_family_of_user(request.user)
+    agreement = get_object_or_404(ChildSupportAgreement, pk=agreement_id, family=family)
+
+    if request.method == "POST":
+        agreement.is_active = False
+        agreement.save()
+        messages.success(request, "🗑️ Accordo archiviato.")
+        return redirect("calendar:calendar_view")
+
+    return render(request, "families/confirm_delete_agreement.html", {"agreement": agreement})
     '''
     if not family:
         return redirect("families:setup")

@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow">
+                <div class="card-body p-4">
+                    <h4 class="text-center mb-4">🔁 Link di attivazione scaduto?</h4>
+                    
+                    <p class="text-muted text-center mb-4">
+                        Inserisci la tua email per ricevere un nuovo link di attivazione.
+                    </p>
+                    
+                    <form method="POST">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="email" class="form-label">La tua email</label>
+                            <input 
+                                type="email" 
+                                class="form-control" 
+                                id="email" 
+                                name="email" 
+                                placeholder="nome@esempio.com"
+                                required
+                                autofocus
+                            >
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">
+                            📩 Invia nuovo link
+                        </button>
+                    </form>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="text-center">
+                        <a href="{% url 'accounts:login' %}" class="text-decoration-none">
+                            ← Torna al login
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

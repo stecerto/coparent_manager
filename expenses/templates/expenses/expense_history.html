@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Cronologia Spesa #{{ expense.id }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card p-3 mb-2 shadow custom-card text-center">
+        <h3>📜 Cronologia Spesa #{{ expense.id }}</h3>
+        <a href="{% url 'expenses:expenses_list' %}" class="btn btn-outline-secondary">← Torna alla lista</a>
+    </div>
+
+    <div class="card p-3 mb-2 shadow custom-card text-center">
+        <div class="card-body p-0">
+            <ul class="list-group list-group-flush">
+            {% for v in expense_versions %}
+                <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+                    <div>
+                        <strong class="badge bg-secondary">v{{ v.version }}</strong>
+                        <span class="ms-2 fw-bold">{{ v.amount|floatformat:2 }} €</span>
+                        <span class="text-muted ms-1">{{ v.expense_date|date:"d/m/Y" }}</span>
+                        <div class="small mt-1 text-primary">
+                            📊 Quota A: <strong>{{ v.effective_split_pct_a|default:"50"|floatformat:0 }}%</strong>
+                            (Genitore B: resto)
+                        </div>
+                    </div>
+                    <div class="text-end small">
+                        {% if v.is_active %}
+                            <span class="badge bg-success mb-1">✅ Attiva</span>
+                        {% else %}
+                            <span class="badge bg-warning text-dark mb-1">📦 Archiviata</span>
+                        {% endif %}
+                        <div class="text-muted">
+                            ✍️ {{ v.modified_by|default:"Sistema" }}<br>
+                            🕒 {{ v.archived_at|date:"d/m/Y H:i"|default:"-" }}
+                        </div>
+                    </div>
+                </li>
+            {% empty %}
+                <li class="list-group-item text-muted text-center py-3">Nessuna versione trovata</li>
+            {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

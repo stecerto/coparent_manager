@@ -44,7 +44,7 @@
     </div>
 
     <br>
-    <a href="{% url 'children:child_form' %}" class="btn btn-success btn-style">➕ Aggiungi Figlio</a>
+    <a href="{% url 'children:child_form' %}" class="btn btn-success btn-style mb-2">➕ Aggiungi Figlio</a>
 </div>
 
 
@@ -114,14 +114,28 @@
             <p><strong>Totale spese:</strong> <span id="totalExpensesDisplay">0.00</span> €</p>
 
             <div class="d-flex gap-2">
-                <a href="{% url 'expenses:add_expense' %}" class="btn btn-success btn-style">➕ Aggiungi Spesa</a>
-                <a href="{% url 'expenses:expenses_dashboard' %}" class="btn btn-success btn-style">📊 Vai alle Spese</a>
-                <a href="{% url 'expenses:download_expense_pdf' %}" class="btn btn-primary">📄 Scarica PDF</a>
+                <a href="{% url 'expenses:add_expense' %}" class="btn btn-success btn-style mb-2">➕ Aggiungi Spesa</a>
+                <a href="{% url 'expenses:expenses_dashboard' %}" class="btn btn-success btn-style mb-2">📊 Vai alle Spese</a>
+                <a href="{% url 'expenses:download_expense_pdf' %}" class="btn btn-success btn-style mb-2 ">📄 Scarica PDF</a>
             </div>
         </div>
 
 </div>
+<!-- =======================
+     Documenti
+======================= -->
+<div class="card p-3 mb-2 shadow custom-card">
+    <h4>📄 Documenti</h4>
+    <div class="chat-box">
 
+                <!-- 📁 LINK UTILI -->
+                    <div class="p-3 border-bottom bg-light">
+                        <a href="{% url 'documents:documents_list' %}" class="btn btn-success btn-style mb-2">
+                            📁 Archivio documenti
+                        </a>
+                    </div>
+    </div>
+</div>
 
 <!-- =======================
      Calendario
@@ -143,7 +157,7 @@
         <p class="text-muted">Nessun evento pianificato</p>
         {% endif %}
 
-        <a href="{% url 'calendar:calendar_view' %}" class="btn btn-success btn-style">Vai al Calendario</a>
+        <a href="{% url 'calendar:calendar_view' %}" class="btn btn-success btn-style mb-2">Vai al Calendario</a>
     </div>
 </div>
 
@@ -165,7 +179,7 @@
         <p class="text-muted">Nessun messaggio</p>
         {% endif %}
 
-        <a href="{% url 'chat:chat_home' %}" class="btn btn-success btn-style">Apri Chat</a>
+        <a href="{% url 'chat:chat_home' %}" class="btn btn-success btn-style mb-2">Vai alla Chat</a>
     </div>
 </div>
 

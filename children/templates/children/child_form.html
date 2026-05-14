@@ -4,20 +4,155 @@
 {% block title %}{% if form.instance.pk %}Modifica{% else %}Nuovo{% endif %} Figlio{% endblock %}
 
 {% block content %}
-<div class="card p-3 mb-2 shadow custom-card text-center">
-    <h2>{% if form.instance.pk %}Modifica{% else %}Nuovo{% endif %} Figlio</h2>
-</div>
-    <!-- Dati figlio -->
-        <div class="card p-3 mb-2 shadow custom-card">
-            <form method="POST">
-                {% csrf_token %}
-                {{ form|crispy }}
-                <button type="submit" class="btn btn-success btn-style">
-                    {% if form.instance.pk %}Salva Modifiche{% else %}Aggiungi Figlio{% endif %}
-                </button>
-                <a href="{% url 'children:children_list' %}" class="btn btn-secondary mt-1">Annulla</a>
-            </form>
-        </div>
+<div class="container-fluid mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
 
+            <!-- Header -->
+            <div class="card p-3 mb-3 shadow custom-card text-center">
+                <h2 class="mb-0">{% if form.instance.pk %}Modifica{% else %}Nuovo{% endif %} Figlio</h2>
+                <small class="text-muted">Compila i dati anagrafici e le condizioni di mantenimento</small>
+            </div>
+
+            <form method="POST" id="childForm">
+                {% csrf_token %}
+
+                <!-- 📋 SEZIONE 1: Dati Anagrafici -->
+                <div class="card p-3 mb-3 shadow custom-card">
+                    <h5 class="card-title mb-3">👤 Dati Personali</h5>
+                    <div class="row g-3">
+                        <div class="col-md-6">{{ form.name|as_crispy_field }}</div>
+                        <div class="col-md-6">{{ form.surname|as_crispy_field }}</div>
+                        <div class="col-12">{{ form.birth_date|as_crispy_field }}</div>
+                        <div class="col-12">{{ form.notes|as_crispy_field }}</div>
+                    </div>
+                </div>
+
+                <!-- ⚖️ SEZIONE 2: Affidamento & Mantenimento -->
+                <div class="card p-3 mb-3 shadow custom-card border-primary">
+                    <h5 class="card-title mb-3 text-primary">⚖️ Affidamento e Ripartizione Spese</h5>
+
+                    <!-- Tipo Affidamento -->
+                    <div class="mb-3">
+                        {{ form.custody_type|as_crispy_field }}
+                    </div>
+                    <div class="col-md-6">
+                        {{ form.manual_maintenance_amount|as_crispy_field }}
+                        <div class="mt-1 small text-muted p-1 bg-white rounded border">
+                            💰 Importo effettivo: <strong class="eff-amount">{{ form.instance.effective_maintenance_amount|floatformat:2|default:"Non definito" }} €</strong>
+                            <br><small class="text-muted">
+                                {% if form.instance.family.support_agreements.filter.is_active.exists %}
+                                    📜 Da sentenza
+                                {% elif form.instance.manual_maintenance_amount %}
+                                    ✍️ Manuale
+                                {% else %}
+                                    ⚠️ Non configurato
+                                {% endif %}
+                            </small>
+                        </div>
+                    </div>
+
+                    <!-- Percentuale Genitore A + Calcolo Live -->
+                    <div class="mb-3">
+                        {{ form.contribution_pct_parent_a|as_crispy_field }}
+
+                        <!-- 💡 Feedback visivo in tempo reale -->
+                        <div class="mt-2 p-2 bg-light rounded border" id="pct-feedback">
+                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                <span class="fw-bold">📊 Ripartizione calcolata:</span>
+                                <div class="d-flex align-items-center gap-3">
+                                    <span>
+                                        Genitore A: <strong id="pctA_display" class="text-primary">50.00%</strong>
+                                    </span>
+                                    <span>
+                                        Genitore B: <strong id="pctB_display" class="text-success">50.00%</strong>
+                                    </span>
+                                </div>
+                            </div>
+                            <small class="text-muted d-block mt-1">
+                                <i class="bi bi-info-circle"></i> La somma deve essere 100%. Modificando la % del Genitore A, quella del Genitore B si aggiorna automaticamente.
+                            </small>
+                            <!-- ✅ Messaggio di errore nascosto di default -->
+                            <div id="pct-error" class="alert alert-warning mt-2 mb-0 d-none" role="alert">
+                                ⚠️ Valore non valido: inserire un numero tra 0 e 100.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Pulsanti -->
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="submit" class="btn btn-success btn-style flex-grow-1">
+                        {% if form.instance.pk %}💾 Salva Modifiche{% else %}✅ Salva Figlio{% endif %}
+                    </button>
+                    <a href="{% url 'children:children_list' %}" class="btn btn-outline-secondary">↩️ Annulla</a>
+                </div>
+            </form>
+
+        </div>
+    </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const inputA = document.getElementById("id_contribution_pct_parent_a");
+    const displayA = document.getElementById("pctA_display");
+    const displayB = document.getElementById("pctB_display");
+    const errorBox = document.getElementById("pct-error");
+    const form = document.getElementById("childForm");
+
+    if (!inputA) return;
+
+    // 📊 Calcolo SOLO dei display durante la digitazione (NON tocca l'input)
+    function updateDisplay() {
+        let raw = inputA.value.toString().trim().replace(',', '.');
+        let val = parseFloat(raw);
+
+        if (!isNaN(val) && val >= 0 && val <= 100) {
+            displayA.textContent = val.toFixed(2) + "%";
+            displayB.textContent = (100 - val).toFixed(2) + "%";
+            errorBox.classList.add("d-none");
+        } else {
+            displayA.textContent = raw === "" ? "--" : "!!";
+            displayB.textContent = raw === "" ? "--" : "!!";
+            if (raw !== "") errorBox.classList.remove("d-none");
+        }
+    }
+
+    // 📝 Formatta l'input SOLO quando l'utente esce dal campo o invia
+    function formatInput() {
+        let raw = inputA.value.toString().trim().replace(',', '.');
+        let val = parseFloat(raw);
+        if (!isNaN(val) && val >= 0 && val <= 100) {
+            inputA.value = val.toFixed(2); // ✅ Sicuro ora: il cursore non viene toccato
+            updateDisplay();
+        }
+    }
+
+    // Inizializza al caricamento
+    if (inputA.value) {
+        formatInput();
+    } else {
+        displayA.textContent = "--"; displayB.textContent = "--";
+    }
+
+    inputA.addEventListener("input", updateDisplay);
+    inputA.addEventListener("change", formatInput);
+
+    // ✅ Validazione finale al submit
+    form.addEventListener("submit", function(e) {
+        formatInput();
+        let val = parseFloat(inputA.value);
+        if (inputA.value.trim() !== "" && (isNaN(val) || val < 0 || val > 100)) {
+            e.preventDefault();
+            errorBox.classList.remove("d-none");
+            errorBox.classList.add("alert-danger");
+            errorBox.textContent = "❌ La percentuale deve essere tra 0 e 100.";
+            inputA.focus();
+        }
+    });
+});
+</script>
 {% endblock %}

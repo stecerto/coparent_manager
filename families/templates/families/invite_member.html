@@ -1,55 +1,60 @@
+<!-- families/invite_member.html -->
 {% extends "base.html" %}
+{% load crispy_forms_tags %}
+
 {% block content %}
+<div class="card p-3 mb-2 shadow custom-card">
+    <h3>👥 Invita un nuovo membro</h3>
 
-<div class="card shadow-sm mb-4">
-    <div class="card-header text-center">
-        <h2>Invita alla Gestione Familiare</h2>
-    </div>
-    <div class="card-body">
-        <div class="card p-3 mb-2 shadow custom-card">
-            <div style="max-width:600px; margin:auto; padding:20px;">
+    <form method="post">
+        {% csrf_token %}
 
-
-                <form method="post">
-                    {% csrf_token %}
-
-                    <div style="margin-bottom:15px;">
-                        <label>Nome destinatario (opzionale)</label>
-                        {{ form.display_name }}
-                        {{ form.display_name.errors }}
-                    </div>
-
-                    <div style="margin-bottom:15px;">
-                        <label>Ruolo</label>
-                        {{ form.role }}
-                        {{ form.role.errors }}
-                    </div>
-
-                    <div style="margin-bottom:15px;">
-                        <label>Canale</label>
-                        {{ form.channel }}
-                        {{ form.channel.errors }}
-                    </div>
-
-                    <div style="margin-bottom:15px;">
-                        <label>Email</label>
-                        {{ form.email }}
-                        {{ form.email.errors }}
-                    </div>
-
-                    <div style="margin-bottom:15px;">
-                        <label>Telefono / WhatsApp</label>
-                        {{ form.phone }}
-                        {{ form.phone.errors }}
-                    </div>
-
-                    <button type="submit"
-                            style="background:#0d6efd; color:white; padding:10px 20px; border:none; border-radius:8px;">
-                        Invia invito
-                    </button>
-                </form>
+        <!-- Campo role nascosto se auto-assegnato -->
+        {% if form.role.field.widget.input_type == 'hidden' %}
+            {{ form.role }}
+            <div class="alert alert-info">
+                <strong>Ruolo assegnato:</strong> {{ form.role.field.choices.0.1 }}
             </div>
-        </div>
-    </div>
+        {% else %}
+            {{ form.role|as_crispy_field }}
+        {% endif %}
+
+        {{ form.channel|as_crispy_field }}
+        {{ form.email|as_crispy_field }}
+        {{ form.phone|as_crispy_field }}
+        {{ form.display_name|as_crispy_field }}
+
+        <button type="submit" class="btn btn-success btn-style">
+            📩 Invia invito
+        </button>
+    </form>
 </div>
+
+<!-- JS per toggle dinamico email/phone -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const channel = document.querySelector("[name='channel']");
+    const emailField = document.getElementById("id_email");
+    const phoneField = document.getElementById("id_phone");
+
+    function toggleFields() {
+        if (channel.value === "email") {
+            emailField.required = true;
+            emailField.disabled = false;
+            phoneField.required = false;
+            phoneField.disabled = true;
+            phoneField.value = "";
+        } else {
+            emailField.required = false;
+            emailField.disabled = true;
+            emailField.value = "";
+            phoneField.required = true;
+            phoneField.disabled = false;
+        }
+    }
+
+    channel?.addEventListener("change", toggleFields);
+    toggleFields(); // Init
+});
+</script>
 {% endblock %}

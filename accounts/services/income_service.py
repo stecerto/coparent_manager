@@ -11,7 +11,7 @@ from families.utils import get_family_of_user
 
 
 def validate_income_documents(user):
-    payslips = ocument.objects.filter(user=user, document_type="payslip")
+    payslips = Document.objects.filter(user=user, document_type="payslip")
     tax = Document.objects.filter(user=user, document_type="tax_return")
 
     return payslips.count() >= 3 and tax.count() >= 3

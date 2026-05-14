@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 from phonenumber_field.modelfields import PhoneNumberField
+from core.choices import RoleChoices
 
 from children.models import ChildProfile
 
@@ -27,23 +28,19 @@ class User(AbstractUser):
     @property
     def display_name(self):
         """Restituisce il primo nome disponibile tra first_name, username ed email"""
-        return self.first_name or self.username or self.email
+        return self.last_name or self.username or self.email
 
 # =========================
 # 🔹 USER PROFILE
 # =========================
 class UserProfile(models.Model):
-    ROLE_CHOICES = (
-        ("parent_a", "Genitore A"),
-        ("parent_b", "Genitore B"),
-        ('lawyer_a', 'Avvocato A'),
-        ('lawyer_b', 'Avvocato B'),
-        ("mediator", "Mediatore"),
-        ("consultant", "Consulente"),
+    role = models.CharField(
+        max_length=20,
+        choices=RoleChoices.choices,
 
     )
     user = models.OneToOneField(User, on_delete=models.CASCADE)
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+
     #family = models.ForeignKey('families.Family', on_delete=models.CASCADE, null=True, blank=True)
     # dati personali (OK)
     address = models.CharField(max_length=255, blank=True)

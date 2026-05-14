@@ -1,5 +1,7 @@
 from django.db import models
 from django.conf import settings
+
+from core.choices import RoleChoices
 from families.models import Family
 
 
@@ -135,9 +137,9 @@ class DocumentVersion(models.Model):
 
 class DocumentAuditLog(models.Model):
     ACTION_CHOICES = [
-        ("upload", "Upload"),
+        ("upload", "Carica"),
         ("view", "Visualizzazione"),
-        ("download", "Download"),
+        ("download", "Scarica"),
         ("update", "Aggiornamento"),
     ]
 
@@ -162,12 +164,10 @@ class DocumentAuditLog(models.Model):
         return f"{self.user} - {self.action} - {self.document.title}"
 
 class DocumentSignature(models.Model):
-    ROLE_CHOICES = [
-        ("parent_a", "Genitore A"),
-        ("parent_b", "Genitore B"),
-        ("lawyer_a", "Avvocato A"),
-        ("lawyer_b", "Avvocato B"),
-    ]
+    role = models.CharField(
+        max_length=20,
+        choices=RoleChoices.choices,
+    )
 
     document = models.ForeignKey(
         "Document",
@@ -180,7 +180,7 @@ class DocumentSignature(models.Model):
         on_delete=models.CASCADE
     )
 
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+
 
     signed_at = models.DateTimeField(auto_now_add=True)
 
@@ -191,12 +191,10 @@ class DocumentSignature(models.Model):
         return f"{self.user} - {self.role}"
 
 class DocumentApproval(models.Model):
-    ROLE_CHOICES = [
-        ("parent_a", "Genitore A"),
-        ("parent_b", "Genitore B"),
-        ("lawyer_a", "Avvocato A"),
-        ("lawyer_b", "Avvocato B"),
-    ]
+    role = models.CharField(
+        max_length=20,
+        choices=RoleChoices.choices
+    )
 
     document = models.ForeignKey(
         "Document",
@@ -205,14 +203,14 @@ class DocumentApproval(models.Model):
     )
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES)
+
 
     approved = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
 class AuditLog(models.Model):
     ACTION_CHOICES = [
-        ("upload", "Upload"),
+        ("upload", "Carica"),
         ("edit", "Modifica"),
         ("approve", "Approvazione"),
         ("sign", "Firma"),

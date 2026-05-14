@@ -3,7 +3,8 @@
 {% load crispy_forms_tags %}
 {% block content %}
 
-<div class="card p-3 mb-3 text-center">
+<div class="card p-3 mb-2 shadow custom-card text-center">
+
     <h4>
         {% if is_edit %}
             ✏️ Modifica evento
@@ -13,51 +14,70 @@
     </h4>
 </div>
 
-<form method="POST">
-    {% csrf_token %}
-    <label>Categoria</label>
-        <select name="event_type" class="form-control mb-2">
-            <option value="expense">Spesa</option>
-            <option value="medical">Medico</option>
-            <option value="school">Scuola</option>
-            <option value="sport">Sport</option>
-            <option value="other">Altro</option>
-        </select>
+<div class="card-body">
+        <div class="card p-3 mb-2 shadow custom-card">
+            <form method="POST">
+                {% csrf_token %}
+                <!-- 🔧 FIX CATEGORIE: usa EVENT_TYPES dal contesto -->
+                <label class="form-label">Categoria</label>
+                <select name="event_type" class="form-control mb-2">
+                    {% for value, label in event_types %}
+                        <option value="{{ value }}" {% if value == "other" %}selected{% endif %}>
+                            {{ label }}
+                        </option>
+                    {% endfor %}
+                </select>
 
-<input type="number" name="amount" class="form-control mb-2" placeholder="Importo (solo spese)">
+                <!-- Importo (solo per spese) -->
+                <input type="number" name="amount" class="form-control mb-2"
+                       placeholder="Importo € (solo per tipo 'Spesa')" step="0.01">
 
-    <input type="text" name="title" class="form-control mb-2"
-           value="{{ event.title|default:'' }}" placeholder="Titolo">
+                <!-- Titolo e Descrizione -->
+                <input type="text" name="title" class="form-control mb-2"
+                       value="{{ event.title|default:'' }}" placeholder="Titolo evento" required>
 
-    <textarea name="description" class="form-control mb-2">
-        {{ event.description|default:'' }}
-    </textarea>
+                <textarea name="description" class="form-control mb-2" rows="2"
+                          placeholder="Descrizione">{{ event.description|default:'' }}</textarea>
 
-    <label>Inizio</label>
-    <input type="datetime-local" name="start_time"
-           class="form-control mb-2"
-           value="{% if event %}{{ event.start_time|date:'Y-m-d\\TH:i' }}{% elif start %}{{ start|slice:":16" }}{% endif %}">
+                <!-- Date con timezone-aware prefill -->
+                <label class="form-label">Inizio</label>
+                <input type="datetime-local" name="start_time" class="form-control mb-2"
+                       value="{% if event %}{{ event.start_time|date:'Y-m-d\\TH:i' }}{% elif start %}{{ start|slice:':16' }}{% endif %}" required>
 
-    <label>Fine</label>
-    <input type="datetime-local" name="end_time"
-           class="form-control mb-2"
-           value="{% if event %}{{ event.end_time|date:'Y-m-d\\TH:i' }}{% elif end %}{{ end|slice:":16" }}{% endif %}">
+                <label class="form-label">Fine</label>
+                <input type="datetime-local" name="end_time" class="form-control mb-2"
+                       value="{% if event %}{{ event.end_time|date:'Y-m-d\\TH:i' }}{% elif end %}{{ end|slice:':16' }}{% endif %}" required>
 
-    <label>Figli</label>
-    <select name="children" multiple class="form-control mb-3">
-        {% for child in family.children.all %}
-        <option value="{{ child.id }}"
-            {% if event and child in event.children.all %}selected{% endif %}>
-            {{ child.name }}
-        </option>
-        {% endfor %}
-    </select>
+                <!-- 🔧 FIX CHILDREN: ManyToMany con selezione multipla -->
+                <label class="form-label">Figli coinvolti</label>
+                <select name="children" multiple class="form-control mb-3" size="3">
+                    {% for child in family.children.all %}
+                    <option value="{{ child.id }}"
+                        {% if event and child in event.children.all %}selected{% endif %}>
+                        {{ child.name }}
+                    </option>
+                    {% empty %}
+                    <option disabled>Nessun figlio configurato</option>
+                    {% endfor %}
+                </select>
+                <small class="text-muted d-block mb-3">Tieni premuto Ctrl/Cmd per selezionare più figli</small>
 
-    <button class="btn btn-success">
-        {% if is_edit %}Aggiorna{% else %}Crea{% endif %}
-    </button>
-
-</form>
+                <!-- Pulsanti -->
+                <div class="d-flex gap-2 flex-wrap mt-3">
+                    <button type="submit" class="btn btn-success">
+                        {% if is_edit %}Aggiorna{% else %}Salva evento{% endif %}
+                    </button>
+                    {% if is_edit %}
+                    <a href="{% url 'calendar:event_delete' event.id %}"
+                       class="btn btn-outline-danger"
+                       onclick="return confirm('Eliminare definitivamente questo evento?')">
+                        🗑️ Elimina
+                    </a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+</div>
 
 {% if is_edit %}
 <form method="POST" action="{% url 'calendar:event_delete' event.id %}">

@@ -4,7 +4,7 @@
 
 {% block title %}{{ title }}{% endblock title %}
 
-{%block content %}
+{% block content %}
 <div class="container-fluid mt-4">
     <div class="row justify-content-center">
         <div class="col-md-6">
@@ -28,6 +28,11 @@
                             Carica ricevuta, screenshot o estratto conto. Formati: JPG, PNG, PDF (max 5MB ciascuno)
                         </div>
                     </div>
+                    {% if split_preview %}
+                    <div class="alert alert-info">
+                        📊 Ripartizione per questo figlio: <strong>{{ split_preview }}</strong>
+                    </div>
+                    {% endif %}
 
                     <button type="submit" class="btn btn-success btn-style">💾 Salva Spesa</button>
                 </form>
@@ -42,6 +47,30 @@
 
 {% block scripts %}
 <script src="{% static 'js/coparentmanager.js' %}"></script>
+<script>
+const childSelect = document.getElementById('id_child');
+const amountInput = document.getElementById('id_amount');
+const splitInput = document.getElementById('id_split_percentage_a'); // Nuovo campo nel form
+
+childSelect.addEventListener('change', function() {
+    // Chiedi al server o leggi da un data-attribute la % di quel figlio
+    const childId = this.value;
+    const defaultPct = getChildDefaultPercentage(childId); // es. 60.00
+
+    // Pre-compila il campo
+    splitInput.value = defaultPct;
+});
+
+</script>
+<script>
+document.getElementById("id_parent_a_share")?.addEventListener("blur", function() {
+    if (!this.value) {
+        this.value = "Default automatico";
+        this.style.color = "#999";
+        setTimeout(() => { this.value = ""; this.style.color = ""; }, 1500);
+    }
+});
+</script>
 {% endblock scripts %}
 
 

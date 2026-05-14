@@ -86,6 +86,7 @@ def build_whatsapp_link(request,invitation):
 
 
 def accept_invitation(invitation, user):
+    """Accetta un invito e sincronizza FamilyMember + UserProfile"""
     if invitation.is_expired:
         invitation.mark_expired()
         return None
@@ -93,18 +94,24 @@ def accept_invitation(invitation, user):
     if invitation.status != "pending":
         return invitation
 
-    FamilyMember.objects.get_or_create(
+    # ✅ Crea/aggiorna FamilyMember
+    member, created = FamilyMember.objects.get_or_create(
         family=invitation.family,
         user=user,
         defaults={"role": invitation.role}
     )
+    if not created and member.role != invitation.role:
+        member.role = invitation.role
+        member.save()
 
+    # ✅ Sincronizza UserProfile
+    profile = getattr(user, 'userprofile', None)
+    if profile and profile.role != invitation.role:
+        profile.role = invitation.role
+        profile.save()
+
+    # ✅ Marca invito come accettato
     invitation.mark_accepted(user)
-
-    profile = user.userprofile
-    profile.role = invitation.role
-    profile.save()
-
     return invitation
 
 def store_invitation_in_session(request, invitation):

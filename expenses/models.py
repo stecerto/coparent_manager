@@ -4,156 +4,130 @@ from django.conf import settings
 
 
 class ExpenseCategory(models.Model):
+    GROUP_CHOICES = [
+        ("ordinarie", "Ordinarie"),
+        ("straordinarie", "Straordinarie"),
+        ("straordinarie_concordare", "Straordinarie da concordare"),
+    ]
     name = models.CharField(max_length=50, unique=True)
-    display_name = models.CharField(max_length=100)  # nome visualizzato (es. "Spesa figlio")
+    display_name = models.CharField(max_length=100)
     color = models.CharField(max_length=7, default="#6f42c1")
+    group = models.CharField(max_length=30, choices=GROUP_CHOICES, default="ordinarie")
+
+    class Meta:
+        verbose_name = "Categoria Spesa"
+        verbose_name_plural = "Categorie Spese"
+        ordering = ["group","display_name"]  # ✅ Ordine alfabetico nel dropdown
+
 
     def __str__(self):
         return self.display_name
 
 
 class Expense(models.Model):
-    EXPENSE_TYPES = [
-        ("child", "Spesa figlio"),
-        ("medical", "Spesa medica"),
-        ("school", "Scuola"),
-        ("extra", "Straordinarie"),
-        ("sport", "Sport"),
-        ("legal", "Legale"),
-        ("stamp_duty", "Marca da bollo"),
-        ("lawyer_invoice", "Fattura avvocato"),
-        ("abbigliamento", "Abbigliamento"),
-        ("ricariche telefono", "Ricarica Telefono"),
-        ("other", "Altro"),
-    ]
-
-    PAYMENT_CHOICES = [
-        ("unpaid", "Da pagare"),
-        ("partial", "Parzialmente pagato"),
-        ("paid", "Pagato e verificato")
-    ]
-    payment_status = models.CharField(
-        max_length=10, choices=PAYMENT_CHOICES, default="unpaid"
-    )
-
-    family = models.ForeignKey(
-        "families.Family",
-        on_delete=models.CASCADE,
-        related_name="expenses"
-    )
-    child = models.ForeignKey(
-        "children.ChildProfile",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="expenses"
-    )
-
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.CASCADE,
-        related_name="created_expenses"
-    )
-
-    expense_type = models.ForeignKey(
-        ExpenseCategory,
-        on_delete=models.PROTECT,
-        related_name="expenses"
-    )
-
-
-    amount = models.DecimalField(
-        max_digits=10,
-        decimal_places=2
-    )
-
-    description = models.TextField()
-
-    expense_date = models.DateField()
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    parent_a_share = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=50
-    )
-
-    parent_b_share = models.DecimalField(
-        max_digits=5,
-        decimal_places=2,
-        default=50
-    )
-
-    approved_by_parent_a = models.BooleanField(
-        null=True,
-        blank=True
-    )
-
-    approved_by_parent_b = models.BooleanField(
-        null=True,
-        blank=True
-    )
-
-    is_active = models.BooleanField(default=True)
-
+    # 🎯 SCELTE (raggruppate in cima)
     STATUS_CHOICES = [
         ("pending", "In Sospeso"),
         ("accepted", "Accettata"),
-        ("paid", "Pagata"),
         ("rejected", "Rifiutata"),
+        ("paid", "Pagata"),
     ]
 
-    status = models.CharField(
-        max_length=10,
-        choices=STATUS_CHOICES,
-        default="pending"
+    # 🌐 RELAZIONI CORE
+    family = models.ForeignKey("families.Family", on_delete=models.CASCADE, related_name="expenses")
+    child = models.ForeignKey("children.ChildProfile", on_delete=models.SET_NULL, null=True, blank=True,
+                              related_name="expenses")
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="created_expenses")
+    expense_type = models.ForeignKey(ExpenseCategory, on_delete=models.PROTECT, related_name="expenses")
+
+    # 💰 DATI FINANZIARI
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+
+    # ✅ Questo campo salva la percentuale applicata AL MOMENTO della spesa
+    split_percentage_a = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text="% caricata sul Genitore A per questa spesa (se nulla, usa quella del figlio)"
     )
 
-#VERSIONE VERSIONING
-    previous_version = models.ForeignKey(
-        "self",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="new_versions"
+    description = models.TextField(blank=True, default="")
+    expense_date = models.DateField()
+
+    # ✅ WORKFLOW & APPROVAZIONI (FK invece di Boolean)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+
+    approved_by_parent_a = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="approved_expenses_a"
+    )
+    approved_by_parent_b = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="approved_expenses_b"
     )
 
+    # 🔄 VERSIONING
     version = models.PositiveIntegerField(default=1)
-
-#VERSIONE ARCHIVING SOFT_DELETE
-    archived_at = models.DateTimeField(
-        null=True,
-        blank=True
+    previous_version = models.ForeignKey(
+        "self", on_delete=models.SET_NULL, null=True, blank=True, related_name="new_versions"
     )
 
-    archived_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="archived_expenses"
+    # 📊 METADATI & AUDIT
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    archived_at = models.DateTimeField(null=True, blank=True, verbose_name="Archiviata il")
+    modified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True,
+        related_name="modified_expenses", verbose_name="Ultima modifica da"
     )
+
+    # 📊 SNAPSHOT PERCENTUALE (immutabile per versione)
+    effective_split_pct_a = models.DecimalField(
+        "Quota Genitore A (snapshot)",
+        max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text="Percentuale effettiva applicata a questa versione"
+    )
+
+    def __str__(self):
+        return f"Spesa v{self.version} - {self.amount}€ ({self.child.name})"
+
+    class Meta:
+        ordering = ["-expense_date", "-created_at"]
+        indexes = [models.Index(fields=["status", "is_active"])]
+
+
+    @property
+    def amount_parent_a(self):
+        """Calcola quanto deve pagare il Genitore A"""
+        # Se è stata specificata una % sulla spesa, usa quella.
+        # Altrimenti, usa la % di default del profilo figlio.
+        pct = self.split_percentage_a
+        if pct is None:
+            pct = self.child.contribution_pct_parent_a
+
+        return (self.amount * pct) / 100
+
+    @property
+    def amount_parent_b(self):
+        return self.amount - self.amount_parent_a
 
     @property
     def is_editable(self):
-        """
-        Restituisce True se la spesa può essere modificata.
-        Regole:
-        - Sempre modificabile se 'pending'
-        - Modificabile se almeno un genitore non ha ancora approvato
-        - Bloccata se 'paid' o se entrambi hanno approvato e status != pending
-        """
-        if self.status in ("pending", "rejected"): # Rifiutata = si può correggere e riproporre
+        """Modificabile se: pending, rejected, o accepted ma non ancora approvata da entrambi."""
+        if self.status in ("pending", "rejected"):
             return True
         if self.status == "paid":
-            return False  # Pagata = bloccata definitivamente
-        # Rifiutata = si può correggere e riproporre
-        if self.status == "accepted":
-            # ✅ Modificabile SOLO se NESSUNO ha accettato (entrambi null o False)
-            return not (self.approved_by_parent_a or self.approved_by_parent_b )
-        return False
+            return False
+        # Se accepted, è modificabile solo se manca almeno un'approvazione
+        return not (self.approved_by_parent_a and self.approved_by_parent_b)
+
+    @property
+    def payment_state(self):
+        """Stato di pagamento DERIVATO automaticamente. Elimina `payment_state` per evitare incongruenze."""
+        if self.status == "paid":
+            return "paid"
+        if self.status == "accepted" and self.approved_by_parent_b:
+            return "partial"
+        return "unpaid"
 
     def get_status_label(self):
         """Restituisce l'etichetta italiana dello stato (fallback sicuro)"""
@@ -165,65 +139,15 @@ class Expense(models.Model):
         }
         return labels.get(self.status, self.status)
 
-
     def __str__(self):
-        return f"{self.description} - {self.amount}"
+        type_name = self.expense_type.display_name if self.expense_type else "Spesa"
+        return f"{type_name} - €{self.amount} ({self.get_status_display()})"
+
 
 
 
 '''
-class ExpenseDocument(models.Model):
-    family = models.ForeignKey(
-        "families.Family",
-        on_delete=models.CASCADE,
-        related_name="expense_documents"
-    )
-
-    expense = models.ForeignKey(
-        Expense,
-        on_delete=models.CASCADE,
-        related_name="documents_expense"
-    )
-
-    uploaded_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True
-    )
-
-    title = models.CharField(max_length=255)
-
-    file = models.FileField(
-        upload_to="expense_documents/"
-    )
-
-    uploaded_at = models.DateTimeField(auto_now_add=True)
-
-    previous_version = models.ForeignKey(
-        "self",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="old_versions"
-    )
-
-    version = models.PositiveIntegerField(default=1)
-
-    modified_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="modified_expenses_documents"
-    )
-
-
-
-    def __str__(self):
-        return self.title
-
-
-
+c
 
 
 creare pagina HTML STORICO

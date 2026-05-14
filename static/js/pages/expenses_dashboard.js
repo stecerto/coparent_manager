@@ -20,7 +20,7 @@ console.log("expenses_dashboard JS caricato");
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        display: false
+                        display: false  // Nascondi legenda nativa (usiamo la tua HTML)
                     }
                 }
             }
@@ -107,49 +107,5 @@ console.log("expenses_dashboard JS caricato");
 
         calendar.render();
     }
-
-
-
-    // =========================
-    // 🔄 STATUS UPDATE (AJAX)
-    // =========================
-
-    document.querySelectorAll(".status-btn").forEach(btn => {
-        btn.addEventListener("click", function () {
-
-            const expenseId = this.dataset.id;
-            const newStatus = this.dataset.status;
-            const csrfToken = document.getElementById("csrfToken").value;
-
-            fetch(`/expenses/${expenseId}/update-status/`, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "X-CSRFToken": csrfToken
-                },
-                body: JSON.stringify({status: newStatus})
-            })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.success) {
-
-                        const row = this.closest("tr");
-
-                        row.querySelectorAll(".status-btn").forEach(b => {
-                            b.classList.remove("active");
-                        });
-
-                        this.classList.add("active");
-                    }
-                });
-
-        });
-    });
-    
-
-    // =========================
-    // ❌ MODAL CLOSE
-    // =========================
-
 
 });

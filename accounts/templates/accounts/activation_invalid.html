@@ -15,7 +15,15 @@
                     {{ form|crispy }}
                     <h4>Ciao {{ user.username }},</h4>
 
-                    <p>Il link di attivazione non è valido o è scaduto.</p>
+                    <p>Il link di attivazione potrebbe essere:<br>
+                        • Scaduto<br>
+                        • Già utilizzato<br>
+                        • Modificato dopo la registrazione</p>
+
+                    <!-- ✅ Pulsante per richiedere nuovo link -->
+                    <a href="{% url 'accounts:resend_activation' %}" class="btn btn-outline-primary mb-3">
+                        🔁 Richiedi nuovo link di attivazione
+                    </a>
 
                     <a href="/">Torna alla home</a>
                 </form>

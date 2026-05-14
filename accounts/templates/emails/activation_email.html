@@ -1,39 +1,43 @@
-<div style="max-width:600px; margin:auto; padding:20px; font-family:Arial, sans-serif;">
-    <h2>Attivazione Email Family Balance</h2>
+<!-- emails/activation_email.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Attiva il tuo account</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center;">
+        <h2 style="color: #0d6efd;">🎉 Benvenuto in CoParentManager!</h2>
+        <p>Ciao {{ user.first_name|default:user.email }},</p>
+        <p>Grazie per esserti registrato. Clicca sul pulsante qui sotto per attivare il tuo account:</p>
 
-    <h4>Ciao {{ user.first_name|default:user.username }},</h4>
+        <p style="margin: 30px 0;">
+            <a href="{{ activation_link }}"
+               style="background: #0d6efd; color: white; padding: 12px 24px;
+                      text-decoration: none; border-radius: 6px; font-weight: bold;">
+                ✅ Attiva il mio account
+            </a>
+        </p>
 
-    <p>Clicca sul pulsante qui sotto per attivare il tuo account:</p>
+        <p style="font-size: 0.9em; color: #666;">
+            Oppure copia e incolla questo link nel browser:<br>
+            <code style="background: #e9ecef; padding: 4px 8px; border-radius: 4px;">
+                {{ activation_link }}
+            </code>
+        </p>
 
-    <div style="margin-top:20px; margin-bottom:20px;">
-        <a href="{{ activation_link }}"
-           style="
-                  background:#006400;
-                  color:#ffffff;
-                  padding:14px 28px;
-                  border-radius:8px;
-                  text-decoration:none;
-                  font-size:16px;
-                  font-weight:600;
-                  display:inline-block;">
-           Attiva il tuo account
-        </a>
+        <hr style="margin: 30px 0; border: none; border-top: 1px solid #dee2e6;">
 
+        <p style="font-size: 0.85em; color: #666;">
+            Se non hai richiesto questa registrazione, ignora semplicemente questa email.<br>
+            Il link scadrà tra 24 ore per motivi di sicurezza.
+        </p>
     </div>
-
-    <p style="font-size:14px;">
-        Link diretto:
-        <br>
-        <p> href="{{ activation_link }}" </p>
-    </p>
-
-    <p style="font-size:12px; color:#666;">
-        Se il pulsante non funziona, copia e incolla il link sopra nel browser.
-    </p>
-</div>
+</body>
+</html>
 <script>
     setTimeout(function() {
-        window.location.href = "{% url 'login' %}";
+        window.location.href = "{% url 'accounts:login' %}";
     }, 3000);
 </script>
 

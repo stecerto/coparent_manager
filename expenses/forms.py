@@ -1,5 +1,8 @@
 # expenses/forms.py
+import itertools
+
 from django import forms
+from django_select2.forms import Select2Widget
 
 from expenses.models import Expense, ExpenseCategory
 from children.models import ChildProfile
@@ -15,38 +18,40 @@ class ExpenseForm(forms.ModelForm):
             "amount",
             "description",
             "expense_date",
+            "status"
         ]
         widgets = {
-            "expense_date": forms.DateInput(
-                attrs={"type": "date"}
-            ),
-            "description": forms.Textarea(
-                attrs={"rows": 3}
-            ),
+            'expense_type': Select2Widget(attrs={'data-placeholder': 'Cerca categoria...'}),  # 🔄 Combobox
+            'expense_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'amount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
+            'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'child': forms.Select(attrs={'class': 'form-select'})
         }
 
-    def __init__(self, *args, user=None, **kwargs):
+    def __init__(self, *args, **kwargs):
+        # ✅ 1. Estrai custom kwargs PRIMA di chiamare super()
+        user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
-        # 🔥 sicurezza: nessun figlio di default
-        self.fields["child"].queryset = ChildProfile.objects.none()
 
-        # 🔥 expense_type come dropdown reale dal DB
-        self.fields["expense_type"].queryset = ExpenseCategory.objects.all()
+        # ✅ 2. Sicurezza: parte vuoto
+        self.fields["child"].queryset = ChildProfile.objects.none()
+        self.fields["child"].empty_label = "Seleziona figlio"
+
+        # ✅ 3. Se c'è un user, carica i figli della sua famiglia
+        if user:
+            family = get_family_of_user(user)  # ⚠️ Assicurati che sia importato in forms.py
+            if family:
+                self.fields["child"].queryset = family.children.filter(is_active=True)
+
+        # ✅ 4. Categorie raggruppate (logica originale, mantenuta)
+        categories = ExpenseCategory.objects.order_by("group", "display_name")
+        grouped_choices = []
+        for group, cats in itertools.groupby(categories, key=lambda c: c.get_group_display()):
+            grouped_choices.append((group, [(c.id, c.display_name) for c in cats]))
+
+        self.fields["expense_type"].widget.choices = grouped_choices
         self.fields["expense_type"].empty_label = "Seleziona categoria"
 
-        if user:
-            family = get_family_of_user(user)
-
-            if family:
-                self.fields["child"].queryset = (
-                    family.children.filter(is_active=True)
-                )
-            else:
-                self.fields["child"].queryset = (
-                    ChildProfile.objects.none()
-                )
-                # 🔥 UX migliore
-        self.fields["child"].empty_label = "Seleziona figlio"
 
 
 
@@ -65,10 +70,11 @@ class ExpenseFilterForm(forms.Form):
     )
 
     expense_type = forms.ModelChoiceField(
-        queryset=ExpenseCategory.objects.all(),
-        required=False,
+        queryset=ExpenseCategory.objects.all().order_by("display_name"),
+        required=False, empty_label="Tutte le categorie",
         label="Categoria",
-        empty_label="Tutte"
+        widget=forms.Select(attrs={'class': 'form-control'})
+
     )
 
     date_from = forms.DateField(

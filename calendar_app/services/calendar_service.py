@@ -12,7 +12,14 @@ def create_event(
     description="",
     event_type="other",
     children=None,
+    amount=None,
 ):
+    # ✅ Assicurati che start/end siano timezone-aware
+    if timezone.is_naive(start_time):
+        start_time = timezone.make_aware(start_time)
+    if timezone.is_naive(end_time):
+        end_time = timezone.make_aware(end_time)
+
     event = CalendarEvent.objects.create(
         family=family,
         title=title,
@@ -21,6 +28,7 @@ def create_event(
         created_by=created_by,
         description=description,
         event_type=event_type,
+        amount=amount,
     )
 
     # ✅ gestione ManyToMany CORRETTA
@@ -43,14 +51,15 @@ def update_event(event, user, data):
     new_event = CalendarEvent.objects.create(
         family=event.family,
         created_by=user,
-        title=data.get("title"),
-        description=data.get("description"),
+        title=data.get("title", event.title),
+        description=data.get("description", event.description),
         event_type=data.get("event_type", event.event_type),
-        start_time=data.get("start_time"),
-        end_time=data.get("end_time"),
+        start_time=data.get("start_time", event.start_time),
+        end_time=data.get("end_time", event.end_time),
         previous_version=event,
         version=event.version + 1,
         is_shared=event.is_shared,
+        amount=data.get("amount", event.amount),
     )
 
     children = data.get("children")

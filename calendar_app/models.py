@@ -10,6 +10,7 @@ from families.models import Family
 class CalendarEvent(models.Model):
     EVENT_TYPES = [
         ("custody", "Affidamento"),
+        ("support", "Mantenimento"),
         ("school", "Scuola"),
         ("medical", "Medico"),
         ("expense", "Spesa"),
@@ -49,6 +50,13 @@ class CalendarEvent(models.Model):
     is_shared = models.BooleanField(default=True)
 
     is_active = models.BooleanField(default=True)
+
+    is_auto_generated = models.BooleanField(default=False, help_text="Generato da accordo mantenimento")
+    linked_agreement = models.ForeignKey(
+        "families.ChildSupportAgreement", on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="calendar_events"
+    )
+
     previous_version = models.ForeignKey(
         "self",
         on_delete=models.SET_NULL,

@@ -1,130 +1,136 @@
 {% extends "base.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
+
 {% block title %}Setup Profilo{% endblock %}
 
 {% block content %}
 <div class="card p-3 mb-2 shadow custom-card text-center">
-        {% if is_edit_mode %}
-                    <h2>Modifica dati</h2>
-                {% else %}
-                    <h2>Configurazione Profilo</h2>
-                {% endif %}
+    {% if is_edit_mode %}
+        <h2>Modifica dati</h2>
+    {% else %}
+        <h2>Configurazione Profilo</h2>
+    {% endif %}
 </div>
 
+<div class="card-body">
+    <form method="post" enctype="multipart/form-data" id="profile-form">
+        {% csrf_token %}
+        {{ formset.management_form }} <!-- ✅ UNA SOLA VOLTA, obbligatorio in cima -->
 
-
-
-    <div class="card-body">
-        <form method="post">
-            {% csrf_token %}
-<!-- Dati personali User -->
-
+        <!-- DATI PERSONALI USER -->
         <div class="card p-3 mb-2 shadow custom-card">
-                <h4>Dati personali</h4>
+            <h4>Dati personali</h4>
             <div class="child-form card p-2 mb-2 border">
-                {{ form_user.first_name|as_crispy_field }}
-                {{ form_user.last_name|as_crispy_field }}
-                {{ form_user.email|as_crispy_field }}
-                {% if form_profile.phone %}
-                    {{ form_profile.phone|as_crispy_field }}
-                {% endif %}
-                {{ form_profile.address|as_crispy_field }}
-                {{ form_profile.birth_place|as_crispy_field }}
-            </div>
-        </div>
-
-    <!-- Numero figli
-        <div class="card p-3 mb-2">
-            <h4>Figlio {{ forloop.counter }}</h4>
-            <label for="id_number_of_children">Numero figli:</label>
-            <input type="number" name="number_of_children" id="id_number_of_children" min="0" max="10" value="{{ formset.total_form_count }}" required>
-        </div>  -->
-
-        <!-- Formset figli -->
-        <div class="card p-3 mb-2 shadow custom-card">
-            <h4>Dati figli</h4>
-            {{ formset.management_form }}
-            <div id="children-forms">
-                {% for form in formset %}
-                <div class="child-form card p-2 mb-2 border">
-                        {% for field in form.visible_fields %}
-                            {{ field|as_crispy_field }}
-                        {% endfor %}
-
-                        {{ form.DELETE }}   <!-- IMPORTANTE -->
-
-                        <button type="button" class="btn btn-danger remove-child mt-2">
-                            ❌ Cancella figlio
-                        </button>
-
-                </div>
-                {% empty %}
-                <!-- Qui il js aggiungerà i form -->
+                {% for field in form_user %}
+                    {% if field.name and field.field %}
+                        {{ field|as_crispy_field }}
+                    {% endif %}
                 {% endfor %}
             </div>
+        </div>
 
-                 <div id="empty-form-template" style="display:none;">
-                    <div class="child-form card p-2 mb-2 border">
-                        {% for field in formset.empty_form.visible_fields %}
-                            {% if field.name %}
-                                {{ field|as_crispy_field }}
-                            {% endif %}
-                        {% endfor %}
-
-                        {{ formset.empty_form.DELETE }}
-                    </div>
-                </div>
-            <!-- </div> -->
-            <div class="d-flex gap-2 content link">
-                <button type="button" id="add-child" class="btn btn-success btn-style">
-                    ➕ Aggiungi figlio
-                </button>
+        <!-- DATI PROFILO -->
+        <div class="card p-3 mb-2 shadow custom-card">
+            <h4>Profilo</h4>
+            <div class="child-form card p-2 mb-2 border">
+                {% for field in form_profile %}
+                    {% if field.name and field.field %}
+                        {{ field|as_crispy_field }}
+                    {% endif %}
+                {% endfor %}
             </div>
         </div>
 
-        <!-- SOLO GENITORI -->
-
-        <div class="d-flex gap-2">
-                {% if membership.role == "parent_a" or membership.role == "parent_b" %}
-
-                        <a class="btn btn-success btn-style" href="{% url 'families:invite_member' %}">
-                            Invita Avvocato
-                        </a>
-
-                {% endif %}
-
-        <!-- SOLO AVVOCATI -->
-                {% if membership.role == "lawyer_a" or membership.role == "lawyer_b" %}
-
-                        <a class="btn btn-success btn-style" href="{% url 'families:invite_member' %}">
-                            Pratica legale
-                        </a>
-
-                {% endif %}
-
-                <!-- SOLO PARENT A -->
-                {% if membership.role == "parent_a" %}
-
-                        <a class="btn btn-success btn-style" href="{% url 'families:invite_member' %}">
-                            Coniuge
-                        </a>
-
-                {% endif %}
-
-            <button type="submit" class="btn btn-success btn-style">Salva e continua</button>
+        <!-- ✅ SEZIONE FIGLI: LISTA -->
+        <div class="card p-3 mb-2 shadow custom-card">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h4 class="mb-0">👶 Figli registrati</h4>
+               <!-- <a href="{% url 'children:child_form' %}" class="btn btn-sm btn-success">➕ Aggiungi figlio</a> -->
             </div>
 
+             {% if active_children %}  <!-- ✅ SEMPLICE: lista già filtrata -->
+                <div class="list-group list-group-flush">
 
 
 
-        </form>
-<!-- Empty Form per js -->
+                    {% for child in active_children %}
+                    <a href="{% url 'children:child_edit' child.pk %}"
+                       class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                        <div>
+                            <strong>{{ child.name }} {{ child.surname }}</strong>
+                            <small class="d-block text-muted">
+                                Nato il {{ child.birth_date|date:"d/m/Y" }} •
+                                {% if child.contribution_pct_parent_a is not None%}
+                                    Ripartizione: {{ child.contribution_pct_parent_a }}% A / {{ child.effective_split_pct_parent_a|add:"-100"|default:"50.00" }}% B
+                                {% else %}
+                                    Ripartizione: da definire
+                                {% endif %}
+                            </small>
+                        </div>
+                        <span class="btn btn-success btn-style mb-2">Modifica</span>
+                    </a>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center py-4 text-muted">
+                    <p class="mb-3">Nessun figlio registrato.</p>
 
-    </div>
+                </div>
+            {% endif %}
+
+            <small class="d-block text-muted mt-3">
+                <i class="bi bi-info-circle"></i> Clicca su un figlio per modificare i dati o la ripartizione spese.
+            </small>
+        </div>
+
+
+        <!-- ✅ PULSANTI -->
+        <div class="d-flex justify-content-between align-items-center flex-wrap mt-3">
+
+            <!-- SINISTRA -->
+            <div class="d-flex gap-2 flex-wrap">
+                {% if membership.role == "parent_a" or membership.role == "parent_b" %}
+                    <a class="btn btn-outline-success"
+                       href="{% url 'families:invite_member' %}">
+                       👨‍⚖️ Invita Avvocato
+                    </a>
+                {% endif %}
+
+                {% if membership.role == "lawyer_a" or membership.role == "lawyer_b" %}
+                    <a class="btn btn-outline-success"
+                       href="{% url 'families:invite_member' %}">
+                       📁 Pratica legale
+                    </a>
+                {% endif %}
+
+                {% if membership.role == "parent_a" %}
+                    <a class="btn btn-outline-success"
+                       href="{% url 'families:invite_member' %}">
+                       👫 Coniuge
+                    </a>
+                {% endif %}
+            </div>
+
+            <!-- DESTRA -->
+            <div class="d-flex gap-2 flex-wrap">
+                <a href="{% url 'children:child_form' %}"
+                   class="btn btn-success btn-style mb-2">
+                    ➕ Aggiungi figlio
+                </a>
+
+                <button type="submit"
+                        class="btn btn-success btn-style mb-2">
+                    💾 Salva e continua
+                </button>
+            </div>
+
+        </div>
+    </form>
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/pages/children.js' %}"></script>
-{% endblock  %}
+<!-- <script src="{% static 'js/pages/children.js' %}"></script> -->
+
+{% endblock %}

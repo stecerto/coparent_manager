@@ -18,4 +18,6 @@ urlpatterns = [
     # ✅ SOLO QUESTI DUE ENDPOINT AJAX (NESSUN <pk>!)
     path('update-status/', views.update_expense_status, name='update_status'),
     path('upload-payment-proof/', views.upload_payment_proof, name='upload_payment_proof'),
+    path("api/send-rejection/", views.send_rejection_message, name="send_rejection_message"),
+    path('history/<int:pk>/', views.expense_history, name='expense_history'),
 ]

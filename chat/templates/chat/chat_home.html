@@ -1,168 +1,399 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block extra_css %}
+<link href="{% static 'css/chat_style.css' %}" rel="stylesheet">
+
+{% endblock %}
+
 {% block content %}
+<div class="container-fluid mt-3">
+    <div class="row justify-content-center">
 
 
-<div class="card p-3 mb-2 shadow custom-card text-center">
-    <h2> Chat</h2>
-</div>
+            <!-- 📌 HEADER -->
+            <div class="card p-3 mb-3 shadow custom-card text-center">
+                <h2 class="mb-0">💬 Chat Famiglia</h2>
+                <small class="text-muted">Conversazione con {{ family.name }}</small>
+            </div>
 
-    <div class="card p-3 mb-2 shadow custom-card">
+            <!-- 🔍 BARRA DI RICERCA (WhatsApp-style) -->
+            <div class="card p-3 mb-3 shadow custom-card ">
+                <form method="get" class="d-flex" action="{% url 'chat:chat_home' %}">
+                    <div class="input-group input-group-sm">
+                        <input
+                            type="text"
+                            name="q"
+                            class="form-control"
+                            placeholder="Cerca nella chat..."
+                            value="{{ search_query|default:'' }}"
+                            aria-label="Cerca messaggi"
+                        >
+                        <button class="btn btn-outline-secondary" type="submit">🔍</button>
+                        {% if search_query %}
+                            <a href="{% url 'chat:chat_home' %}" class="btn btn-outline-secondary" title="Pulisci ricerca">✕</a>
+                        {% endif %}
+                    </div>
+                </form>
+            </div>
 
-        <h4 class="mt-4">💬 Chat famiglia</h4>
-
-        <div class="card p-3 mb-2 shadow custom-card">
 
 
-            <a href="{% url 'documents:documents_list' %}" class="btn btn-outline-secondary">
-                📁 Archivio documenti
-            </a>
-            <!-- FORM INVIO -->
-            <form method="POST" enctype="multipart/form-data">
-                {% csrf_token %}
+            <!-- 📦 CARD PRINCIPALE -->
+            <div class="card p-3 mb-2 shadow custom-card">
+                <div class="card-body p-0">
 
-                <div class="mb-3">
-                            <textarea
+
+
+
+
+                    <!-- 💬 LISTA MESSAGGI -->
+                    <div class="chat-container p-3" id="chatMessages">
+                        {% for msg in messages %}
+                            {% if msg.sender == request.user %}
+                                <!-- ✅ MIO MESSAGGIO (destra) -->
+                                <div class="chat-message mine" id="msg-{{ msg.id }}">
+
+                                    <!-- 👤 AVATAR SVG STILIZZATO (Verde) -->
+                                    <div class="sender-avatar mine-avatar">
+                                        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                                        </svg>
+                                    </div>
+
+                                    <div class="message-bubble">
+                                        {% if "🔴 *Rifiuto spesa*" in msg.content %}
+                                        <div class="message-reject-justification"></div>
+                                        {% endif %}
+
+                                        {% if msg.reply_to %}
+                                        <div class="message-reply">
+                                            <strong>↩️ {{ msg.reply_to.sender.first_name|default:"Utente" }}</strong><br>
+                                            <small class="text-muted">{{ msg.reply_to.content|truncatechars:50 }}</small>
+                                        </div>
+                                        {% endif %}
+
+                                      <!--  <p>{{ msg.content }}</p> -->
+                                        <p class="message-content" data-search="{{ search_query|default:'' }}">
+                                            {{ msg.content|linebreaksbr }}
+                                        </p>
+
+                                        {% if msg.attachments.all %}
+                                        <div class="message-attachments">
+                                            {% for file in msg.attachments.all %}
+                                            <a href="{{ file.file.url }}" target="_blank">📎 {{ file.file.name|slice:"30:"|default:"Allegato" }}</a>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+
+                                        <div class="message-meta">
+                                            <span>{{ msg.created_at|date:"H:i" }}</span>
+                                            {% if msg.version > 1 %}<span title="Modificato">✏️</span>{% endif %}
+                                        </div>
+                                    </div>
+
+                                    <!-- Pulsanti azione (miei messaggi) -->
+                                    <div class="message-actions d-flex gap-1">
+                                        <button class="btn btn-sm btn-link text-muted p-0" onclick="replyToMessage('{{ msg.id }}', '{{ msg.content|escapejs }}')" title="Rispondi">↩️</button>
+                                        <a href="{% url 'chat:delete_message' msg.id %}" class="btn btn-sm btn-link text-danger p-0" onclick="return confirm('Eliminare?')" title="Elimina">🗑️</a>
+                                    </div>
+                                </div>
+
+                            {% else %}
+                                <!-- ✅ MESSAGGIO ALTRO (sinistra) -->
+                                <div class="chat-message other" id="msg-{{ msg.id }}">
+
+                                    <!-- 👤 AVATAR SVG STILIZZATO (Blu) -->
+                                    <div class="sender-avatar other-avatar">
+                                        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
+                                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+                                        </svg>
+                                    </div>
+
+                                    <div class="message-bubble">
+                                        {% if "🔴 *Rifiuto spesa*" in msg.content %}
+                                        <div class="message-reject-justification"></div>
+                                        {% endif %}
+
+                                        {% if msg.reply_to %}
+                                        <div class="message-reply">
+                                            <strong>↩️ {{ msg.reply_to.sender.first_name|default:"Utente" }}</strong><br>
+                                            <small class="text-muted">{{ msg.reply_to.content|truncatechars:50 }}</small>
+                                        </div>
+                                        {% endif %}
+
+                                        <!-- <p>{{ msg.content }}</p> -->
+                                        <p class="message-content" data-search="{{ search_query|default:'' }}">
+                                            {{ msg.content|linebreaksbr }}
+                                        </p>
+
+                                        {% if msg.attachments.all %}
+                                        <div class="message-attachments">
+                                            {% for file in msg.attachments.all %}
+                                            <a href="{{ file.file.url }}" target="_blank">📎 {{ file.file.name|slice:"30:"|default:"Allegato" }}</a>
+                                            {% endfor %}
+                                        </div>
+                                        {% endif %}
+
+                                        <div class="message-meta">
+                                            <span>{{ msg.sender.first_name|default:msg.sender.username|slice:":1" }} • </span>
+                                            <span>{{ msg.created_at|date:"H:i" }}</span>
+                                            {% if msg.version > 1 %}<span title="Modificato">✏️</span>{% endif %}
+                                        </div>
+                                    </div>
+
+                                    <!-- Pulsante risposta (messaggi altri) -->
+                                    <div class="message-actions d-flex gap-1">
+                                        <button class="btn btn-sm btn-link text-muted p-0" onclick="replyToMessage('{{ msg.id }}', '{{ msg.content|escapejs }}')" title="Rispondi">↩️ Rispondi</button>
+                                    </div>
+                                </div>
+                            {% endif %}
+                        {% empty %}
+                            <div class="text-center text-muted py-5">
+                                <p class="fs-4 mb-3">💬</p>
+                                <p>Nessun messaggio ancora.</p>
+                                <small class="text-secondary">Inizia la conversazione scrivendo qui sopra!</small>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                </div>
+                </div>
+
+                <div class="card p-3 mb-2 shadow custom-card">
+                <!-- ✍️ FORM INVIO MESSAGGIO -->
+                    <div class="p-3 border-bottom">
+                        <form method="POST" enctype="multipart/form-data" id="chatForm">
+                            {% csrf_token %}
+
+                            <!-- Preview risposta -->
+                            <div id="replyPreview" class="alert alert-info py-2 mb-3 d-none">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <span><strong>↩️ Risposta a:</strong> <span id="replyText"></span></span>
+                                    <button type="button" class="btn-close btn-close-sm" onclick="cancelReply()" title="Annulla risposta"></button>
+                                </div>
+                            </div>
+
+                            <!-- Contesto rifiuto spesa (se presente) -->
+                            {% if reject_context %}
+                            <div class="alert alert-warning border-warning mb-3">
+                                <div class="d-flex align-items-start gap-2">
+                                    <span class="fs-5">🔴</span>
+                                    <div>
+                                        <h6 class="mb-1 fw-bold">Giustificazione rifiuto spesa</h6>
+                                        <p class="mb-2 small text-muted">
+                                            Stai rifiutando la spesa di <strong>{{ reject_context.created_by }}</strong>:
+                                        </p>
+                                        <ul class="list-unstyled mb-2 small">
+                                            <li>📅 {{ reject_context.date }}</li>
+                                            <li>🏷️ {{ reject_context.category }}</li>
+                                            <li>💰 € {{ reject_context.amount }}</li>
+                                        </ul>
+                                        <p class="mb-0 small fst-italic">Scrivi il motivo qui sotto.</p>
+                                    </div>
+                                </div>
+                                <input type="hidden" name="reject_expense_id" value="{{ reject_context.expense_id }}">
+                            </div>
+                            {% endif %}
+
+                            <!-- Textarea messaggio -->
+                            <div class="mb-3">
+                                <textarea
                                     name="message"
                                     class="form-control"
                                     rows="3"
-                                    placeholder="Scrivi messaggio..."
+                                    placeholder="Scrivi un messaggio..."
                                     required
-                            ></textarea>
-                </div>
+                                    id="messageInput"
+                                ></textarea>
+                            </div>
 
-                <div class="mb-3">
-                    <input type="file" name="attachments" multiple class="form-control">
-                </div>
+                            <!-- Allegati -->
+                            <div class="mb-3">
+                                <label class="form-label small text-muted">📎 Allegati (opzionale)</label>
+                                <input type="file" name="attachments" multiple class="form-control form-control-sm">
+                            </div>
 
-                <!-- evento calendario -->
-                <div class="form-check mt-2">
-                    <input class="form-check-input" type="checkbox"
-                           name="create_event"
-                           id="createEventCheck"
-                           onchange="toggleEventFields()">
+                            <!-- Crea evento calendario -->
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" name="create_event" id="createEventCheck" onchange="toggleEventFields()">
+                                <label class="form-check-label small" for="createEventCheck">
+                                    📅 Crea evento nel calendario
+                                </label>
+                            </div>
 
-                    <label class="form-check-label" for="createEventCheck">
-                        📅 Crea evento nel calendario
-                    </label>
-                </div>
+                            <!-- Campi evento (nascosti di default) -->
+                            <div id="eventFields" class="d-none border rounded p-3 mb-3 bg-light">
+                                <input type="text" name="event_title" placeholder="Titolo evento" class="form-control form-control-sm mb-2">
+                                <div class="row g-2">
+                                    <div class="col-6">
+                                        <input type="datetime-local" name="event_start" class="form-control form-control-sm">
+                                        <small class="text-muted">Inizio</small>
+                                    </div>
+                                    <div class="col-6">
+                                        <input type="datetime-local" name="event_end" class="form-control form-control-sm">
+                                        <small class="text-muted">Fine</small>
+                                    </div>
+                                </div>
+                                <textarea name="event_description" placeholder="Descrizione evento" class="form-control form-control-sm mt-2" rows="2"></textarea>
+                            </div>
 
-                <div id="eventFields" style="display:none;" class="mt-3">
-                    <input type="text"
-                           name="event_title"
-                           placeholder="Titolo evento"
-                           class="form-control mb-2">
+                            <!-- Pulsante invio -->
+                            <input type="hidden" name="reply_to" id="replyToInput">
+                            <div class="d-flex gap-2 flex-wrap mt-3">
+                                <button type="submit" class="btn btn-success btn-style ms-auto">
+                                <!--<button type="submit" class="btn btn-success btn-style"> -->
+                                    📤 Invia messaggio
+                                </button>
+                            </div>
 
-                    <input type="datetime-local"
-                           name="event_start"
-                           class="form-control mb-2">
-
-                    <input type="datetime-local"
-                           name="event_end"
-                           class="form-control mb-2">
-
-                    <textarea
-                            name="event_description"
-                            placeholder="Descrizione evento"
-                            class="form-control"></textarea>
-                </div>
-
-                <button type="submit" class="btn btn-success btn-style">
-                    Invia
-                </button>
-            </form>
-
-            <input type="hidden" name="reply_to" id="replyToInput">
-
-            <div id="replyPreview" class="alert alert-info mb-3" style="display:none;">
-                <strong>↩️ Stai rispondendo a:</strong>
-                <span id="replyText"></span>
-            </div>
-        </div>
-
-        <hr>
-        <div class="card p-3 mb-2 shadow custom-card">
-            <!-- LISTA MESSAGGI -->
-            {% for msg in messages %}
-            <div class="card mt-2 shadow-sm">
-                <div class="card-body">
-                    <strong>{{ msg.sender }}</strong>
-                    <small class="text-muted">
-                        {{ msg.created_at|date:"d/m/Y H:i" }}
-                    </small>
-
-
-                    <p class="mt-2">{{ msg.content }}</p>
-                    {% if msg.reply_to %}
-                    <div class="alert alert-light p-2 mb-2">
-                        ↩️ Risposta a:
-                        <strong>{{ msg.reply_to.sender }}</strong><br>
-                        {{ msg.reply_to.content|truncatechars:80 }}
+                        </form>
                     </div>
-                    {% endif %}
-
-                    <a href="{% url 'chat:delete_message' msg.id %}" class="btn btn-sm btn-danger">
-                        🗑️
-                    </a>
-
-                    <a href="{% url 'chat:message_history' msg.id %}"
-                       class="btn btn-sm {% if msg.version > 1 or msg.deleted_at %}btn-warning{% else %}btn-secondary{% endif %}">
-                        🕘 Cronologia
-                    </a>
-
-                    {% if msg.linked_event %}
-                    <small>📅 Evento collegato: {{ msg.linked_event.title }}</small>
-                    {% endif %}
-
-                    {% if msg.attachments.all %}
-                    <hr>
-                    <strong>Allegati:</strong>
-                    <ul>
-                        {% for file in msg.attachments.all %}
-                        <li>
-                            <a href="{{ file.file.url }}" target="_blank">
-                                {{ file.file.name|slice:":40" }}
-                            </a>
-                        </li>
-                        {% endfor %}
-                    </ul>
-                    {% endif %}
-
-                    <button
-                            class="btn btn-sm btn-outline-primary"
-                            onclick="replyToMessage('{{ msg.id }}', '{{ msg.content|escapejs }}')">
-                        ↩️ Rispondi
-                    </button>
                 </div>
-            </div>
-            {% empty %}
-            <p>Nessun messaggio</p>
-            {% endfor %}
 
-        </div>
+                <!-- 📎 SIDEBAR DOCUMENTI (WhatsApp-style) -->
+                <div class="col-md-3 mt-3">
+                    <div class="card shadow custom-card">
+                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                            <h6 class="mb-0">📎 Documenti</h6>
+                            <a href="{% url 'documents:documents_list' %}" class="btn btn-sm btn-link p-0 text-decoration-none">
+                                Tutti →
+                            </a>
+                        </div>
+                        <div class="card-body p-2" style="max-height: 400px; overflow-y: auto;">
+                            {% for doc in shared_docs %}
+                                <div class="list-group-item list-group-item-action p-2 mb-1 border rounded">
+                                    <a href="{% url 'documents:documents_detail' doc.id %}"
+                                       class="text-decoration-none d-block"
+                                       title="Apri dettaglio documento">
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="fs-5">
+                                                {% if doc.file.name|lower|slice:"-4:" == ".pdf" %}📕
+                                                {% elif doc.file.name|lower|slice:"-4:" == ".doc" or doc.file.name|lower|slice:"-5:" == ".docx" %}📘
+                                                {% elif doc.file.name|lower|slice:"-4:" == ".xls" or doc.file.name|lower|slice:"-5:" == ".xlsx" %}📗
+                                                {% else %}📄{% endif %}
+                                            </span>
+                                            <div class="flex-grow-1">
+                                                <div class="small fw-bold text-truncate" title="{{ doc.title }}">
+                                                    {{ doc.title|truncatechars:25 }}
+                                                </div>
+                                                <div class="small text-muted" style="font-size: 0.75rem;">
+                                                    {{ doc.uploaded_by.first_name|default:"Utente" }} •
+                                                    {{ doc.created_at|date:"d/m/Y" }}  {# ✅ created_at, non uploaded_at #}
+                                                </div>
+                                                {% if doc.category %}
+                                                    <span class="badge bg-secondary mt-1" style="font-size: 0.65rem;">
+                                                        {{ doc.get_category_display|truncatechars:10 }}
+                                                    </span>
+                                                {% endif %}
+                                            </div>
+                                        </div>
+                                    </a>
+                                    <!-- Pulsante anteprima rapida -->
+                                    <div class="mt-2 d-flex gap-1">
+                                        <a href="{% url 'documents:document_preview' doc.id %}"
+                                           target="_blank"
+                                           class="btn btn-sm btn-outline-primary py-0 px-2"
+                                           style="font-size: 0.75rem;">
+                                            👁️ Anteprima
+                                        </a>
+                                        <a href="{{ doc.file.url }}"
+                                           target="_blank"
+                                           class="btn btn-sm btn-outline-secondary py-0 px-2"
+                                           style="font-size: 0.75rem;">
+                                            ⬇️ Download
+                                        </a>
+                                    </div>
+                                </div>
+                            {% empty %}
+                                <p class="text-muted small text-center mb-0 py-3">Nessun documento condiviso</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
     </div>
-
-
+</div>
+{% endblock %}
 
 {% block extra_js %}
 <script>
-    function toggleEventFields() {
-        const checkbox = document.getElementById("createEventCheck");
-        const fields = document.getElementById("eventFields");
+document.addEventListener("DOMContentLoaded", function() {
 
-        fields.style.display = checkbox.checked ? "block" : "none";
+    // 📜 SCROLL AUTOMATICO IN FONDO ALLA CHAT
+    const chatContainer = document.getElementById("chatMessages");
+    if (chatContainer) {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+
+        // Scroll al messaggio evidenziato (da URL con #msg-XXX)
+        const hash = window.location.hash;
+        if (hash && hash.startsWith("#msg-")) {
+            const target = document.querySelector(hash);
+            if (target) {
+                target.scrollIntoView({ behavior: "smooth", block: "center" });
+                target.classList.add("bg-warning", "bg-opacity-25");
+                setTimeout(() => target.classList.remove("bg-warning", "bg-opacity-25"), 2000);
+            }
+        }
     }
 
-    function replyToMessage(messageId, content) {
-        document.getElementById("replyToInput").value = messageId;
-        document.getElementById("replyText").innerText = content;
-        document.getElementById("replyPreview").style.display = "block";
+    const searchQuery = "{{ search_query|default:''|escapejs }}";
 
-        // scroll automatico verso il form
-        window.scrollTo({
-            top: 0,
-            behavior: "smooth"
+    if (searchQuery && searchQuery.trim().length > 0) {
+        // 🔍 Highlight semplice con JS (case-insensitive)
+        document.querySelectorAll('.message-content').forEach(el => {
+            const originalText = el.textContent;
+            const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+            el.innerHTML = originalText.replace(regex, '<mark class="bg-warning text-dark">$1</mark>');
         });
     }
+
+    // ↩️ FUNZIONE RISPOSTA
+    window.replyToMessage = function(messageId, content) {
+        document.getElementById("replyToInput").value = messageId;
+        document.getElementById("replyText").textContent =
+            content.split('\n')[0].slice(0, 50) + (content.length > 50 ? '...' : '');
+        document.getElementById("replyPreview").classList.remove("d-none");
+
+        // Focus e scroll al form
+        const textarea = document.getElementById("messageInput");
+        if (textarea) {
+            textarea.focus();
+            textarea.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+    };
+
+    // ❌ ANNULLA RISPOSTA
+    window.cancelReply = function() {
+        document.getElementById("replyToInput").value = "";
+        document.getElementById("replyPreview").classList.add("d-none");
+        document.getElementById("messageInput").focus();
+    };
+
+    // 📅 TOGGLE CAMPI EVENTO
+    window.toggleEventFields = function() {
+        const checkbox = document.getElementById("createEventCheck");
+        const fields = document.getElementById("eventFields");
+        fields.classList.toggle("d-none", !checkbox.checked);
+    };
+
+    // ⌨️ TASTO ESC PER ANNULLARE RISPOSTA
+    document.addEventListener("keydown", function(e) {
+        if (e.key === "Escape") {
+            cancelReply();
+        }
+    });
+
+    // ✅ AUTO-FOCUS SE C'È CONTESTO RIFIUTO
+    {% if request.GET.auto_focus %}
+        const textarea = document.getElementById("messageInput");
+        if (textarea) {
+            textarea.focus();
+            textarea.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+    {% endif %}
+
+});
 </script>
-{% endblock extra_js %}
+
+
 {% endblock %}

@@ -7,7 +7,8 @@ from .views import (
     setup_view,
     invite_member_view,
     accept_invite_view, resend_invitation_view, cancel_invitation_view, confirm_invitation_view, expenses_by_child,
-    invitation_landing_view, family_timeline_view,
+    invitation_landing_view, family_timeline_view, create_support_agreement_view, edit_support_agreement_view,
+    delete_support_agreement_view,
 )
 
 app_name = "families"
@@ -46,5 +47,10 @@ urlpatterns = [
     path("invite/resend/<int:invitation_id>/", resend_invitation_view, name="invite_resend"),
     path("invite/cancel/<int:invitation_id>/", cancel_invitation_view, name="invite_cancel"),
     path("timeline/", family_timeline_view, name="timeline"),
-    path("by-child/", expenses_by_child, name="expenses_by_child")
+    path("by-child/", expenses_by_child, name="expenses_by_child"),
+#  ACCORDI DI MANTENIMENTO
+    path("agreement/create/", create_support_agreement_view, name="create_support_agreement"),
+    path("agreement/<int:agreement_id>/edit/", edit_support_agreement_view, name="edit_support_agreement"),
+    path("agreement/<int:agreement_id>/delete/", delete_support_agreement_view, name="delete_support_agreement"),
+
 ]

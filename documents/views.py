@@ -153,13 +153,13 @@ def upload_document_view(request):
                         DocumentVersion.objects.create(
                             document=existing_doc,
                             file=existing_doc.file,
-                            version=existing_doc.version,  # ✅ Passa l'intero corrente
+                            version=existing_doc.versions,  # ✅ Passa l'intero corrente
                             uploaded_by=request.user
                         )
 
                         # Aggiorna documento principale
                         existing_doc.file = uploaded_file
-                        existing_doc.version += 1  # ✅ Incrementa l'intero
+                        existing_doc.versions += 1  # ✅ Incrementa l'intero
                         existing_doc.category = category
                         existing_doc.scope = scope
                         existing_doc.reference_year = reference_year

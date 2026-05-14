@@ -48,11 +48,14 @@ INSTALLED_APPS = [
     'core',
     'accounts',
     'families',
+    'children',
+    'calendar_app',
+    'expenses',
     'chat',
     'documents',
-    'expenses',
-    'calendar_app',
-    'children',
+
+
+
 ]
 
 MIDDLEWARE = [

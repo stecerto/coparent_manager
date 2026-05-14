@@ -4,14 +4,15 @@ from children.models import ChildProfile
 
 def create_child(family, user, data):
     return ChildProfile.objects.create(
-        family=family,
-        name=data.get("name"),
-        surname=data.get("surname"),
+        family=family, modified_by=user,
+        name=data.get("name"), surname=data.get("surname"),
         birth_date=data.get("birth_date"),
-        notes=data.get("notes", ""),
-        modified_by=user
+        custody_type=data.get("custody_type", "shared_custody"),
+        contribution_pct_parent_a=data.get("contribution_pct_parent_a"),
+        manual_maintenance_amount=data.get("manual_maintenance_amount"),
+        override_split_pct=data.get("override_split_pct"),
+        notes=data.get("notes", "")
     )
-
 
 def update_child(child, user, data):
     child.is_active = False
@@ -20,14 +21,16 @@ def update_child(child, user, data):
     child.save()
 
     return ChildProfile.objects.create(
-        family=child.family,
-        name=data.get("name"),
-        surname=data.get("surname"),
+        family=child.family, modified_by=user,
+        name=data.get("name"), surname=data.get("surname"),
         birth_date=data.get("birth_date"),
+        custody_type=data.get("custody_type", "shared_custody"),
+        contribution_pct_parent_a=data.get("contribution_pct_parent_a"),
+        manual_maintenance_amount=data.get("manual_maintenance_amount"),
+        override_split_pct=data.get("override_split_pct"),
         notes=data.get("notes", ""),
         version=child.version + 1,
-        previous_version=child,
-        modified_by=user
+        previous_version=child
     )
 
 from datetime import date

@@ -11,24 +11,10 @@
     <h2>📊 Dashboard Spese</h2>
 </div>
 
-<div class="d-flex gap-2">
-    <a href="{% url 'expenses:expenses_riepilogo_spese' %}" class="btn btn-success btn-style">
-        Riepilogo Spese
-    </a>
-</div>
 
 <div class="col-md-12">
 
-    <div class="card p-3 mb-2 shadow custom-card">
-        <h4>📅 Calendario spese</h4>
 
-        
-
-        <div id="calendar"
-             style="max-width: 100%; margin-bottom:20px;">
-
-        </div>
-    </div>
     <div class="card p-3 mb-2 shadow custom-card">
         {% csrf_token %}
         <!--{{ form|crispy }}
@@ -37,49 +23,55 @@
 
         <!-- Bottone aggiunta -->
         <div class="d-flex gap-2">
-            <a href="{% url 'expenses:add_expense' %}" class="btn btn-success btn-style">
+            <a href="{% url 'expenses:add_expense' %}" class="btn btn-success btn-style mb-2">
                 ➕ Aggiungi Spesa
             </a>
-            <a href="{% url 'expenses:expenses_list' %}" class="btn btn-primary">
+            <a href="{% url 'expenses:expenses_list' %}" class="btn btn-success btn-style mb-2">
                 📄 Vedi tutte le spese
+            </a>
+            <a href="{% url 'expenses:expenses_riepilogo_spese' %}" class="btn btn-success btn-style mb-2">
+                Riepilogo Spese
+            </a>
+            <a href="{% url 'expenses:download_expense_pdf' %}" class="btn btn-success btn-style mb-2">
+            📄 Scarica PDF
             </a>
 
         </div>
     </div>
 
+    <div class="card p-3 mb-2 shadow custom-card">
+        <div class="row justify-content-center">
 
-    <div class="row justify-content-center">
+        <!-- CATEGORY -->
+        <div class="col-12 col-md-6 col-lg-4 mb-3">
+            <div class="card p-3 shadow custom-card h-100">
 
-    <!-- CATEGORY -->
-    <div class="col-12 col-md-6 col-lg-4 mb-3">
-        <div class="card p-3 shadow custom-card h-100">
+                <h5 class="text-center">Spese per categoria</h5>
 
-            <h5 class="text-center">Spese per categoria</h5>
+                    <!-- WRAPPER STABILE -->
+                    <div class="d-flex w-100 align-items-stretch">
 
-            <!-- WRAPPER STABILE -->
-            <div class="d-flex w-100 align-items-stretch">
-
-                <!-- LEGENDA SINISTRA -->
-                <div id="categoryLegend" class="d-flex flex-column gap-2 me-3">
-                    {% for c in category_summary %}
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="legend-dot"
-                                  style="background: {{ c.expense_type__color|default:'#6f42c1' }}"></span>
-                            <small>{{ c.expense_type__display_name }}</small>
+                        <!-- LEGENDA SINISTRA -->
+                        <div id="categoryLegend" class="d-flex flex-column gap-2 me-3">
+                            {% for c in category_summary %}
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="legend-dot" style="background:{{ c.expense_type__color|default:'#6f42c1' }}"></span>
+                                    <small>{{ c.expense_type__display_name }}</small>
+                                </div>
+                            {% endfor %}
                         </div>
-                    {% endfor %}
-                </div>
 
-                <!-- GRAFICO DESTRA -->
-                <div class="flex-grow-1 d-flex justify-content-center align-items-center"
-                     style="height:250px; width:100%;">
-                    <canvas id="categoryChart"></canvas>
-                </div>
+                        <!-- GRAFICO DESTRA -->
+                        <div class="flex-grow-1 d-flex justify-content-center align-items-center"
+                             style="height:250px; width:100%;">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+
+                    </div>
 
             </div>
-
         </div>
-    </div>
+
 
     <!-- PARENT -->
     <div class="col-12 col-md-6 col-lg-4 mb-3">
@@ -95,15 +87,22 @@
     </div>
 
 </div>
+        </div>
 
         <!-- PDF -->
-        <a href="{% url 'expenses:download_expense_pdf' %}" class="btn btn-success btn-style">
-            📄 Scarica PDF
-        </a>
+
+        <!-- <hr style="border: 1px solid #ccc; width: 50%; margin: 20px auto;"> -->
+
+    </div>
+    <div class="card p-3 mb-2 shadow custom-card">
+        <h4>📅 Calendario spese</h4>
 
 
-        <hr style="border: 1px solid #ccc; width: 50%; margin: 20px auto;">
 
+        <div id="calendar" class="mb-4"
+             style="max-width: 100%; margin-bottom:20px;">
+
+        </div>
     </div>
     <!-- MODAL SPESE GIORNO -->
     <div id="dayModal" class="custom-modal" style="display:none;">

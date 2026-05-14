@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card p-3 shadow custom-card">
+                <h3 class="mb-3">📜 Nuovo Accordo di Mantenimento</h3>
+                <form method="POST" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+                    
+                    <!-- 💡 Feedback Ripartizione -->
+                    <div class="alert alert-info mt-3 d-flex justify-content-between align-items-center">
+                        <span>📊 Ripartizione calcolata:</span>
+                        <div>
+                            <strong>Genitore A:</strong> <span id="pctA">50.00%</span> (€<span id="amtA">0.00</span>) | 
+                            <strong>Genitore B:</strong> <span id="pctB">50.00%</span> (€<span id="amtB">0.00</span>)
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-success w-100 mt-2">💾 Salva Accordo & Genera Calendario</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    const pctA = document.getElementById("id_split_pct_parent_a");
+    const amount = document.getElementById("id_monthly_amount");
+    const displayA = document.getElementById("pctA"), displayB = document.getElementById("pctB");
+    const amtA = document.getElementById("amtA"), amtB = document.getElementById("amtB");
+
+    function update() {
+        const valA = parseFloat(pctA.value) || 0;
+        const total = parseFloat(amount.value) || 0;
+        const valB = 100 - valA;
+        
+        displayA.textContent = valA.toFixed(2) + "%";
+        displayB.textContent = valB.toFixed(2) + "%";
+        amtA.textContent = (total * valA / 100).toFixed(2);
+        amtB.textContent = (total * valB / 100).toFixed(2);
+    }
+    pctA.addEventListener("input", update);
+    amount.addEventListener("input", update);
+    update();
+});
+</script>
+{% endblock %}

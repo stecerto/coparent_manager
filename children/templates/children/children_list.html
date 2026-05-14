@@ -1,97 +1,123 @@
 {% extends "base.html" %}
-{% load crispy_forms_tags %}
 {% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}Lista Figli{% endblock %}
+
 {% block content %}
+<div class="container-fluid mt-4">
+    <!-- Header + Pulsante Aggiungi -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">👶 Lista Figli</h2>
+        <a href="{% url 'children:child_form' %}" class="btn btn-success btn-style">
+            ➕ Aggiungi Figlio
+        </a>
+    </div>
 
-<div class="card p-3 mb-2 shadow custom-card text-center">
-        <h2 class="mb-0">Lista Figli</h2>
-</div>
-
-                <!-- bottone a destra -->
-                <div style="flex: 1;" class="d-flex justify-content-end">
-                    <a href="{% url 'children:child_form' %}"
-                       class="btn btn-success btn-style">
-                        Aggiungi Figlio
-                    </a>
+    {% if children %}
+    <div class="row g-4">
+        {% for child in children %}
+        <div class="col-md-6 col-xl-4">
+            <div class="card shadow custom-card h-100">
+                <!-- Intestazione Card -->
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold">{{ child.name }} {{ child.surname }}</h5>
+                    <small class="text-muted">
+                        {{ child.birth_date|date:"d/m/Y" }} • {{ child.age }} anni
+                    </small>
                 </div>
 
-            <br>
-            <div class="card-body">
-                <div class="card p-3 mb-2 shadow custom-card">
-                   <!--  <div style="max-width:600px; margin:auto; padding:20px;"> -->
+                <!-- Dati Finanziari -->
+                <div class="card-body">
+                    <ul class="list-group list-group-flush mb-3">
+                        <!-- Mantenimento -->
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>💰 Mantenimento mensile</span>
+                            <strong class="text-primary">
+                                {% if child.current_support is not None %}
+                                    {{ child.current_support|floatformat:2 }} €
+                                {% else %}
+                                    Non definito
+                                {% endif %}
+                            </strong>
+                        </li>
 
+                        <!-- Spese Attive -->
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>🔄 Spese attive</span>
+                            <strong class="text-warning">{{ child.active_total|floatformat:2|default:"0.00" }} €</strong>
+                        </li>
 
-                    <ul>
-                        {% for child in children %}
-                        <div class="card p-3 mb-2 shadow custom-card">
+                        <!-- Spese Approvate -->
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>✅ Spese approvate</span>
+                            <strong class="text-success">{{ child.approved_total|floatformat:2|default:"0.00" }} €</strong>
+                        </li>
 
-                            <h4>{{ child.name }}</h4>
+                        <!-- Ripartizione & Saldo -->
+                        <li class="list-group-item">
+                            <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-2">
+                                <span class="fw-bold">⚖️ Ripartizione spese approvate</span>
+                                <small class="text-muted">
+                                    📊 {{ child.split_pct_a|floatformat:0 }}% / {{ child.split_pct_b|floatformat:0 }}%
+                                </small>
+                            </div>
 
-                            <ul class="list-group">
+                            {% if child.approved_total > 0 %}
+                                <div class="p-2 bg-light rounded border">
+                                    <div class="d-flex justify-content-between small mb-1">
+                                        <span>👨 Genitore A:</span>
+                                        <strong class="text-primary">{{ child.parent_a_total|floatformat:2 }} €</strong>
+                                    </div>
+                                    <div class="d-flex justify-content-between small mb-2">
+                                        <span>👩 Genitore B:</span>
+                                        <strong class="text-success">{{ child.parent_b_total|floatformat:2 }} €</strong>
+                                    </div>
 
-                                <li class="list-group-item">
-                                    🔄 Spese attive:
-                                    <strong>{{ child.active_total|default:0 }} €</strong>
-                                </li>
-
-                                <li class="list-group-item">
-                                    ✅ Spese già sostenute:
-                                    <strong>{{ child.approved_total|default:0 }} €</strong>
-                                </li>
-
-                                <li class="list-group-item">
-                                    💰 Mantenimento mensile:
-                                    <strong>
-                                        {% if child.current_support %}
-                                            {{ child.current_support }} €
-                                        {% else %}
-                                            Non definito
-                                        {% endif %}
-                                    </strong>
-                                </li>
-
-                                <li class="list-group-item">
-                                    ⚖️ Saldo spese:
-                                    <strong>
-                                        {% if child.maintenance_balance > 0 %}
-                                            Genitore B deve {{ child.maintenance_balance }} €
-                                        {% elif child.maintenance_balance < 0 %}
-                                            Genitore A deve {{ child.maintenance_balance|floatformat:2|cut:"-" }} €
-                                        {% else %}
-                                            Pari
-                                        {% endif %}
-                                    </strong>
-                                </li>
-
-                            </ul>
-                                <div class="d-flex justify-content-end gap-2">
-
-                                    <a href="{% url 'children:child_edit' child.id %}"
-                                       class="btn btn-success btn-style">
-                                        ✏️ Dettagli Figlio
-                                    </a>
-
-                                    <a href="{% url 'children:child_confirm_delete' child.id %}"
-                                       class="btn btn-danger mt-1">
-                                         🗑️ Elimina
-                                    </a>
-                                    &nbsp;&nbsp;
-                                    <a href="{% url 'children:child_pdf' child.id %}"
-                                       class="btn btn-success btn-style">
-                                        Genera PDF
-                                    </a>
-
+                                    <hr class="my-2">
+                                    {% if child.maintenance_balance > 0.01 %}
+                                        <div class="text-center small">
+                                            <span class="badge bg-warning text-dark">
+                                                🔸 Se ha pagato A → B deve rimborsare <strong>{{ child.maintenance_balance|floatformat:2 }} €</strong>
+                                            </span>
+                                        </div>
+                                    {% elif child.maintenance_balance < -0.01 %}
+                                        <div class="text-center small">
+                                            <span class="badge bg-info text-dark">
+                                                🔸 Se ha pagato B → A deve rimborsare <strong>{{ child.maintenance_balance|floatformat:2|cut:"-" }} €</strong>
+                                            </span>
+                                        </div>
+                                    {% else %}
+                                        <div class="text-center small text-muted">✅ Quote bilanciate</div>
+                                    {% endif %}
                                 </div>
-                        </div>
-                        {% endfor %}
+                            {% else %}
+                                <div class="text-center small text-muted">Nessuna spesa approvata da ripartire</div>
+                            {% endif %}
+                        </li>
                     </ul>
+                </div>
+
+                <!-- Pulsanti Azione -->
+                <div class="card-footer bg-transparent d-flex gap-2 justify-content-end">
+                    <a href="{% url 'children:child_edit' child.id %}" class="btn btn-sm btn-outline-primary">✏️ Modifica</a>
+                    <a href="{% url 'children:child_pdf' child.id %}" class="btn btn-sm btn-outline-secondary">📄 PDF</a>
+                    <a href="{% url 'children:child_confirm_delete' child.id %}" class="btn btn-sm btn-outline-danger">🗑️ Elimina</a>
                 </div>
             </div>
         </div>
+        {% endfor %}
     </div>
+    {% else %}
+    <!-- Stato Vuoto -->
+    <div class="text-center py-5 border rounded-3 bg-light mt-3">
+        <p class="text-muted fs-5 mb-3">Nessun figlio registrato.</p>
+        <a href="{% url 'children:child_form' %}" class="btn btn-primary">👶 Aggiungi il primo figlio</a>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/pages/children.js' %}"></script>
+<!-- Nessun JS necessario per questa pagina -->
 {% endblock %}
