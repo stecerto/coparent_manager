@@ -185,8 +185,8 @@ MAILJET_SECRET_KEY = os.getenv("MAILJET_SECRET_KEY")
 EMAIL_HOST = "smtp.gmail.com" #"in-v3.mailjet.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = 'sc.assistenza.pc@gmail.com'  #os.getenv("MAILJET_API_KEY")
-EMAIL_HOST_PASSWORD = 'aooa ityf nggk fqxx' #os.getenv("MAILJET_SECRET_KEY")
+EMAIL_HOST_USER = os.getenv("MAILJET_API_KEY")
+EMAIL_HOST_PASSWORD =  os.getenv("MAILJET_SECRET_KEY")
 DEFAULT_FROM_EMAIL = "no-reply@mailjet.com"  #"sc.assistenza.pc@gmail.com"
 
 #SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  produzione
