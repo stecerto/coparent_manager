@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Account Già Esistente{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow text-center p-4 border-0">
+                <div class="display-1 text-success mb-3">✅</div>
+                <h2 class="h4 mb-3">Account Già Esistente</h2>
+                
+                <p class="text-muted mb-4">
+                    L'email <strong>{{ invitation.email }}</strong> è già associata a un account CoParent Manager.
+                </p>
+                
+                <div class="alert alert-info mb-4">
+                    <small>
+                        <strong>Invito per:</strong> {{ invitation.family.name }}<br>
+                        <strong>Ruolo:</strong> {{ invitation.get_role_display }}<br>
+                        <strong>Invitato da:</strong> {{ invitation.invited_by.first_name|default:invitation.invited_by.email }}
+                    </small>
+                </div>
+
+                <div class="d-grid gap-2 col-10 mx-auto">
+                    <!-- ✅ Link che preserva il token in sessione -->
+                    <a href="{% url 'accounts:login' %}?next={{ request.path }}" 
+                       class="btn btn-primary">
+                        🔑 Accedi per accettare l'invito
+                    </a>
+                    <a href="{% url 'home' %}" class="btn btn-outline-secondary">
+                        🏠 Torna alla Home
+                    </a>
+                </div>
+                
+                <p class="small text-muted mt-3">
+                    Dopo il login, verrai automaticamente aggiunto a <strong>{{ invitation.family.name }}</strong>.
+                </p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

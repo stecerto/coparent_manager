@@ -135,7 +135,7 @@ def child_create_view(request):
                 if amt is not None and amt > Decimal("0"):
                     update_child_support(child, amt, date.today())
 
-                messages.success(request, f"✅ {child.name} aggiunto con successo")
+                messages.success(request, f"✅ {child.name.capitalize()} aggiunto con successo")
                 return redirect("children:children_list")
             else:
                 messages.error(request, "⚠️ Correggi gli errori evidenziati")

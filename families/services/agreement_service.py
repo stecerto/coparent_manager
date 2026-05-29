@@ -49,7 +49,9 @@ def generate_support_calendar_events(agreement):
                 is_auto_generated=True,
                 linked_agreement=agreement,
                 created_by=agreement.modified_by or family.members.first().user,
-                is_shared=True
+                is_shared=True,
+                source = "agreement",
+                linked_id = agreement.id
             )
             created_count += 1
 

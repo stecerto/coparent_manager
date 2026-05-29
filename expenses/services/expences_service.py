@@ -3,6 +3,7 @@ from django.utils import timezone
 from decimal import Decimal
 
 from expenses.models import Expense
+from notifications.services import create_notification
 
 
 def _get_effective_split_pct(child, override_pct=None):
@@ -14,23 +15,36 @@ def _get_effective_split_pct(child, override_pct=None):
     return Decimal("50.00")
 
 
-def create_expense(family, user, data, child, membership):
-    """Crea spesa v1 con snapshot percentuale"""
-    pct_a = _get_effective_split_pct(child, data.get("split_override_pct"))
+def create_expense(family, user, child, expense_type, amount, description, expense_date, membership):
 
-    # ✅ Prepara i dati puliti (esclude split_override_pct)
-    model_data = {k: v for k, v in data.items() if k not in ["split_override_pct"]}
-    model_data["family"] = family
-    model_data["child"] = child
+    if not expense_type:
+        raise ValueError("expense_type obbligatorio")
+
+    pct_a = _get_effective_split_pct(child, None)
 
     return Expense.objects.create(
+        family=family,
         created_by=user,
         modified_by=user,
+
+        child=child,
+        expense_type=expense_type,
+
+        amount=amount,
+        description=description,
+        expense_date=expense_date,
+
+        status="pending",
+
         effective_split_pct_a=pct_a,
-        is_active=True,
+
+        category_name_snapshot=expense_type.display_name,
+        category_color_snapshot=expense_type.color,
+        group_snapshot=expense_type.group.label,
+
         version=1,
         previous_version=None,
-        **model_data
+        is_active=True,
     )
 
 
@@ -48,6 +62,8 @@ def update_expense(original, user, data, child, membership):
     model_data = {k: v for k, v in data.items() if k not in ["split_override_pct"]}
     model_data["family"] = original.family
     model_data["child"] = child or original.child
+    expense_type = model_data.get("expense_type")
+
 
     # ✅ Forza stato pending per la nuova versione (va riapprovata)
     model_data.pop("status", None)
@@ -56,6 +72,9 @@ def update_expense(original, user, data, child, membership):
         created_by=original.created_by,
         modified_by=user,
         effective_split_pct_a=pct_a,
+        category_name_snapshot=expense_type.display_name,
+        category_color_snapshot=expense_type.color,
+        group_snapshot=expense_type.group.label,
         version=original.version + 1,
         previous_version=original,
         is_active=True,
@@ -81,4 +100,32 @@ def approve_expense(expense, user, role):
 
     if updated_fields:
         expense.save(update_fields=updated_fields)
+
+    if new_status == "pending" and expense.created_by != user:
+        # Notifica all'altro genitore che c'è una spesa in attesa
+        other_parent = family.members.exclude(user=user).filter(role__in=["parent_a", "parent_b"]).first()
+        if other_parent:
+            create_notification(
+                user=other_parent.user,
+                notification_type="expense_pending",
+                title=f"Nuova spesa da approvare",
+                message=f"{user.first_name} ha inserito una spesa di €{expense.amount} per {expense.child.name if expense.child else 'la famiglia'}.",
+                target_url=f"/expenses/list/?status=pending",
+                target_model="Expense",
+                target_id=expense.id,
+                send_email=True
+            )
+
+    elif new_status == "rejected":
+        # Notifica a chi ha inserito la spesa che è stata rifiutata
+        create_notification(
+            user=expense.created_by,
+            notification_type="expense_rejected",
+            title=f"Spesa rifiutata",
+            message=f"La tua spesa di €{expense.amount} è stata rifiutata. Vedi la chat per i dettagli.",
+            target_url=f"/chat/?family_id={family.id}",
+            target_model="Expense",
+            target_id=expense.id,
+            send_email=True
+        )
     return expense

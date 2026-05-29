@@ -17,8 +17,8 @@ from .models import Invitation
 
 class InvitationForm(forms.ModelForm):
     """
-    Form per invitare nuovi membri nella famiglia.
-    Filtra automaticamente i ruoli disponibili e gestisce validazione canale.
+    Form per invitare membri nella famiglia.
+    Responsabilità: validazione + UI (NO business logic complessa).
     """
 
     display_name = forms.CharField(
@@ -50,8 +50,7 @@ class InvitationForm(forms.ModelForm):
         label="Telefono (con prefisso)",
         widget=forms.TextInput(attrs={
             "placeholder": "+39 333 1234567",
-            "class": "form-control",
-            "pattern": r"^\+?[0-9\s\-\(\)]+$"
+            "class": "form-control"
         })
     )
 
@@ -62,146 +61,129 @@ class InvitationForm(forms.ModelForm):
             "role": forms.Select(attrs={"class": "form-select"}),
         }
 
+    # =========================
+    # INIT
+    # =========================
     def __init__(self, *args, user_role=None, family=None, **kwargs):
-        """
-        Inizializza il form filtrando i ruoli disponibili.
-        """
-        # Estrai parametri custom PRIMA di super()
-        if 'user_role' in kwargs:
-            user_role = kwargs.pop('user_role')
-        if 'family' in kwargs:
-            family = kwargs.pop('family')
-
         super().__init__(*args, **kwargs)
 
-        # 🔹 STEP 1: Carica tutti i ruoli come fallback
-        all_roles = RoleChoices.all_roles()
-        self.fields["role"].choices = all_roles
+        self.user_role = user_role
+        self.family = family
 
-        # 🔹 STEP 2: Se abbiamo la famiglia, calcola i ruoli DISPONIBILI
-        if family:
-            # ✅ Calcola ruoli occupati (una sola volta)
-            occupied = set(family.members.values_list('role', flat=True)) | set(
-                family.invitations.filter(status='pending').values_list('role', flat=True)
+        # Default: tutti i ruoli
+        self.fields["role"].choices = RoleChoices.choices
+
+        if not family or not user_role:
+            return
+
+        # =========================
+        # RUOLI GIÀ OCCUPATI
+        # =========================
+        occupied = set(family.members.values_list("role", flat=True))
+
+        # =========================
+        # RUOLI CONSENTITI PER INVITANTE
+        # =========================
+        if user_role in (RoleChoices.PARENT_A, "parent_a"):
+            allowed = {
+                RoleChoices.PARENT_B,
+                RoleChoices.LAWYER_A,
+                RoleChoices.MEDIATOR,
+                RoleChoices.CONSULTANT,
+            }
+
+        elif user_role in (RoleChoices.PARENT_B, "parent_b"):
+            allowed = {
+                RoleChoices.PARENT_A,
+                RoleChoices.LAWYER_B,
+                RoleChoices.MEDIATOR,
+                RoleChoices.CONSULTANT,
+            }
+
+        elif "lawyer" in str(user_role):
+            allowed = {
+                RoleChoices.LAWYER_A,
+                RoleChoices.LAWYER_B,
+                RoleChoices.MEDIATOR,
+                RoleChoices.CONSULTANT,
+            }
+
+        else:
+            allowed = {c[0] for c in RoleChoices.choices}
+
+        # =========================
+        # FILTRO FINALE
+        # =========================
+        available_roles = [
+            c for c in RoleChoices.choices
+            if c[0] in allowed and c[0] not in occupied
+        ]
+
+        self.fields["role"].choices = available_roles
+
+        # =========================
+        # CASO NESSUN RUOLO DISPONIBILE
+        # =========================
+        if not available_roles:
+            self.fields["role"].disabled = True
+            self.fields["role"].help_text = (
+                "Tutti i ruoli sono già assegnati in questa famiglia."
             )
 
-            # 🔹 STEP 3: Filtra in base a chi sta invitando (usa RoleChoices, non vecchi constant)
-            if user_role in (RoleChoices.PARENT_A, "parent_a"):
-                allowed = {RoleChoices.PARENT_B, RoleChoices.LAWYER_A, RoleChoices.LAWYER_B,
-                           RoleChoices.MEDIATOR, RoleChoices.CONSULTANT}
-            elif user_role in (RoleChoices.PARENT_B, "parent_b"):
-                allowed = {RoleChoices.PARENT_A, RoleChoices.LAWYER_A, RoleChoices.LAWYER_B,
-                           RoleChoices.MEDIATOR, RoleChoices.CONSULTANT}
-            elif user_role in (RoleChoices.LAWYER_A, "lawyer_a", RoleChoices.LAWYER_B, "lawyer_b"):
-                allowed = {RoleChoices.LAWYER_A, RoleChoices.LAWYER_B,
-                           RoleChoices.MEDIATOR, RoleChoices.CONSULTANT}
-            else:
-                # Mediator/consultant: possono invitare tutti i ruoli
-                allowed = {c[0] for c in RoleChoices.choices}
-
-            # 🔹 STEP 4: Rimuovi ruoli già occupati e applica permessi
-            available_roles = [c for c in RoleChoices.choices if c[0] in (allowed - occupied)]
-
-            if available_roles:
-                self.fields["role"].choices = available_roles
-
-                # 🔹 STEP 5: Auto-seleziona il ruolo "complementare" se logico
-                available_values = {c[0] for c in available_roles}  # ✅ Estrai solo i valori stringa
-
-                if user_role in (RoleChoices.PARENT_A, "parent_a") and RoleChoices.PARENT_B in available_values:
-                    self.fields["role"].initial = RoleChoices.PARENT_B
-                elif user_role in (RoleChoices.PARENT_B, "parent_b") and RoleChoices.PARENT_A in available_values:
-                    self.fields["role"].initial = RoleChoices.PARENT_A
-                elif user_role in (RoleChoices.LAWYER_A, "lawyer_a") and RoleChoices.LAWYER_B in available_values:
-                    self.fields["role"].initial = RoleChoices.LAWYER_B
-                elif user_role in (RoleChoices.LAWYER_B, "lawyer_b") and RoleChoices.LAWYER_A in available_values:
-                    self.fields["role"].initial = RoleChoices.LAWYER_A
-                else:
-                    # Fallback: primo ruolo disponibile
-                    self.fields["role"].initial = available_roles[0][0]
-            else:
-                # Nessun ruolo disponibile → disabilita il campo
-                self.fields["role"].disabled = True
-                self.fields["role"].help_text = "Tutti i ruoli sono già assegnati in questa famiglia."
-
-        # 🔹 STEP 6: Se c'è SOLO un ruolo disponibile, nascondilo (UX pulita)
-        if len(self.fields["role"].choices) == 1:
+        # =========================
+        # UX: se 1 solo ruolo → hidden
+        # =========================
+        if len(available_roles) == 1:
             self.fields["role"].widget = forms.HiddenInput()
-            role_value, role_label = self.fields["role"].choices[0]
-            self.fields["role"].help_text = f"Ruolo assegnato automaticamente: {role_label}"
 
-        # 🔹 STEP 7: Gestione visibilità email/phone in base al canale
-        self._toggle_channel_fields()
-
-    def _toggle_channel_fields(self):
-        """Mostra/nasconde email o phone in base al canale selezionato"""
-        # ✅ Controlla prima initial (GET), poi data (POST)
-        channel = self.initial.get("channel") or self.data.get("channel") or "email"
-
-        if channel == "email":
-            self.fields["email"].required = True
-            self.fields["phone"].required = False
-            self.fields["phone"].widget.attrs.update({"disabled": "disabled", "class": "form-control text-muted"})
-        elif channel == "whatsapp":
-            self.fields["email"].required = False
-            self.fields["phone"].required = True
-            self.fields["email"].widget.attrs.update({"disabled": "disabled", "class": "form-control text-muted"})
-
-        # Aggiungi attributi data- per JS dinamico (opzionale)
-        self.fields["channel"].widget.attrs.update({
-            "data-toggle-email": "true",
-            "data-email-field": "id_email",
-            "data-phone-field": "id_phone"
-        })
-
+    # =========================
+    # CLEAN
+    # =========================
     def clean(self):
-        """Validazione incrociata canale → contatto"""
         cleaned_data = super().clean()
+
         channel = cleaned_data.get("channel")
         email = cleaned_data.get("email")
         phone = cleaned_data.get("phone")
         role = cleaned_data.get("role")
 
-        # 🔹 Validazione canale obbligatorio
         if not channel:
             self.add_error("channel", "Seleziona un metodo di invito")
 
-        # 🔹 Validazione contatto in base al canale
         if channel == "email" and not email:
-            self.add_error("email", "L'email è obbligatoria per gli inviti via email")
-        elif channel == "whatsapp" and not phone:
-            self.add_error("phone", "Il telefono è obbligatorio per gli inviti via WhatsApp")
+            self.add_error("email", "Email obbligatoria")
 
-        # 🔹 Validazione ruolo (se campo visibile)
-        if role:
-            available_values = {c[0] for c in self.fields["role"].choices}
-            if role not in available_values:
-                self.add_error("role", "Ruolo non disponibile per questa famiglia")
+        if channel == "whatsapp" and not phone:
+            self.add_error("phone", "Telefono obbligatorio")
 
-        # 🔹 Validazione duplicato invito pendente (extra sicurezza)
-        if self.instance.pk is None and email and channel == "email":
+        # validazione ruolo
+        available_values = {c[0] for c in self.fields["role"].choices}
+        if role and role not in available_values:
+            self.add_error("role", "Ruolo non disponibile per questa famiglia")
+
+        # duplicati invito
+        if self.instance.pk is None and email:
             if Invitation.objects.filter(
-                    family=getattr(self.instance, 'family', None),
-                    email=email,
-                    status="pending"
+                family=self.family,
+                email=email,
+                status="pending"
             ).exists():
-                self.add_error("email", "Esiste già un invito pendente per questa email")
+                self.add_error("email", "Invito già esistente")
 
         return cleaned_data
 
-    def save(self, commit=True, family=None, sender=None, **kwargs):
-        """
-        Override di save() per impostare automaticamente family e invited_by.
-        """
+    # =========================
+    # SAVE
+    # =========================
+    def save(self, commit=True, family=None, sender=None):
         invitation = super().save(commit=False)
 
-        # ✅ Usa i parametri espliciti se forniti, altrimenti fallback su instance
         if family:
             invitation.family = family
+
         if sender:
             invitation.invited_by = sender
 
-        # Auto-expire a 7 giorni se non impostato
         if not invitation.expire_at:
             from django.utils import timezone
             from datetime import timedelta
@@ -209,15 +191,27 @@ class InvitationForm(forms.ModelForm):
 
         if commit:
             invitation.save()
+
         return invitation
+
+
 # expenses/forms.py
 class ExpenseForm(forms.ModelForm):
     class Meta:
         model = Expense
+
         fields = [
             "child", "expense_type", "amount", "description",
             "expense_date", "status"  # ✅ AGGIUNGI QUESTO se vuoi modificarlo via form
         ]
+        labels = {
+            "child": "Figlio",
+            "expense_type": "Categoria spesa",
+            "amount": "Importo",
+            "description": "Descrizione",
+            "expense_date": "Data",
+            "status": "Stato"
+        }
 
         widgets = {
             "expense_date": forms.DateInput(attrs={"type": "date", "class": "form-control"}),

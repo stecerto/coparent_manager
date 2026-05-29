@@ -19,7 +19,7 @@ def generate_child_report(child, supports):
 
     content = []
 
-    content.append(Paragraph(f"Report Figlio: {child.name}", styles["Title"]))
+    content.append(Paragraph(f"Report Figlio: {child.name.capitalize()}", styles["Title"]))
     content.append(Spacer(1, 10))
 
     content.append(Paragraph("Storico mantenimento:", styles["Heading2"]))

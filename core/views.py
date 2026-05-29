@@ -1,7 +1,8 @@
 from django.contrib.auth.decorators import login_required
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 
 from accounts.decorators import confirmed_required, first_login_required
+from core.choices import RoleChoices
 
 
 def home(request):
@@ -11,8 +12,21 @@ def home(request):
 @confirmed_required
 @first_login_required
 def dashboard(request):
-    return render(request, "core/dashboard.html")
+    return render(request, "families/family_dashboard.html")
 
+
+@login_required
+def lawyer_home_view(request):
+    # 🔒 Sicurezza: solo avvocati possono accedere
+    profile = getattr(request.user, 'profile', None)
+    if not profile or profile.role not in RoleChoices.lawyer_roles():
+        return redirect('home')  # O 'families:lawyer_dashboard' se preferisci
+
+    context = {
+        'user': request.user,
+        'profile': profile,
+    }
+    return render(request, 'core/lawyer_home.html', context)
 '''
 @login_required(login_url='/accounts/login/')
 def dashboard(request):

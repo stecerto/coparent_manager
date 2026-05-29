@@ -2,27 +2,133 @@ from django.conf.locale import fa
 from django.db import models
 from django.conf import settings
 
+from django.utils import timezone
+from django.conf import settings
 
-class ExpenseCategory(models.Model):
-    GROUP_CHOICES = [
-        ("ordinarie", "Ordinarie"),
-        ("straordinarie", "Straordinarie"),
-        ("straordinarie_concordare", "Straordinarie da concordare"),
-    ]
-    name = models.CharField(max_length=50, unique=True)
-    display_name = models.CharField(max_length=100)
-    color = models.CharField(max_length=7, default="#6f42c1")
-    group = models.CharField(max_length=30, choices=GROUP_CHOICES, default="ordinarie")
+
+class ExpenseCategoryGroup(models.Model):
+
+    code = models.CharField(
+        max_length=50,
+        unique=True
+    )
+
+    label = models.CharField(
+        max_length=100
+    )
+
+    color = models.CharField(
+        max_length=7,
+        default="#6c757d"
+    )
+
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
-        verbose_name = "Categoria Spesa"
-        verbose_name_plural = "Categorie Spese"
-        ordering = ["group","display_name"]  # ✅ Ordine alfabetico nel dropdown
+        ordering = ["label"]
 
+    def __str__(self):
+        return self.label
+
+
+class ExpenseCategory(models.Model):
+
+    group = models.ForeignKey(
+        ExpenseCategoryGroup,
+        on_delete=models.PROTECT,
+        related_name="categories"
+    )
+
+    slug = models.SlugField(max_length=100)
+
+    display_name = models.CharField(max_length=255)
+
+    color = models.CharField(max_length=7)
+
+    is_active = models.BooleanField(default=True)
+
+    # VERSIONING
+    version = models.PositiveIntegerField(default=1)
+
+    previous_version = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="new_versions"
+    )
+
+    valid_from = models.DateTimeField(default=timezone.now)
+
+    valid_to = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+
+    # AUDIT
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="created_categories"
+    )
+
+    modified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="modified_categories"
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["group__label", "display_name"]
 
     def __str__(self):
         return self.display_name
 
+class ExpenseCategoryHistory(models.Model):
+    ACTIONS = [
+        ("created", "Creata"),
+        ("updated", "Modificata"),
+        ("deleted", "Disattivata"),
+    ]
+
+    category = models.ForeignKey(
+        ExpenseCategory,
+        on_delete=models.CASCADE,
+        related_name="history"
+    )
+
+    action = models.CharField(max_length=20, choices=ACTIONS)
+
+    old_name = models.CharField(max_length=255, blank=True)
+
+    new_name = models.CharField(max_length=255, blank=True)
+
+    old_color = models.CharField(max_length=20, blank=True)
+
+    new_color = models.CharField(max_length=20, blank=True)
+
+    changed_at = models.DateTimeField(auto_now_add=True)
+
+    changed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        on_delete=models.SET_NULL,
+        )
+
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ["-changed_at"]
 
 class Expense(models.Model):
     # 🎯 SCELTE (raggruppate in cima)
@@ -32,6 +138,17 @@ class Expense(models.Model):
         ("rejected", "Rifiutata"),
         ("paid", "Pagata"),
     ]
+
+    class Meta:
+        ordering = ["-expense_date", "-created_at"]
+        indexes = [models.Index(fields=["status", "is_active"])]
+
+
+    category_name_snapshot = models.CharField("Nome categoria", max_length=255, blank=True, default="")
+    category_color_snapshot = models.CharField("Colore categoria", max_length=7, blank=True, default="#6f42c1")
+    group_snapshot = models.CharField("Gruppo categoria", max_length=100, blank=True, default="ordinarie")
+
+
 
     # 🌐 RELAZIONI CORE
     family = models.ForeignKey("families.Family", on_delete=models.CASCADE, related_name="expenses")
@@ -87,12 +204,17 @@ class Expense(models.Model):
         help_text="Percentuale effettiva applicata a questa versione"
     )
 
+    def save(self, *args, **kwargs):
+        if self.expense_type and not self.pk:  # Solo alla CREAZIONE (pk è None)
+            self.category_name_snapshot = self.expense_type.display_name
+            self.category_color_snapshot = self.expense_type.color
+            self.group_snapshot = self.expense_type.group
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"Spesa v{self.version} - {self.amount}€ ({self.child.name})"
 
-    class Meta:
-        ordering = ["-expense_date", "-created_at"]
-        indexes = [models.Index(fields=["status", "is_active"])]
+
 
 
     @property
@@ -147,8 +269,6 @@ class Expense(models.Model):
 
 
 '''
-c
-
 
 creare pagina HTML STORICO
 Expense.objects.filter(

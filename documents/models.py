@@ -49,6 +49,8 @@ class Document(models.Model):
     owner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
+        null=False,
+        blank=False,
         related_name="owned_documents"
     )
 
@@ -108,6 +110,14 @@ class Document(models.Model):
         null=True,
         blank=True
     )
+    is_private = models.BooleanField(
+        default=False,
+        verbose_name="Documento Riservato",
+        help_text="Se attivo, il documento sarà visibile solo ai partecipanti della chat privata."
+    )
+
+    class Meta:
+        ordering = ['-created_at']
 
     def __str__(self):
         return f"{self.title} - v{self.versions}"

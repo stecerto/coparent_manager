@@ -1,3 +1,27 @@
+/* 🖼️ BRAND BANNER */
+.brand-banner {
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.brand-logo {
+    max-height: 200px;       /* ✅ Dimensione richiesta */
+    width: auto;             /* Mantiene proporzioni */
+    transition: transform 0.2s ease, filter 0.2s ease;
+    filter: drop-shadow(0 2px 4px rgba(0,0,0,0.1));
+}
+
+.brand-logo:hover {
+    transform: scale(1.03);
+    filter: drop-shadow(0 4px 8px rgba(0,0,0,0.15));
+}
+
+/* 📱 Responsive: su mobile 200px è troppo invasivo */
+@media (max-width: 768px) {
+    .brand-logo { max-height: 120px; }
+    .brand-banner { padding: 1rem 0; }
+}
+
 /* Menu colore base grigio */
 .navbar .nav-link {
     color: #6c757d;
@@ -13,22 +37,18 @@
 /* Attivo rosso */
 .navbar .nav-link.active {
     color: red !important;
+    padding-bottom: 2px;
 }
 
-url-link a {
-    color: #6c757d !important;
-    font-weight: 500;
-    transition: 0.3s ease;
+.custom-nav-link{
+    margin-top:20px; margin-bottom:20px;
+    display: inline-block;
+    padding: 12px 24px;
+    border-radius:8px !important;
+    color: purple !important;
     text-decoration: none;
-}
-
-url-link a:hover {
-    color: #6f42c1 !important;
-}
-
-.url-link:hover {
-    color: #6f42c1;
-    text-decoration: underline; /* opzionale, per evidenziare il link al passaggio del mouse */
+    font-weight: bold;
+    font-family: Arial, sans-serif;
 }
 
 .search-box {
@@ -49,16 +69,20 @@ url-link a:hover {
 }
 
 .result-item {
-    padding: 12px 0;
-    border-bottom: 1px solid #8B008B; /* linea viola */
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #eee;
+    background-color: #fff;
+    transition: 0.2s;
+    border-bottom: 1px solid #8B008B;
     width: 50%;
     margin: 20px auto;
     opacity: 0.7;
 }
+.result-item:last-child { border-bottom: none; }
+.result-item:hover { background-color: #f8f9fa; }
 
-.result-item:last-child {
-    border-bottom: none; /* niente linea nell’ultimo */
-}
+
 
 
 .custom-card {
@@ -88,11 +112,7 @@ url-link a:hover {
     justify-content: flex-end;
 }
 
-.btn-success.btn-style {
-    background-color: #28a745;
-    border-color: #28a745;
-    gap: 10px;
-}
+
 
 .btn-style {
    /* verde */
@@ -144,38 +164,6 @@ url-link a:hover {
 }
 
 
-
-.link-style:hover{
-    padding: 10px 18px;
-    border-radius: 5px;
-    border: 2px solid purple !important;/* bordo viola al passaggio del mouse */
-    color: #008000 !important;/* mantiene il testo bianco */
-    background-color: white !important;/* mantiene il verde */
-}
-
-.result-item {
-    padding: 12px;
-    margin-bottom: 10px;
-    border-radius: 10px;
-    border: 1px solid #eee;
-    background-color: #fff;
-    transition: 0.2s;
-}
-
-.result-item:hover {
-    background-color: #f8f9fa;
-}
-
-.custom-nav-link{
-    margin-top:20px; margin-bottom:20px;
-    display: inline-block;
-    padding: 12px 24px;
-    border-radius:8px !important;
-    color: purple !important;
-    text-decoration: none;
-    font-weight: bold;
-    font-family: Arial, sans-serif;
-}
 
 .timeline {
     position: relative;
@@ -343,3 +331,35 @@ url-link a:hover {
     max-width: 100% !important;
     max-height: 100% !important;
 }
+
+.badge-family {
+    display: inline-block;
+    border: 2px solid #7b2cbf !important;
+    border-radius: 8px;
+    background-color: #f8f5ff;
+    color: black !important;
+}
+
+.badge-parent-a {
+    background: #e8f5e9;
+    border: 2px solid #7b2cbf !important;
+}
+
+.badge-parent-b {
+    background: #e8f5e9;
+    border: 2px solid #7b2cbf !important;
+}
+
+/* 🔧 OVERRIDE BOOTSTRAP → VIOLETTO COERENTE */
+:root {
+    --bs-primary: #7b2cbf !important;
+    --bs-primary-rgb: 123, 44, 191 !important;
+    --bs-link-color: #6f42c1 !important;
+    --bs-link-hover-color: #5a32a3 !important;
+}
+
+/* 🏷️ Badge, bordi, sfondi chiari */
+.badge.bg-primary { background-color: #7b2cbf !important; }
+.border-primary { border-color: #7b2cbf !important; }
+.bg-light { background-color: #faf5ff !important; }
+.alert-primary { background-color: #f3e8ff !important; border-color: #d8b4fe !important; color: #6b21a8 !important; }

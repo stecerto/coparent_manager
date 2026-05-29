@@ -3,14 +3,21 @@
 {% load crispy_forms_tags %}
 
 
-{% block title %}Dashboard Familiare{% endblock %}
+{% block title %}Pannello Controllo Famiglia{% endblock %}
 
 {% block content %}
 
 <div class="card p-3 mb-2 shadow custom-card text-center">
-    <h2 class="mb-0">🏠 Dashboard Familiare</h2>
+    <h2 class="mb-0">🏠 Pannello Controllo Famiglia</h2>
 </div>
-
+{% if not is_setup_complete %}
+<div class="alert alert-warning alert-dismissible fade show" role="alert">
+    <strong>⚠️ Profilo incompleto</strong>
+    Alcune funzionalità potrebbero non essere disponibili.
+    <a href="{% url 'families:setup' %}" class="alert-link">Completa ora →</a>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endif %}
 
 <!-- =======================
      Figli

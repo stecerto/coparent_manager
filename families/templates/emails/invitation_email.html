@@ -7,7 +7,14 @@
 {% endif %}
 
 <p>Invitato da: {{ inviter_name }}</p>
-
+<!-- invite_accept.html -->
+{% if user_exists %}
+<div class="alert alert-info">
+    👋 Hai già un account con questa email?
+    <a href="{% url 'accounts:login' %}" class="fw-bold">Accedi ora</a>
+    per accettare l'invito automaticamente.
+</div>
+{% else %}
 <div style="margin-top:20px; margin-bottom:20px;">
         <a href="{{ invite_link }}"
            style="
@@ -23,8 +30,9 @@
            Accetta l'invito
         </a>
 </div>
-<p style="font-size:12px; color:#666;">
+    <p style="font-size:12px; color:#666;">
         Se il pulsante non funziona, copia e incolla questo link:
         <br>
         {{ invite_link }}
     </p>
+{% endif %}

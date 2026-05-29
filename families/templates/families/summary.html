@@ -1,81 +1,183 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4">
 
-    <h2>Riepilogo dati famiglia</h2>
 
+<!-- Spacer per non coprire il contenuto -->
+
+
+<!-- ✅ Badge: confronto ESPlicito, nessun else implicito -->
+
+
+<!-- ... resto del template ... -->
+{% comment %} 📋 RIEPILOGO FAMIGLIA {% endcomment %}
+
+{# 🔹 HEADER #}
+<div class="card p-3 mb-3 shadow custom-card text-center bg-light">
+    <h2 class="mb-0">👨‍👩‍👧 Riepilogo: <strong>{{ family_name|default:"Famiglia" }}</strong></h2>
+</div>
+
+{# 🔹 CARD 1: UTENTE LOGGATO #}
+<div class="card p-3 mb-3 shadow custom-card border-primary">
+    <h4 class="text-primary">
+        {% if user_role in RoleChoices.parent_roles %}👤
+        {% elif user_role in RoleChoices.lawyer_roles %}⚖️
+        {% else %}👤 {% endif %}
+        {{ user_role_label }}
+    </h4>
     <hr>
+    <p><strong>Nome:</strong> {{ request.user.first_name|default:"-" }}</p>
+    <p><strong>Cognome:</strong> {{ request.user.last_name|default:"-" }}</p>
+    <p><strong>Email:</strong> {{ request.user.email|default:"-" }}</p>
+    <p><strong>Telefono:</strong> {{ profile.phone|default:"-" }}</p>
+    <p><strong>Indirizzo:</strong> {{ profile.address|default:"-" }}</p>
+</div>
 
-    <h4>Genitore A</h4>
-    <p><strong>Nome:</strong> {{ request.user.first_name }}</p>
-    <p><strong>Cognome:</strong> {{ request.user.last_name }}</p>
-    <p><strong>Email:</strong> {{ request.user.email }}</p>
-    <p><strong>Telefono:</strong> {{ profile.phone }}</p>
-    <p><strong>Indirizzo:</strong> {{ profile.address }}</p>
-
-    <hr>
-
-    {% if profile.parent_b_name %}
-    <h4>Genitore B</h4>
-    <p><strong>Nome:</strong> {{ profile.parent_b_name }}</p>
-    <p><strong>Cognome:</strong> {{ profile.parent_b_surname }}</p>
-    <p><strong>Email:</strong> {{ profile.parent_b_email }}</p>
-    <p><strong>Telefono:</strong> {{ profile.parent_b_phone }}</p>
-    {% endif %}
-
-    <hr>
-
-    {% if profile.lawyer_a %}
-    <h4>Avvocato A</h4>
-    <p><strong>Nome:</strong> {{ profile.lawyer_a.name }}</p>
-    <p><strong>Email:</strong> {{ profile.lawyer_a.email }}</p>
-    <p><strong>Telefono:</strong> {{ profile.lawyer_a.phone }}</p>
-    {% endif %}
-
-    {% if profile.lawyer_b %}
-    <h4>Avvocato B</h4>
-    <p><strong>Nome:</strong> {{ profile.lawyer_b.name }}</p>
-    <p><strong>Email:</strong> {{ profile.lawyer_b.email }}</p>
-    <p><strong>Telefono:</strong> {{ profile.lawyer_b.phone }}</p>
-    {% endif %}
-
-    <hr>
-
-    <h4>👶 Figli</h4>
-
+{# 🔹 CARD 2: GENITORI (visibile se l'utente è avvocato/mediatore/consultant) #}
+{% if user_role in RoleChoices.lawyer_roles or user_role in 'mediator,consultant' %}
     <div class="row">
-        {% for child in children %}
-            <div class="col-md-4">
-                <div class="card mb-3 shadow-sm">
-                    <div class="card-body">
-                        <h5 class="card-title">{{ child.name }} {{ child.surname }}</h5>
-                        <p class="card-text">
-                            <strong>Data di nascita:</strong> {{ child.birth_date|date:"d/m/Y" }}<br>
-                            <strong>Età:</strong> {{ child.age }} anni
-                        </p>
-                        <a href="{% url 'child_edit' child.id %}" class="btn btn-sm btn-warning">✏️ Modifica</a>
-                        <a href="{% url 'child_delete' child.id %}" class="btn btn-sm btn-danger">🗑️ Elimina</a>
+        {# Genitore A #}
+        <div class="col-md-6 mb-3">
+            <div class="card p-3 h-100 shadow custom-card">
+                <h5 class="text-success">👤 {{ RoleChoices.PARENT_A.label }}</h5>
+                <hr>
+                {% if parent_a and parent_a.user %}
+                    <p><strong>Nome:</strong> {{ parent_a.user.first_name|default:"-" }}</p>
+                    <p><strong>Cognome:</strong> {{ parent_a.user.last_name|default:"-" }}</p>
+                    <p><strong>Email:</strong> {{ parent_a.user.email|default:"-" }}</p>
+                    <p><strong>Telefono:</strong> {{ parent_a.user.profile.phone|default:"-" }}</p>
+                {% else %}
+                    <p class="text-muted small">Non ancora registrato</p>
+                {% endif %}
+            </div>
+        </div>
+
+        {# Genitore B #}
+        <div class="col-md-6 mb-3">
+            <div class="card p-3 h-100 shadow custom-card">
+                <h5 class="text-success">👤 {{ RoleChoices.PARENT_B.label }}</h5>
+                <hr>
+                {% if parent_b and parent_b.user %}
+                    <p><strong>Nome:</strong> {{ parent_b.user.first_name|default:"-" }}</p>
+                    <p><strong>Cognome:</strong> {{ parent_b.user.last_name|default:"-" }}</p>
+                    <p><strong>Email:</strong> {{ parent_b.user.email|default:"-" }}</p>
+                    <p><strong>Telefono:</strong> {{ parent_b.user.profile.phone|default:"-" }}</p>
+                {% else %}
+                    <p class="text-muted small">Non ancora registrato</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+{# 🔹 CARD 3: ALTRO GENITORE (solo se l'utente è un genitore) #}
+{% if user_role in RoleChoices.parent_roles and other_parent and other_parent.user %}
+<div class="card p-3 mb-3 shadow custom-card">
+    <h4 class="text-success">
+        👤 {% if user_role == RoleChoices.PARENT_A %}{{ RoleChoices.PARENT_B.label }}{% else %}{{ RoleChoices.PARENT_A.label }}{% endif %}
+    </h4>
+    <hr>
+    <p><strong>Nome:</strong> {{ other_parent.user.first_name|default:"-" }}</p>
+    <p><strong>Cognome:</strong> {{ other_parent.user.last_name|default:"-" }}</p>
+    <p><strong>Email:</strong> {{ other_parent.user.email|default:"-" }}</p>
+    <p><strong>Telefono:</strong> {{ other_parent.user.profile.phone|default:"-" }}</p>
+</div>
+{% endif %}
+
+{# 🔹 CARD 4: AVVOCATI #}
+{% if user_role not in RoleChoices.lawyer_roles %}
+    {# Utente NON avvocato: mostra entrambi #}
+    <div class="row">
+        <div class="col-md-6 mb-3">
+            <div class="card p-3 h-100 shadow custom-card border-info">
+                <h5 class="text-info">⚖️ {{ RoleChoices.LAWYER_A.label }}</h5>
+                <hr>
+                {% if lawyer_a_member and lawyer_a_member.user %}
+                    <p><strong>Nome:</strong> {{ lawyer_a_member.user.first_name }} {{ lawyer_a_member.user.last_name }}</p>
+                    <p><strong>Email:</strong> {{ lawyer_a_member.user.email }}</p>
+                    <p><strong>Telefono:</strong> {{ lawyer_a_member.user.profile.phone|default:"-" }}</p>
+                {% else %}
+                    <p class="text-muted small">Non ancora assegnato</p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="col-md-6 mb-3">
+            <div class="card p-3 h-100 shadow custom-card border-info">
+                <h5 class="text-info">⚖️ {{ RoleChoices.LAWYER_B.label }}</h5>
+                <hr>
+                {% if lawyer_b_member and lawyer_b_member.user %}
+                    <p><strong>Nome:</strong> {{ lawyer_b_member.user.first_name }} {{ lawyer_b_member.user.last_name }}</p>
+                    <p><strong>Email:</strong> {{ lawyer_b_member.user.email }}</p>
+                    <p><strong>Telefono:</strong> {{ lawyer_b_member.user.profile.phone|default:"-" }}</p>
+                {% else %}
+                    <p class="text-muted small">Non ancora assegnato</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+{% else %}
+    {# Utente È avvocato: mostra solo l'ALTRO avvocato #}
+    <div class="card p-3 mb-3 shadow custom-card border-info">
+        <h5 class="text-info">
+            ⚖️ {% if user_role == RoleChoices.LAWYER_A %}{{ RoleChoices.LAWYER_B.label }}{% else %}{{ RoleChoices.LAWYER_A.label }}{% endif %}
+        </h5>
+        <hr>
+        {% if user_role == RoleChoices.LAWYER_A and lawyer_b_member and lawyer_b_member.user %}
+            <p><strong>Nome:</strong> {{ lawyer_b_member.user.first_name }} {{ lawyer_b_member.user.last_name }}</p>
+            <p><strong>Email:</strong> {{ lawyer_b_member.user.email }}</p>
+            <p><strong>Telefono:</strong> {{ lawyer_b_member.user.profile.phone|default:"-" }}</p>
+        {% elif user_role == RoleChoices.LAWYER_B and lawyer_a_member and lawyer_a_member.user %}
+            <p><strong>Nome:</strong> {{ lawyer_a_member.user.first_name }} {{ lawyer_a_member.user.last_name }}</p>
+            <p><strong>Email:</strong> {{ lawyer_a_member.user.email }}</p>
+            <p><strong>Telefono:</strong> {{ lawyer_a_member.user.profile.phone|default:"-" }}</p>
+        {% else %}
+            <p class="text-muted small">Non ancora assegnato</p>
+        {% endif %}
+    </div>
+{% endif %}
+
+
+
+    <div class="card p-3 mb-2 shadow custom-card">
+        <h4>👶 Figli</h4>
+
+        <div class="row">
+            {% for child in children %}
+                <div class="col-md-4">
+                    <div class="card mb-3 shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ child.name }} {{ child.surname }}</h5>
+                            <p class="card-text">
+                                <strong>Data di nascita:</strong> {{ child.birth_date|date:"d/m/Y" }}<br>
+                                <strong>Età:</strong> {{ child.age }} anni
+                            </p>
+
+                        </div>
                     </div>
                 </div>
-            </div>
-        {% empty %}
-            <div class="col-12">
-                <p class="text-muted">Nessun figlio inserito</p>
-            </div>
-        {% endfor %}
+            {% empty %}
+                <div class="col-12">
+                    <p class="text-muted">Nessun figlio inserito</p>
+                </div>
+            {% endfor %}
+        </div>
+
     </div>
 
-    <hr>
 
     <div class="mt-4">
         <a href="{% url 'families:setup' %}?edit=1" class="btn btn-warning">
             Modifica dati
         </a>
-
-        <a href="{% url 'families:family_dashboard' %}" class="btn btn-success">
-            Conferma e continua
-        </a>
+        {% if user_role not in RoleChoices.lawyer_roles %}
+            <a href="{% url 'families:family_dashboard' %}" class="btn btn-success">
+                Conferma e continua
+            </a>
+        {% else %}
+            <a href="{% url 'families:lawyer_dashboard' %}" class="btn btn-success">
+                Conferma e continua
+            </a>
+        {% endif %}
     </div>
 
 </div>

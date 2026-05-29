@@ -1,0 +1,45 @@
+{% extends 'families/lawyer/base_lawyer.html' %}
+
+{% block title %}Seleziona Famiglia - Expenses{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5">
+    <div class="col-md-8">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">💰 Seleziona una famiglia per gestire le Expenses</h4>
+            </div>
+            <div class="card-body">
+                <div class="list-group">
+                    {% for membership in assigned_families %}
+                        {% with family=membership.family %}
+                        <a href="{% url 'families:lawyer_expenses' family.id %}" 
+                           class="list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3">
+                            <div>
+                                <h6 class="mb-1 fw-bold">{{ family.name }}</h6>
+                                <small class="text-muted">
+                                    {% if membership.role == 'lawyer_a' %}
+                                        🎯 Il tuo ruolo: Avvocato A
+                                    {% else %}
+                                        🎯 Il tuo ruolo: Avvocato B
+                                    {% endif %}
+                                </small>
+                            </div>
+                            <div class="text-end">
+                                <span class="badge bg-primary rounded-pill">→</span>
+                                <br>
+                                <small class="text-muted">{{ family.members.count }} membri</small>
+                            </div>
+                        </a>
+                        {% endwith %}
+                    {% empty %}
+                        <div class="text-center py-4">
+                            <p class="text-muted mb-0">🎉 Non hai famiglie assegnate.</p>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -13,7 +13,10 @@ class Family(models.Model):
         ("lawyer_a", "Avvocato A"),
     ]
 
+
     name = models.CharField(max_length=255)
+    # 🔑 Identificativo univoco (per inviti, link, API)
+    code = models.UUIDField("Codice famiglia", default=uuid.uuid4, unique=False, editable=True)
 
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -71,10 +74,15 @@ class FamilyMember(models.Model):
     joined_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
+        unique_together = ['family', 'user']
         constraints = [
             models.UniqueConstraint(
                 fields=["family", "user"],
                 name="unique_family_user"
+            ),
+            models.UniqueConstraint(
+                fields=["family", "role"],
+                name="unique_family_role"
             )
         ]
 
@@ -86,6 +94,8 @@ class FamilyMember(models.Model):
             raise ValidationError(
                 f"Ruolo {self.role} già assegnato"
             )
+
+
 
     def __str__(self):
         family_surname = self.family.surname if self.family else "N/D"

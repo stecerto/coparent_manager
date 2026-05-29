@@ -1,0 +1,41 @@
+/* 🟣 SOVRASCRITTURA TEMA BIANCO/VIOLETTO */
+:root {
+    --bs-primary: #7c3aed;
+    --bs-primary-rgb: 124, 58, 237;
+    --bs-link-color: #7c3aed;
+    --bs-link-hover-color: #5b21b6;
+    --bs-body-bg: #ffffff;
+    --bs-light: #faf5ff; /* Bianco con leggera tonalità viola */
+}
+
+/* Navbar */
+.navbar.bg-primary, .navbar-dark.bg-primary {
+    background: linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%) !important;
+    border-bottom: 1px solid #5b21b6;
+}
+
+/* Pulsanti */
+.btn-primary {
+    background-color: #7c3aed !important;
+    border-color: #7c3aed !important;
+}
+.btn-primary:hover, .btn-primary:focus {
+    background-color: #5b21b6 !important;
+    border-color: #5b21b6 !important;
+}
+.btn-outline-primary { color: #7c3aed !important; border-color: #7c3aed !important; }
+.btn-outline-primary:hover { background-color: #7c3aed !important; color: #fff !important; }
+
+/* Badge e Bordi */
+.badge.bg-primary { background-color: #7c3aed !important; }
+.border-primary { border-color: #7c3aed !important; }
+
+/* Sfondi leggeri */
+.bg-light { background-color: #faf5ff !important; }
+.alert-primary { background-color: #ede9fe !important; border-color: #c4b5fd !important; color: #5b21b6 !important; }
+
+/* Chat Privata (mantengo il verde per distinguere la riservatezza, ma lo armonizzo) */
+.border-success { border-color: #10b981 !important; }
+.bg-success { background-color: #10b981 !important; }
+.bg-success.bg-opacity-10 { background-color: rgba(16, 185, 129, 0.08) !important; }
+.text-success { color: #059669 !important; }

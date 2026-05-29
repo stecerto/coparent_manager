@@ -56,6 +56,20 @@ class CalendarEvent(models.Model):
         "families.ChildSupportAgreement", on_delete=models.SET_NULL,
         null=True, blank=True, related_name="calendar_events"
     )
+    # ✅ NUOVO: Traccia l'origine dell'evento
+    source = models.CharField(
+        max_length=20,
+        choices=[
+            ("manual", "📅 Creato manualmente"),
+            ("chat", "💬 Generato da Chat"),
+            ("expense", "💰 Generato da Spesa"),
+            ("agreement", "📄 Generato da Accordo"),
+        ],
+        default="manual",
+        db_index=True
+    )
+    # Opzionale ma consigliato: link all'oggetto che l'ha generato
+    linked_id = models.PositiveIntegerField(null=True, blank=True, db_index=True)
 
     previous_version = models.ForeignKey(
         "self",

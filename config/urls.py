@@ -40,6 +40,10 @@ urlpatterns = [
 
     # Chat
     path("chat/", include("chat.urls")),
+
+    #notification
+    # ✅ CORRETTO
+    path("notifications/", include("notifications.urls", namespace='notifications')),
 ]
 
 if settings.DEBUG:

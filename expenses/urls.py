@@ -20,4 +20,12 @@ urlpatterns = [
     path('upload-payment-proof/', views.upload_payment_proof, name='upload_payment_proof'),
     path("api/send-rejection/", views.send_rejection_message, name="send_rejection_message"),
     path('history/<int:pk>/', views.expense_history, name='expense_history'),
+
+    path("categories/", views.categories_list, name="categories_list"),
+
+    path("categories/create/", views.category_create, name="category_create"),
+
+    path("categories/<int:pk>/update/", views.category_update, name="category_update"),
+
+    path("categories/<int:pk>/delete/", views.category_delete, name="category_delete"),
 ]

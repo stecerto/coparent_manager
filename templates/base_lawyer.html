@@ -1,0 +1,157 @@
+
+{% load static %}
+{% load crispy_forms_tags %}
+
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
+    <link rel="apple-touch-icon" href="{% static 'images/apple-touch-icon.png' %}">
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- FullCalendar -->
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css' rel='stylesheet'/>
+    <!-- Custom CSS -->
+    <link href="{% static 'css/style.css' %}" rel="stylesheet">
+    
+    <title>{% block title %}⚖️ CoParent Manager - Avvocato{% endblock %}</title>
+    {% block extra_css %}{% endblock %}
+</head>
+<!-- 🖼️ BRAND BANNER (Logo grande, fuori dalla navbar) -->
+<header class="brand-banner py-4 bg-white border-bottom">
+    <div class="container text-center">
+        {% with role=user.profile.role|default:"" %}
+            {% if role == "lawyer_a" or role == "lawyer_b" %}
+                <a href="{% url 'lawyer_home' %}">
+            {% else %}
+                <a href="{% url 'home' %}">
+            {% endif %}
+        {% endwith %}
+            <img src="{% static 'images/logo-coparent.svg' %}"
+                 alt="CoParent Manager"
+                 class="brand-logo img-fluid">
+        </a>
+    </div>
+</header>
+<body>
+
+<!-- 🔹 NAVBAR AVVOCATO - MINIMALISTA -->
+<nav class="navbar navbar-expand-lg bg-light shadow-sm">
+    <div class="container">
+
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
+                data-bs-target="#mainMenu" aria-controls="mainMenu"
+                aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="lawyerMenu">
+            <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
+                <!-- ✅ UNICO LINK: DASHBOARD -->
+                {% with role=user.profile.role|default:"" %}
+                        {% if user.is_authenticated %}
+                <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'setup' %}active{% endif %}"
+
+                            {% if role == "lawyer_a" or role == "lawyer_b" %}
+                               <a href="{% url 'families:lawyer_dashboard' %}">📊 Vai al Pannello di controllo Avvocato</a>
+                            {% else %}
+                                 <a href="{% url 'families:family_dashboard' %}">🚀 Vai al Pannello di controllo</a>
+                            {% endif %}
+
+                </li>
+
+
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'setup' %}active{% endif %}"
+                            href="{% url 'families:setup' %}">⚙️ Impostazioni</a>
+                    </li>
+
+                    <li class="nav-item">
+                        <a class="nav-link {% if request.resolver_match.url_name == 'logout' %}active{% endif %}"
+                            href="{% url 'accounts:logout' %}">Logout</a>
+                    </li>
+                {% endif %}
+                {% endwith %}
+            </ul>
+
+
+        </div>
+    </div>
+</nav>
+
+
+<!-- 🔹 BARRA CONTESTO FAMIGLIA (con dati dalla view) -->
+{% if selected_family_data %}
+{% with family=selected_family_data.family membership=selected_family_data.membership client=selected_family_data.client %}
+<div class="bg-light border-bottom py-2">
+    <div class="container d-flex justify-content-between align-items-right flex-wrap gap-2">
+        <div>
+            <span class="badge bg-primary me-2">🏠 {{ family.name }}</span>
+            <span class="badge bg-info text-dark">
+                {% if membership.role == 'lawyer_a' %}Avvocato A{% else %}Avvocato B{% endif %}
+            </span>
+        </div>
+
+        {# 🔹 PULSANTE CHAT PRIVATA #}
+        {% if client %}
+            <a href="{% url 'chat:chat_private' family.id client.id %}"
+               class="btn btn-success btn-style">
+                💬 Chat con {{ client.last_name }}
+            </a>
+        {% endif %}
+    </div>
+</div>
+{% endwith %}
+{% endif %}
+
+<!-- 🔹 BREADCRUMB -->
+<div class="container py-2">
+    {% if breadcrumbs %}
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb mb-0">
+            {% for crumb in breadcrumbs %}
+                {% if crumb.url %}
+                    <li class="breadcrumb-item"><a href="{{ crumb.url }}">{{ crumb.name }}</a></li>
+                {% else %}
+                    <li class="breadcrumb-item active text-primary fw-bold">{{ crumb.name }}</li>
+                {% endif %}
+            {% endfor %}
+        </ol>
+    </nav>
+    {% endif %}
+</div>
+
+<!-- 🔹 MAIN CONTENT -->
+<main>
+    <div class="container py-4">
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+        
+        {% block content %}{% endblock %}
+    </div>
+</main>
+
+
+<!-- 🔹 FOOTER -->
+<footer class="bg-light border-top py-4 mt-5">
+    <div class="container text-center">
+        <p class="mb-0 text-muted small">© 2026 CoParent Manager - Area Avvocati</p>
+    </div>
+</footer>
+
+<!-- JS Libraries -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
+<script src="{% static 'js/base.js' %}"></script>
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

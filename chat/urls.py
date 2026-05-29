@@ -6,5 +6,10 @@ urlpatterns = [
     path("message/<int:pk>/delete/", views.delete_message_view, name="delete_message"),
     path("history/<int:pk>/", views.message_history_view, name="message_history"),
     path("api/send-rejection/", views.send_rejection_message, name="send_rejection_message"),
+    # ✅ Chat per avvocati con selezione famiglia
+    path('lawyer/family/<int:family_id>/', views.family_chat_view, name='chat_family'),
+
+    # ✅ Chat privata avvocato-assistito
+    path('lawyer/family/<int:family_id>/private/<int:user_id>/', views.family_chat_view, name='chat_private'),
 
 ]

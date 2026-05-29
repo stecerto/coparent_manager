@@ -3,8 +3,8 @@ from django.apps import apps
 
 # 🔹 URL → label leggibile
 LABEL_MAP = {
-    "family_dashboard": "Dashboard",
-    "children_list": "Children",
+    "family_dashboard": "Generale",
+    "children_list": "Figli",
     "child_detail": "Figlio",
     "child_edit": "Modifica",
     "child_confirm_delete": "Elimina",

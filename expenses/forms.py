@@ -9,6 +9,28 @@ from children.models import ChildProfile
 from families.utils import get_family_of_user
 
 
+from django import forms
+from .models import ExpenseCategory
+
+
+class ExpenseCategoryForm(forms.ModelForm):
+
+    class Meta:
+        model = ExpenseCategory
+
+        fields = [
+            "group",
+            "display_name",
+            "color",
+            "is_active"
+        ]
+
+        widgets = {
+            "color": forms.TextInput(
+                attrs={"type": "color"}
+            )
+        }
+
 class ExpenseForm(forms.ModelForm):
     class Meta:
         model = Expense
@@ -20,6 +42,14 @@ class ExpenseForm(forms.ModelForm):
             "expense_date",
             "status"
         ]
+        labels = {
+            "child": "Figlio",
+            "expense_type": "Categoria spesa",
+            "amount": "Importo",
+            "description": "Descrizione",
+            "expense_date": "Data",
+            "status": "Stato"
+        }
         widgets = {
             'expense_type': Select2Widget(attrs={'data-placeholder': 'Cerca categoria...'}),  # 🔄 Combobox
             'expense_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
@@ -44,15 +74,29 @@ class ExpenseForm(forms.ModelForm):
                 self.fields["child"].queryset = family.children.filter(is_active=True)
 
         # ✅ 4. Categorie raggruppate (logica originale, mantenuta)
-        categories = ExpenseCategory.objects.order_by("group", "display_name")
-        grouped_choices = []
-        for group, cats in itertools.groupby(categories, key=lambda c: c.get_group_display()):
-            grouped_choices.append((group, [(c.id, c.display_name) for c in cats]))
+        categories = ExpenseCategory.objects.filter(
+            is_active=True,
+            valid_to__isnull=True,
+            group__is_active=True
+        ).select_related("group").order_by(
+            "group__label",
+            "display_name"
+        )
 
-        self.fields["expense_type"].widget.choices = grouped_choices
+        grouped_choices = []
+
+        for group, cats in itertools.groupby(categories, key=lambda c: c.group.label):
+            grouped_choices.append((
+                group,
+                [(c.id, c.display_name) for c in cats]
+            ))
+
+        self.fields["expense_type"].choices = grouped_choices
         self.fields["expense_type"].empty_label = "Seleziona categoria"
 
-
+        expense_type = forms.ModelChoiceField(
+            queryset=ExpenseCategory.objects.filter(is_active=True),
+            required=True ) # 🔥 OBBLIGATORIO
 
 
 class ExpenseFilterForm(forms.Form):

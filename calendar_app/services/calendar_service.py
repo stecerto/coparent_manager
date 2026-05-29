@@ -1,6 +1,15 @@
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 from django.utils import timezone
+from datetime import timedelta
+from calendar_app.models import CalendarEvent, EventReminder
+from datetime import timedelta
 
-from calendar_app.models import CalendarEvent
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+from django.utils import timezone
+from datetime import timedelta
+from calendar_app.models import CalendarEvent, EventReminder
 
 
 def create_event(
@@ -29,6 +38,9 @@ def create_event(
         description=description,
         event_type=event_type,
         amount=amount,
+        source="event",
+        #linked_id=event_type.id,
+
     )
 
     # ✅ gestione ManyToMany CORRETTA
@@ -76,3 +88,23 @@ def get_family_events(family):
         family=family,
         is_active=True
     ).order_by("start_time")
+
+
+# ✅ Usa la stringa per evitare AppRegistryNotReady
+@receiver(post_save, sender='calendar_app.CalendarEvent')
+def auto_create_reminders(sender, instance, created, **kwargs):
+    # Solo eventi nuovi e non auto-generati
+    if not created or instance.is_auto_generated:
+        return
+
+    now = timezone.now()
+    # Promemoria: 1 giorno prima + 1 ora prima
+    offsets = [timedelta(days=1), timedelta(hours=1)]
+    for offset in offsets:
+        remind_time = instance.start_time - offset
+        if remind_time > now:
+            EventReminder.objects.get_or_create(
+                event=instance,
+                remind_at=remind_time,
+                defaults={'sent': False}
+            )

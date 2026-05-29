@@ -1,4 +1,31 @@
+/* 🔒 Badge per messaggi di sistema (benvenuto chat privata) */
+.system-badge {
+    background: #d4edda;
+    border: 1px solid #c3e6cb;
+    border-radius: 6px;
+    padding: 6px 10px;
+    margin-bottom: 8px;
+}
 
+.system-badge small {
+    font-size: 0.75rem;
+    color: #155724;
+}
+
+/* Opzionale: stile diverso per la bubble di sistema */
+.system-message {
+    background: #f8fff8 !important;
+    border: 1px dashed #28a745 !important;
+    max-width: 90% !important;
+    margin: 10px auto !important;
+    text-align: center;
+}
+
+.system-message .message-content {
+    font-style: italic;
+    color: #28a745;
+    font-size: 0.9rem;
+}
 /* 💬 CHAT WHATSAPP-STYLE */
 .chat-container {
     max-height: 60vh;
@@ -244,4 +271,11 @@ mark.bg-warning {
     padding: 0 3px;
     border-radius: 2px;
     font-weight: 500;
+}
+
+/* Su desktop: affianca i due tab */
+@media (min-width: 992px) {
+    #chatTabContent { display: grid !important; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .tab-pane { display: block !important; opacity: 1 !important; }
+    .chat-container { max-height: 65vh !important; }
 }

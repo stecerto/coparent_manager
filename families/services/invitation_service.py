@@ -1,18 +1,17 @@
 import secrets
 import uuid
+from urllib import request
 
-from django.contrib.admin import display
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
-from django.shortcuts import render, redirect
-
-from django.utils import timezone
-from django.views import defaults
-
+from django.db import transaction
+from psycopg.types import none
 
 from families.models import FamilyMember
 from families.models import Invitation
-from families.services.email_service import send_invitation_email
+from families.utils import get_user_role_in_family
+
+User = get_user_model()
 
 BASE_URL = "http://127.0.0.1:8000" #"https://yourdomain.com"
 #domain = request.get_host()
@@ -27,26 +26,48 @@ def create_invitation(
     expire_at=None,
     display_name=None
 ):
+    # =========================
+    # 1. VALIDAZIONE SENDER
+    # =========================
+    if sender is None:
+        raise ValueError("sender (request.user) è obbligatorio")
+
+    inviter_profile = getattr(sender, "userprofile", None)
+    inviter_role = inviter_profile.role if inviter_profile else None
+
+    # =========================
+    # 2. MAP RUOLO
+    # =========================
+    invited_role = map_invitation_role(role, inviter_role)
+
+    # =========================
+    # 3. CONTROLLO INVITI DUPLICATI
+    # =========================
     existing = Invitation.objects.filter(
         family=family,
-        role=role,
+        role=invited_role,
         email=email,
         phone=phone,
         status="pending"
-    ).exclude(status="accepted").first()
+    ).first()
 
     if existing:
         raise ValidationError(
             "Esiste già un invito pendente per questo contatto."
         )
 
-
+    # =========================
+    # 4. TOKEN
+    # =========================
     if token is None:
         token = uuid.uuid4()
 
+    # =========================
+    # 5. CREA INVITO
+    # =========================
     invitation = Invitation.objects.create(
         family=family,
-        role=role,
+        role=invited_role,
         channel=channel,
         email=email if channel == "email" else None,
         phone=phone if channel == "whatsapp" else None,
@@ -55,7 +76,6 @@ def create_invitation(
         expire_at=expire_at,
         status="pending",
         display_name=display_name
-
     )
 
     return invitation
@@ -82,11 +102,14 @@ def build_whatsapp_link(request,invitation):
     return f"https://wa.me/?text={quote(message)}"
 
 
-
-
-
+# families/services/invitation_service.py
+@transaction.atomic
 def accept_invitation(invitation, user):
-    """Accetta un invito e sincronizza FamilyMember + UserProfile"""
+    """
+    Accetta un invito e sincronizza FamilyMember + UserProfile.
+    ✅ Idempotente: se l'utente è già membro con lo stesso ruolo, non duplica nulla.
+    """
+    # 🛡️ 1. Controlli preliminari
     if invitation.is_expired:
         invitation.mark_expired()
         return None
@@ -94,24 +117,30 @@ def accept_invitation(invitation, user):
     if invitation.status != "pending":
         return invitation
 
-    # ✅ Crea/aggiorna FamilyMember
+    # ✅ 2. Crea o aggiorna FamilyMember (la tua logica originale)
     member, created = FamilyMember.objects.get_or_create(
         family=invitation.family,
         user=user,
-        defaults={"role": invitation.role}
+        defaults={"role": invitation.role}  # ✅ Importante: imposta il ruolo se è nuovo
     )
+
+    # ✅ 3. Aggiorna ruolo se cambiato (es. da lawyer_a a lawyer_b in un'altra famiglia)
+    # ✅ Aggiorna ruolo se è cambiato (es. da lawyer_b a lawyer_a in un'altra famiglia)
     if not created and member.role != invitation.role:
         member.role = invitation.role
         member.save()
 
-    # ✅ Sincronizza UserProfile
+    # ⚠️ NON sovrascrivere userprofile.role se già impostato!
+    # Un avvocato può essere lawyer_a in una famiglia e lawyer_b in un'altra.
+    # Il profilo utente ha un solo campo 'role', quindi lo impostiamo solo alla prima registrazione.
     profile = getattr(user, 'userprofile', None)
-    if profile and profile.role != invitation.role:
+    if profile and not profile.role:  # ✅ Aggiorna solo se il ruolo è vuoto (evita overwrite)
         profile.role = invitation.role
         profile.save()
 
-    # ✅ Marca invito come accettato
+    # ✅ 5. Marca invito come accettato (usa il tuo metodo esistente)
     invitation.mark_accepted(user)
+
     return invitation
 
 def store_invitation_in_session(request, invitation):
@@ -126,7 +155,7 @@ def get_session_invitation(request):
 
     return Invitation.objects.filter(
         id=invitation_id,
-        accepted=False
+        status="pending"
     ).first()
 
 
@@ -134,7 +163,7 @@ def get_session_invitation(request):
 # REGISTRAZIONE
 # =========================
 
-
+'''
 def register_member_view(request,user):
     invitation_id = request.session.get('invitation_id')
     # Gestione invito
@@ -143,13 +172,13 @@ def register_member_view(request,user):
             invitation = Invitation.objects.get(id=invitation_id, accepted=False)
             accept_invitation(invitation, user)
 
-            profile = user.userprofile
-            profile.role = invitation.role
-            profile.save()
+            if profile and not profile.role:  # ← Solo se vuoto!
+                profile.role = invitation.role
+                profile.save()
         except Invitation.DoesNotExist:
             pass
-
-def build_invitation_context(invitation, request_user, profile=None):
+'''
+def build_invitation_context(invitation, request_user = None, profile=None):
     role = invitation.role
 
     inviter_name = (
@@ -162,11 +191,6 @@ def build_invitation_context(invitation, request_user, profile=None):
     if role == "parent_b":
         title = "Invito alla famiglia"
         message = "Sei stato invitato come secondo genitore."
-
-        if profile:
-            subject_name = (
-                f"{profile.parent_a_name} {profile.parent_a_surname}"
-            )
 
     elif role == "lawyer_a":
         title = "Invito come avvocato"
@@ -185,7 +209,6 @@ def build_invitation_context(invitation, request_user, profile=None):
             subject_name = (
                 f"{profile.parent_b_name} {profile.parent_b_surname}"
             )
-
     else:
         title = "Invito alla piattaforma"
         message = "Sei stato invitato a partecipare."
@@ -207,12 +230,19 @@ def add_member(family, user, role):
 
 
 
-def map_invitation_role(inv_role):
+def map_invitation_role(invitation_role, inviter_role=None):
     """
-    Mappa ruolo invito → ruolo FamilyMember
+    Determina il ruolo finale nel sistema FamilyMember
     """
-    mapping = {
-        "parent_b": "parent_b",
-        "lawyer": "lawyer_a",  # oppure logica più avanzata
-    }
-    return mapping.get(inv_role, "parent_b")
+
+    if invitation_role == "parent_b":
+        return "parent_b"
+
+    if invitation_role == "lawyer":
+        # 🔥 dipende da chi invita
+        if inviter_role == "parent_a":
+            return "lawyer_a"
+        if inviter_role == "parent_b":
+            return "lawyer_b"
+
+    return invitation_role

@@ -3,397 +3,292 @@
 
 {% block extra_css %}
 <link href="{% static 'css/chat_style.css' %}" rel="stylesheet">
-
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-3">
-    <div class="row justify-content-center">
-
-
-            <!-- 📌 HEADER -->
-            <div class="card p-3 mb-3 shadow custom-card text-center">
-                <h2 class="mb-0">💬 Chat Famiglia</h2>
-                <small class="text-muted">Conversazione con {{ family.name }}</small>
+<div class="container-fluid py-3">
+    <!-- 📌 HEADER CONTESTUALE UNIFICATO -->
+    <div class="card p-3 mb-3 shadow custom-card">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+                <span class="badge bg-primary fs-6 me-1">👨‍👩‍👧 Famiglia: {{ family.name }}</span>
+                {% if private_with_user %}
+                    <span class="badge bg-success fs-6">🤝 Chat con {{ private_with_user.first_name }} {{ private_with_user.last_name }}</span>
+                {% else %}
+                    <span class="badge bg-info text-dark fs-6">👥 Modalità Gruppo</span>
+                {% endif %}
             </div>
+            <div class="text-muted small">
+                {% if membership %}Il tuo ruolo: <strong>{{ membership.get_role_display }}</strong>{% endif %}
+            </div>
+        </div>
+    </div>
 
-            <!-- 🔍 BARRA DI RICERCA (WhatsApp-style) -->
-            <div class="card p-3 mb-3 shadow custom-card ">
-                <form method="get" class="d-flex" action="{% url 'chat:chat_home' %}">
-                    <div class="input-group input-group-sm">
-                        <input
-                            type="text"
-                            name="q"
-                            class="form-control"
-                            placeholder="Cerca nella chat..."
-                            value="{{ search_query|default:'' }}"
-                            aria-label="Cerca messaggi"
-                        >
-                        <button class="btn btn-outline-secondary" type="submit">🔍</button>
-                        {% if search_query %}
-                            <a href="{% url 'chat:chat_home' %}" class="btn btn-outline-secondary" title="Pulisci ricerca">✕</a>
+    <div class="row g-3">
+        <!-- ✅ COLONNA 1: CHAT FAMIGLIA -->
+        <div class="col-12 {% if private_with_user %}col-lg-6{% endif %}">
+            <div class="card shadow custom-card h-100 d-flex flex-column">
+                <div class="p-3 border-bottom bg-light">
+                    <h5 class="mb-0">👨‍👩‍👧 Chat Famiglia</h5>
+                    <small class="text-muted">Visibile a tutti i membri</small>
+                </div>
+
+                <div class="chat-container flex-grow-1 p-3" style="max-height: 55vh; overflow-y: auto;" id="chatMessages-family">
+                    {% for msg in family_messages %}
+                        {% if msg.sender == request.user %}
+                            <div class="chat-message mine" id="msg-family-{{ msg.id }}">
+                                <div class="sender-avatar mine-avatar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>
+                                <div class="message-bubble">
+                                    {% if "🔴 *Rifiuto spesa*" in msg.content %}<div class="message-reject-justification"></div>{% endif %}
+                                    {% if msg.reply_to %}<div class="message-reply"><strong>↩️ {{ msg.reply_to.sender.first_name|default:"Utente" }}</strong><br><small class="text-muted">{{ msg.reply_to.content|truncatechars:50 }}</small></div>{% endif %}
+                                    <p class="message-content">{{ msg.content|linebreaksbr }}</p>
+                                    {% if msg.attachments.all %}<div class="message-attachments">{% for file in msg.attachments.all %}<a href="{{ file.file.url }}" target="_blank">📎 {{ file.file.name|slice:"30:"|default:"Allegato" }}</a>{% endfor %}</div>{% endif %}
+                                    <div class="message-meta"><span>{{ msg.created_at|date:"H:i" }}</span>{% if msg.version > 1 %}<span title="Modificato">✏️</span>{% endif %}</div>
+                                </div>
+                                <div class="message-actions d-flex gap-1">
+                                    <button class="btn btn-sm btn-link text-muted p-0" onclick="replyToMessage('{{ msg.id }}', '{{ msg.content|escapejs }}', 'family')">↩️</button>
+                                    <a href="{% url 'chat:delete_message' msg.id %}" class="btn btn-sm btn-link text-danger p-0" onclick="return confirm('Eliminare?')">🗑️</a>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="chat-message other" id="msg-family-{{ msg.id }}">
+                                <div class="sender-avatar other-avatar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>
+                                <div class="message-bubble">
+                                    {% if "🔴 *Rifiuto spesa*" in msg.content %}<div class="message-reject-justification"></div>{% endif %}
+                                    {% if msg.reply_to %}<div class="message-reply"><strong>↩️ {{ msg.reply_to.sender.first_name|default:"Utente" }}</strong><br><small class="text-muted">{{ msg.reply_to.content|truncatechars:50 }}</small></div>{% endif %}
+                                    <p class="message-content">{{ msg.content|linebreaksbr }}</p>
+                                    {% if msg.attachments.all %}<div class="message-attachments">{% for file in msg.attachments.all %}<a href="{{ file.file.url }}" target="_blank">📎 {{ file.file.name|slice:"30:"|default:"Allegato" }}</a>{% endfor %}</div>{% endif %}
+                                    <div class="message-meta"><span>{{ msg.sender.first_name|default:msg.sender.username|slice:":1" }} • </span><span>{{ msg.created_at|date:"H:i" }}</span>{% if msg.version > 1 %}<span title="Modificato">✏️</span>{% endif %}</div>
+                                </div>
+                                <div class="message-actions d-flex gap-1">
+                                    <button class="btn btn-sm btn-link text-muted p-0" onclick="replyToMessage('{{ msg.id }}', '{{ msg.content|escapejs }}', 'family')">↩️ Rispondi</button>
+                                </div>
+                            </div>
                         {% endif %}
+                    {% empty %}<p class="text-center text-muted py-4">Nessun messaggio pubblico.</p>{% endfor %}
+                </div>
+
+                <!-- ✍️ FORM FAMIGLIA (TUTTE LE FEATURE ORIGINALI) -->
+                <div class="p-3 border-top">
+                    <form method="POST" enctype="multipart/form-data" id="chatForm-family">
+                        {% csrf_token %}
+                        <input type="hidden" name="chat_type" value="family">
+
+                        <div id="replyPreview-family" class="alert alert-info py-2 mb-3 d-none">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <span><strong>↩️ Risposta a:</strong> <span id="replyText-family"></span></span>
+                                <button type="button" class="btn-close btn-close-sm" onclick="cancelReply('family')"></button>
+                            </div>
+                        </div>
+
+                        {% if reject_context %}
+                        <div class="alert alert-warning border-warning mb-3">
+                            <div class="d-flex align-items-start gap-2">
+                                <span class="fs-5">🔴</span>
+                                <div>
+                                    <h6 class="mb-1 fw-bold">Giustificazione rifiuto spesa</h6>
+                                    <p class="mb-2 small text-muted">Stai rifiutando la spesa di <strong>{{ reject_context.created_by }}</strong>:</p>
+                                    <ul class="list-unstyled mb-2 small">
+                                        <li>📅 {{ reject_context.date }}</li>
+                                        <li>🏷️ {{ reject_context.category }}</li>
+                                        <li>💰 € {{ reject_context.amount }}</li>
+                                    </ul>
+                                    <p class="mb-0 small fst-italic">Scrivi il motivo qui sotto.</p>
+                                </div>
+                            </div>
+                            <input type="hidden" name="reject_expense_id" value="{{ reject_context.expense_id }}">
+                        </div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <textarea name="message" class="form-control" rows="3" placeholder="Scrivi un messaggio per tutta la famiglia..." required id="messageInput-family"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small text-muted">📎 Allegati (opzionale)</label>
+                            <input type="file" name="attachments" multiple class="form-control form-control-sm">
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" name="create_event" id="createEventCheck-family" onchange="toggleEventFields('family')">
+                            <label class="form-check-label small" for="createEventCheck-family">📅 Crea evento nel calendario</label>
+                        </div>
+                        <div id="eventFields-family" class="d-none border rounded p-3 mb-3 bg-light">
+                            <input type="text" name="event_title" placeholder="Titolo evento" class="form-control form-control-sm mb-2">
+                            <div class="row g-2">
+                                <div class="col-6"><input type="datetime-local" name="event_start" class="form-control form-control-sm"><small class="text-muted">Inizio</small></div>
+                                <div class="col-6"><input type="datetime-local" name="event_end" class="form-control form-control-sm"><small class="text-muted">Fine</small></div>
+                            </div>
+                            <!-- 👶 Selettore Figli (opzionale) -->
+                            <div class="mb-2">
+                                <label class="form-label small text-muted">👶 Coinvolgi figli (opzionale)</label>
+                                <select name="event_children" multiple class="form-select form-select-sm" size="3">
+                                    {% for child in family_children %}
+                                        <option value="{{ child.id }}">
+                                            {{ child.name }} {{ child.surname }} {% if child.birth_date %}({{ child.birth_date|date:"Y" }}){% endif %}
+                                        </option>
+                                    {% empty %}
+                                        <option disabled class="text-muted">Nessun figlio attivo configurato</option>
+                                    {% endfor %}
+                                </select>
+                                <small class="text-muted">Tieni premuto Ctrl/Cmd per selezionarne più di uno</small>
+                            </div>
+                            <textarea name="event_description" placeholder="Descrizione evento" class="form-control form-control-sm mt-2" rows="2"></textarea>
+                        </div>
+
+                        <input type="hidden" name="reply_to" id="replyToInput-family">
+                        <div class="d-flex gap-2 flex-wrap mt-3">
+                            <button type="submit" class="btn btn-success btn-style ms-auto">📤 Invia messaggio</button>
+                        </div>
+                    </form>
+                </div>
+
+                {% if shared_docs %}
+                <div class="p-3 border-top">
+                    <h6 class="mb-2">📎 Documenti Recenti</h6>
+                    <div style="max-height: 150px; overflow-y: auto;">
+                        {% for doc in shared_docs %}
+                            <a href="{% url 'documents:documents_detail' doc.id %}" class="d-block text-decoration-none small mb-1">📄 {{ doc.title|truncatechars:35 }}</a>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- ✅ COLONNA 2: CHAT PRIVATA (solo se c'è controparte) -->
+        {% if private_with_user %}
+        <div class="col-12 col-lg-6">
+            <div class="card shadow custom-card h-100 d-flex flex-column border-success" style="border-width: 2px !important;">
+                <div class="p-3 border-bottom bg-success bg-opacity-10">
+                    <h5 class="mb-0 text-success">🔒 Chat Privata</h5>
+                    <small class="text-muted">Visibile solo a te e {{ private_with_user.first_name }}</small>
+                </div>
+
+                <div class="chat-container flex-grow-1 p-3" style="max-height: 55vh; overflow-y: auto;" id="chatMessages-private">
+                    {% for msg in private_messages %}
+                        {% if msg.sender == request.user %}
+                            <div class="chat-message mine" id="msg-private-{{ msg.id }}">
+                                <div class="sender-avatar mine-avatar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>
+                                <div class="message-bubble">
+                                    {% if msg.content|slice:":15" == "🔒 *Chat privata" %}<div class="system-badge mb-2"><small class="text-success fw-bold">🛡️ Canale riservato</small></div>{% endif %}
+                                    <p class="message-content">{{ msg.content|linebreaksbr }}</p>
+                                    <div class="message-meta"><span>{{ msg.created_at|date:"H:i" }}</span>{% if msg.version > 1 %}<span title="Modificato">✏️</span>{% endif %}</div>
+                                </div>
+                                <div class="message-actions d-flex gap-1">
+                                    <button class="btn btn-sm btn-link text-muted p-0" onclick="replyToMessage('{{ msg.id }}', '{{ msg.content|escapejs }}', 'private')">↩️</button>
+                                    <a href="{% url 'chat:delete_message' msg.id %}" class="btn btn-sm btn-link text-danger p-0" onclick="return confirm('Eliminare?')">🗑️</a>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="chat-message other" id="msg-private-{{ msg.id }}">
+                                <div class="sender-avatar other-avatar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>
+                                <div class="message-bubble">
+                                    <p class="message-content">{{ msg.content|linebreaksbr }}</p>
+                                    <div class="message-meta"><span>{{ msg.sender.first_name }} • {{ msg.created_at|date:"H:i" }}</span>{% if msg.version > 1 %}<span title="Modificato">✏️</span>{% endif %}</div>
+                                </div>
+                                <div class="message-actions d-flex gap-1">
+                                    <button class="btn btn-sm btn-link text-muted p-0" onclick="replyToMessage('{{ msg.id }}', '{{ msg.content|escapejs }}', 'private')">↩️ Rispondi</button>
+                                </div>
+                            </div>
+                        {% endif %}
+                    {% empty %}<p class="text-center text-muted py-4">Nessun messaggio privato.</p>{% endfor %}
+                </div>
+
+                <!-- ✍️ FORM PRIVATA (Reply + Allegati) -->
+
+            <div class="p-3 border-top bg-light">
+                <form method="POST" enctype="multipart/form-data" id="chatForm-private">
+                    {% csrf_token %}
+                    <input type="hidden" name="chat_type" value="private">
+
+                    <div id="replyPreview-private" class="alert alert-info py-2 mb-3 d-none">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span><strong>↩️ Risposta a:</strong> <span id="replyText-private"></span></span>
+                            <button type="button" class="btn-close btn-close-sm" onclick="cancelReply('private')"></button>
+                        </div>
+                    </div>
+
+                    <div class="mb-2">
+                        <textarea name="message" class="form-control" rows="2" placeholder="Scrivi a {{ private_with_user.first_name }}..." required id="messageInput-private"></textarea>
+                    </div>
+
+                    <div class="mb-2">
+                        <label class="form-label small text-muted mb-1">📎 Allegati</label>
+                        <input type="file" name="attachments" multiple class="form-control form-control-sm">
+                    </div>
+
+                    <input type="hidden" name="reply_to" id="replyToInput-private">
+
+                    <!-- ✅ PULSANTE INVIO: chiaro, full-width, senza custom CSS -->
+                    <div class="d-flex gap-2 flex-wrap mt-3">
+                        <button type="submit" class="btn btn-success btn-style ms-auto">
+                            🔒 Invia messaggio riservato
+                        </button>
                     </div>
                 </form>
             </div>
-
-
-
-            <!-- 📦 CARD PRINCIPALE -->
-            <div class="card p-3 mb-2 shadow custom-card">
-                <div class="card-body p-0">
-
-
-
-
-
-                    <!-- 💬 LISTA MESSAGGI -->
-                    <div class="chat-container p-3" id="chatMessages">
-                        {% for msg in messages %}
-                            {% if msg.sender == request.user %}
-                                <!-- ✅ MIO MESSAGGIO (destra) -->
-                                <div class="chat-message mine" id="msg-{{ msg.id }}">
-
-                                    <!-- 👤 AVATAR SVG STILIZZATO (Verde) -->
-                                    <div class="sender-avatar mine-avatar">
-                                        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                                        </svg>
-                                    </div>
-
-                                    <div class="message-bubble">
-                                        {% if "🔴 *Rifiuto spesa*" in msg.content %}
-                                        <div class="message-reject-justification"></div>
-                                        {% endif %}
-
-                                        {% if msg.reply_to %}
-                                        <div class="message-reply">
-                                            <strong>↩️ {{ msg.reply_to.sender.first_name|default:"Utente" }}</strong><br>
-                                            <small class="text-muted">{{ msg.reply_to.content|truncatechars:50 }}</small>
-                                        </div>
-                                        {% endif %}
-
-                                      <!--  <p>{{ msg.content }}</p> -->
-                                        <p class="message-content" data-search="{{ search_query|default:'' }}">
-                                            {{ msg.content|linebreaksbr }}
-                                        </p>
-
-                                        {% if msg.attachments.all %}
-                                        <div class="message-attachments">
-                                            {% for file in msg.attachments.all %}
-                                            <a href="{{ file.file.url }}" target="_blank">📎 {{ file.file.name|slice:"30:"|default:"Allegato" }}</a>
-                                            {% endfor %}
-                                        </div>
-                                        {% endif %}
-
-                                        <div class="message-meta">
-                                            <span>{{ msg.created_at|date:"H:i" }}</span>
-                                            {% if msg.version > 1 %}<span title="Modificato">✏️</span>{% endif %}
-                                        </div>
-                                    </div>
-
-                                    <!-- Pulsanti azione (miei messaggi) -->
-                                    <div class="message-actions d-flex gap-1">
-                                        <button class="btn btn-sm btn-link text-muted p-0" onclick="replyToMessage('{{ msg.id }}', '{{ msg.content|escapejs }}')" title="Rispondi">↩️</button>
-                                        <a href="{% url 'chat:delete_message' msg.id %}" class="btn btn-sm btn-link text-danger p-0" onclick="return confirm('Eliminare?')" title="Elimina">🗑️</a>
-                                    </div>
-                                </div>
-
-                            {% else %}
-                                <!-- ✅ MESSAGGIO ALTRO (sinistra) -->
-                                <div class="chat-message other" id="msg-{{ msg.id }}">
-
-                                    <!-- 👤 AVATAR SVG STILIZZATO (Blu) -->
-                                    <div class="sender-avatar other-avatar">
-                                        <svg viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
-                                            <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
-                                        </svg>
-                                    </div>
-
-                                    <div class="message-bubble">
-                                        {% if "🔴 *Rifiuto spesa*" in msg.content %}
-                                        <div class="message-reject-justification"></div>
-                                        {% endif %}
-
-                                        {% if msg.reply_to %}
-                                        <div class="message-reply">
-                                            <strong>↩️ {{ msg.reply_to.sender.first_name|default:"Utente" }}</strong><br>
-                                            <small class="text-muted">{{ msg.reply_to.content|truncatechars:50 }}</small>
-                                        </div>
-                                        {% endif %}
-
-                                        <!-- <p>{{ msg.content }}</p> -->
-                                        <p class="message-content" data-search="{{ search_query|default:'' }}">
-                                            {{ msg.content|linebreaksbr }}
-                                        </p>
-
-                                        {% if msg.attachments.all %}
-                                        <div class="message-attachments">
-                                            {% for file in msg.attachments.all %}
-                                            <a href="{{ file.file.url }}" target="_blank">📎 {{ file.file.name|slice:"30:"|default:"Allegato" }}</a>
-                                            {% endfor %}
-                                        </div>
-                                        {% endif %}
-
-                                        <div class="message-meta">
-                                            <span>{{ msg.sender.first_name|default:msg.sender.username|slice:":1" }} • </span>
-                                            <span>{{ msg.created_at|date:"H:i" }}</span>
-                                            {% if msg.version > 1 %}<span title="Modificato">✏️</span>{% endif %}
-                                        </div>
-                                    </div>
-
-                                    <!-- Pulsante risposta (messaggi altri) -->
-                                    <div class="message-actions d-flex gap-1">
-                                        <button class="btn btn-sm btn-link text-muted p-0" onclick="replyToMessage('{{ msg.id }}', '{{ msg.content|escapejs }}')" title="Rispondi">↩️ Rispondi</button>
-                                    </div>
-                                </div>
-                            {% endif %}
-                        {% empty %}
-                            <div class="text-center text-muted py-5">
-                                <p class="fs-4 mb-3">💬</p>
-                                <p>Nessun messaggio ancora.</p>
-                                <small class="text-secondary">Inizia la conversazione scrivendo qui sopra!</small>
-                            </div>
+                 <!-- ✅ DOCUMENTI RISERVATI (SOLO chat privata) -->
+                {% if private_docs %}
+                <div class="p-3 border-top bg-success bg-opacity-10">
+                    <h6 class="mb-2 text-success fw-bold">🔒 Documenti Riservati</h6>
+                    <div style="max-height: 150px; overflow-y: auto;">
+                        {% for doc in private_docs %}
+                            <a href="{% url 'documents:documents_detail' doc.id %}"
+                               class="d-block text-decoration-none small mb-1 text-dark">
+                                📄 {{ doc.title|truncatechars:35 }}
+                                <!-- ✅ Fallback sicuro se owner è None -->
+                                <small class="text-muted">• {{ doc.uploaded_by.first_name|default:"Sistema" }}</small>
+                            </a>
                         {% endfor %}
                     </div>
-
                 </div>
-                </div>
+                {% endif %}
 
-                <div class="card p-3 mb-2 shadow custom-card">
-                <!-- ✍️ FORM INVIO MESSAGGIO -->
-                    <div class="p-3 border-bottom">
-                        <form method="POST" enctype="multipart/form-data" id="chatForm">
-                            {% csrf_token %}
-
-                            <!-- Preview risposta -->
-                            <div id="replyPreview" class="alert alert-info py-2 mb-3 d-none">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <span><strong>↩️ Risposta a:</strong> <span id="replyText"></span></span>
-                                    <button type="button" class="btn-close btn-close-sm" onclick="cancelReply()" title="Annulla risposta"></button>
-                                </div>
-                            </div>
-
-                            <!-- Contesto rifiuto spesa (se presente) -->
-                            {% if reject_context %}
-                            <div class="alert alert-warning border-warning mb-3">
-                                <div class="d-flex align-items-start gap-2">
-                                    <span class="fs-5">🔴</span>
-                                    <div>
-                                        <h6 class="mb-1 fw-bold">Giustificazione rifiuto spesa</h6>
-                                        <p class="mb-2 small text-muted">
-                                            Stai rifiutando la spesa di <strong>{{ reject_context.created_by }}</strong>:
-                                        </p>
-                                        <ul class="list-unstyled mb-2 small">
-                                            <li>📅 {{ reject_context.date }}</li>
-                                            <li>🏷️ {{ reject_context.category }}</li>
-                                            <li>💰 € {{ reject_context.amount }}</li>
-                                        </ul>
-                                        <p class="mb-0 small fst-italic">Scrivi il motivo qui sotto.</p>
-                                    </div>
-                                </div>
-                                <input type="hidden" name="reject_expense_id" value="{{ reject_context.expense_id }}">
-                            </div>
-                            {% endif %}
-
-                            <!-- Textarea messaggio -->
-                            <div class="mb-3">
-                                <textarea
-                                    name="message"
-                                    class="form-control"
-                                    rows="3"
-                                    placeholder="Scrivi un messaggio..."
-                                    required
-                                    id="messageInput"
-                                ></textarea>
-                            </div>
-
-                            <!-- Allegati -->
-                            <div class="mb-3">
-                                <label class="form-label small text-muted">📎 Allegati (opzionale)</label>
-                                <input type="file" name="attachments" multiple class="form-control form-control-sm">
-                            </div>
-
-                            <!-- Crea evento calendario -->
-                            <div class="form-check mb-3">
-                                <input class="form-check-input" type="checkbox" name="create_event" id="createEventCheck" onchange="toggleEventFields()">
-                                <label class="form-check-label small" for="createEventCheck">
-                                    📅 Crea evento nel calendario
-                                </label>
-                            </div>
-
-                            <!-- Campi evento (nascosti di default) -->
-                            <div id="eventFields" class="d-none border rounded p-3 mb-3 bg-light">
-                                <input type="text" name="event_title" placeholder="Titolo evento" class="form-control form-control-sm mb-2">
-                                <div class="row g-2">
-                                    <div class="col-6">
-                                        <input type="datetime-local" name="event_start" class="form-control form-control-sm">
-                                        <small class="text-muted">Inizio</small>
-                                    </div>
-                                    <div class="col-6">
-                                        <input type="datetime-local" name="event_end" class="form-control form-control-sm">
-                                        <small class="text-muted">Fine</small>
-                                    </div>
-                                </div>
-                                <textarea name="event_description" placeholder="Descrizione evento" class="form-control form-control-sm mt-2" rows="2"></textarea>
-                            </div>
-
-                            <!-- Pulsante invio -->
-                            <input type="hidden" name="reply_to" id="replyToInput">
-                            <div class="d-flex gap-2 flex-wrap mt-3">
-                                <button type="submit" class="btn btn-success btn-style ms-auto">
-                                <!--<button type="submit" class="btn btn-success btn-style"> -->
-                                    📤 Invia messaggio
-                                </button>
-                            </div>
-
-                        </form>
-                    </div>
-                </div>
-
-                <!-- 📎 SIDEBAR DOCUMENTI (WhatsApp-style) -->
-                <div class="col-md-3 mt-3">
-                    <div class="card shadow custom-card">
-                        <div class="card-header bg-light d-flex justify-content-between align-items-center">
-                            <h6 class="mb-0">📎 Documenti</h6>
-                            <a href="{% url 'documents:documents_list' %}" class="btn btn-sm btn-link p-0 text-decoration-none">
-                                Tutti →
-                            </a>
-                        </div>
-                        <div class="card-body p-2" style="max-height: 400px; overflow-y: auto;">
-                            {% for doc in shared_docs %}
-                                <div class="list-group-item list-group-item-action p-2 mb-1 border rounded">
-                                    <a href="{% url 'documents:documents_detail' doc.id %}"
-                                       class="text-decoration-none d-block"
-                                       title="Apri dettaglio documento">
-                                        <div class="d-flex align-items-center gap-2">
-                                            <span class="fs-5">
-                                                {% if doc.file.name|lower|slice:"-4:" == ".pdf" %}📕
-                                                {% elif doc.file.name|lower|slice:"-4:" == ".doc" or doc.file.name|lower|slice:"-5:" == ".docx" %}📘
-                                                {% elif doc.file.name|lower|slice:"-4:" == ".xls" or doc.file.name|lower|slice:"-5:" == ".xlsx" %}📗
-                                                {% else %}📄{% endif %}
-                                            </span>
-                                            <div class="flex-grow-1">
-                                                <div class="small fw-bold text-truncate" title="{{ doc.title }}">
-                                                    {{ doc.title|truncatechars:25 }}
-                                                </div>
-                                                <div class="small text-muted" style="font-size: 0.75rem;">
-                                                    {{ doc.uploaded_by.first_name|default:"Utente" }} •
-                                                    {{ doc.created_at|date:"d/m/Y" }}  {# ✅ created_at, non uploaded_at #}
-                                                </div>
-                                                {% if doc.category %}
-                                                    <span class="badge bg-secondary mt-1" style="font-size: 0.65rem;">
-                                                        {{ doc.get_category_display|truncatechars:10 }}
-                                                    </span>
-                                                {% endif %}
-                                            </div>
-                                        </div>
-                                    </a>
-                                    <!-- Pulsante anteprima rapida -->
-                                    <div class="mt-2 d-flex gap-1">
-                                        <a href="{% url 'documents:document_preview' doc.id %}"
-                                           target="_blank"
-                                           class="btn btn-sm btn-outline-primary py-0 px-2"
-                                           style="font-size: 0.75rem;">
-                                            👁️ Anteprima
-                                        </a>
-                                        <a href="{{ doc.file.url }}"
-                                           target="_blank"
-                                           class="btn btn-sm btn-outline-secondary py-0 px-2"
-                                           style="font-size: 0.75rem;">
-                                            ⬇️ Download
-                                        </a>
-                                    </div>
-                                </div>
-                            {% empty %}
-                                <p class="text-muted small text-center mb-0 py-3">Nessun documento condiviso</p>
-                            {% endfor %}
-                        </div>
-                    </div>
-                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
+
+<!-- 🔍 DEBUG (rimuovi in produzione) -->
+<div class="position-fixed top-0 end-0 p-2 bg-dark text-white small" style="z-index:9999;">
+  Fam: {{ family_messages|length }} | Priv: {{ private_messages|length }} | Controparte: {{ private_with_user.email|default:"Nessuna" }}
+</div>
+<div style="height:80px;"></div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-
-    // 📜 SCROLL AUTOMATICO IN FONDO ALLA CHAT
-    const chatContainer = document.getElementById("chatMessages");
-    if (chatContainer) {
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-
-        // Scroll al messaggio evidenziato (da URL con #msg-XXX)
-        const hash = window.location.hash;
-        if (hash && hash.startsWith("#msg-")) {
-            const target = document.querySelector(hash);
-            if (target) {
-                target.scrollIntoView({ behavior: "smooth", block: "center" });
-                target.classList.add("bg-warning", "bg-opacity-25");
-                setTimeout(() => target.classList.remove("bg-warning", "bg-opacity-25"), 2000);
-            }
-        }
-    }
-
-    const searchQuery = "{{ search_query|default:''|escapejs }}";
-
-    if (searchQuery && searchQuery.trim().length > 0) {
-        // 🔍 Highlight semplice con JS (case-insensitive)
-        document.querySelectorAll('.message-content').forEach(el => {
-            const originalText = el.textContent;
-            const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-            el.innerHTML = originalText.replace(regex, '<mark class="bg-warning text-dark">$1</mark>');
-        });
-    }
-
-    // ↩️ FUNZIONE RISPOSTA
-    window.replyToMessage = function(messageId, content) {
-        document.getElementById("replyToInput").value = messageId;
-        document.getElementById("replyText").textContent =
-            content.split('\n')[0].slice(0, 50) + (content.length > 50 ? '...' : '');
-        document.getElementById("replyPreview").classList.remove("d-none");
-
-        // Focus e scroll al form
-        const textarea = document.getElementById("messageInput");
-        if (textarea) {
-            textarea.focus();
-            textarea.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-    };
-
-    // ❌ ANNULLA RISPOSTA
-    window.cancelReply = function() {
-        document.getElementById("replyToInput").value = "";
-        document.getElementById("replyPreview").classList.add("d-none");
-        document.getElementById("messageInput").focus();
-    };
-
-    // 📅 TOGGLE CAMPI EVENTO
-    window.toggleEventFields = function() {
-        const checkbox = document.getElementById("createEventCheck");
-        const fields = document.getElementById("eventFields");
-        fields.classList.toggle("d-none", !checkbox.checked);
-    };
-
-    // ⌨️ TASTO ESC PER ANNULLARE RISPOSTA
-    document.addEventListener("keydown", function(e) {
-        if (e.key === "Escape") {
-            cancelReply();
-        }
+document.addEventListener("DOMContentLoaded", () => {
+    ['family', 'private'].forEach(t => {
+        const el = document.getElementById(`chatMessages-${t}`);
+        if (el) el.scrollTop = el.scrollHeight;
     });
 
-    // ✅ AUTO-FOCUS SE C'È CONTESTO RIFIUTO
-    {% if request.GET.auto_focus %}
-        const textarea = document.getElementById("messageInput");
-        if (textarea) {
-            textarea.focus();
-            textarea.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-    {% endif %}
+    window.replyToMessage = function(id, content, type) {
+        document.getElementById(`replyToInput-${type}`).value = id;
+        document.getElementById(`replyText-${type}`).textContent = content.split('\n')[0].slice(0, 50) + (content.length > 50 ? '...' : '');
+        document.getElementById(`replyPreview-${type}`).classList.remove("d-none");
+        const ta = document.getElementById(`messageInput-${type}`);
+        if (ta) { ta.focus(); ta.scrollIntoView({ behavior: "smooth", block: "center" }); }
+    };
 
+    window.cancelReply = function(type) {
+        document.getElementById(`replyToInput-${type}`).value = "";
+        document.getElementById(`replyPreview-${type}`).classList.add("d-none");
+    };
+
+    window.toggleEventFields = function(type) {
+        const cb = document.getElementById(`createEventCheck-${type}`);
+        const f = document.getElementById(`eventFields-${type}`);
+        if (f) f.classList.toggle("d-none", !cb.checked);
+    };
+
+    document.addEventListener("keydown", e => { if(e.key === "Escape") ['family','private'].forEach(cancelReply); });
+
+    {% if request.GET.auto_focus %}
+        const ta = document.getElementById("messageInput-family");
+        if (ta) { ta.focus(); ta.scrollIntoView({ behavior: "smooth", block: "center" }); }
+    {% endif %}
 });
 </script>
-
-
 {% endblock %}

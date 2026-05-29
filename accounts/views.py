@@ -1,50 +1,51 @@
 import logging
+from urllib.parse import unquote
 
 from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth import get_user_model, login
-from django.contrib.auth import logout
+# accounts/views.py
+from django.contrib.auth import get_user_model, login, logout
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
+from django.db import transaction
 from django.shortcuts import render, redirect
 from django.template.loader import render_to_string
-from django.utils.encoding import force_bytes
-from django.utils.encoding import force_str
-from django.utils.http import urlsafe_base64_decode
-from django.utils.http import urlsafe_base64_encode
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+
+from accounts.forms import RegisterForm, UserForm, UserProfileForm
+from accounts.models import UserProfile
+from accounts.services import email_service
+from families.models import Invitation, FamilyMember, Family
 from families.services.invitation_service import accept_invitation
-from families.models import FamilyMember
-from families.services.memberships import add_user_to_family
+from families.utils import get_family_of_user, generate_family_name
+from accounts.services.email_service import send_activation_email
+from django.contrib.auth import login, authenticate
+from django.contrib.auth.forms import AuthenticationForm
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from families.models import FamilyMember, Invitation
 from families.utils import get_family_of_user
-from .forms import RegisterForm, UserForm, UserProfileForm
-from .services import email_service
+from families.services import invitation_service
+from accounts.models import UserProfile
+from core.choices import RoleChoices  # ✅ Importa le choices
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 
 def redirect_after_login(request):
     profile = request.user.userprofile
-
-    if profile.role == 'lawyer':
-        return redirect('lawyer_dashboard')
-
+    if profile.role in RoleChoices.lawyer_roles():
+        return redirect('families:lawyer_dashboard')
     return redirect('families:family_dashboard')
 
 
 # =========================
 # REGISTRAZIONE
 # =========================
-from families.models import Invitation
-from accounts.models import UserProfile
-from django.utils import timezone
-
-
-# accounts/views.py
-from families.services.invitation_service import accept_invitation
-from accounts.services import email_service
-
 def register_view(request):
     invitation = None
     invitation_id = request.session.get("invitation_id")
@@ -67,13 +68,13 @@ def register_view(request):
         # 2️⃣ Crea profilo
         profile, _ = UserProfile.objects.get_or_create(user=user)
         if invitation:
-            profile.role = invitation.role  # Fallback, verrà sincronizzato da accept_invitation
+            profile.role = invitation.role
         profile.save()
 
-        # 3️⃣ ✅ Accetta invito → CREA FamilyMember nella famiglia corretta
+        # 3️⃣ Accetta invito → CREA FamilyMember
         if invitation:
             accept_invitation(invitation, user)
-            del request.session["invitation_id"]  # Pulisci sessione
+            del request.session["invitation_id"]
 
         # 4️⃣ Email di attivazione
         email_service.send_activation_email(request, user)
@@ -81,129 +82,206 @@ def register_view(request):
 
     return render(request, "accounts/register.html", {"form": form, "invitation": invitation})
 
+
 # =========================
 # ATTIVAZIONE ACCOUNT
 # =========================
-logger = logging.getLogger(__name__)
-User = get_user_model()
-
-
 def activate_account(request):
-    uidb64 = request.GET.get("uidb64")
-    token = request.GET.get("token")
+    # =========================
+    # 1. RECUPERO PARAMETRI LINK
+    # =========================
+    uidb64 = unquote(request.GET.get("uidb64", "")).strip()
+    token = unquote(request.GET.get("token", "")).strip()
 
-    # 1️⃣ Validazione input
     if not uidb64 or not token:
         logger.warning("⚠️ Attivazione: parametri mancanti")
         return render(request, "accounts/activation_invalid.html")
-
-    # 2️⃣ Decodifica UID con logging
+    # =========================
+    # 2. DECODIFICA USER ID
+    # =========================
     try:
         uid = force_str(urlsafe_base64_decode(uidb64))
-        logger.info(f"🔍 UID decodificato: {uid}")
     except (TypeError, ValueError, OverflowError) as e:
         logger.error(f"❌ Errore decodifica UID: {e}")
-        return render(request, "accounts/activation_invalid.html")
-
-    # 3️⃣ Cerca utente
+        try:
+            import base64
+            # Aggiungi padding se manca
+            padded = uidb64 + "=" * (4 - len(uidb64) % 4)
+            uid = force_str(base64.urlsafe_b64decode(padded))
+        except Exception:
+            return render(request, "accounts/activation_invalid.html", {
+                "error": "Link di attivazione non valido"
+            })
+    # =========================
+    # 3. TROVA UTENTE
+    # =========================
     user = User.objects.filter(pk=uid).first()
     if not user:
         logger.warning(f"⚠️ Utente con pk={uid} non trovato")
         return render(request, "accounts/activation_invalid.html")
-
-    # 4️⃣ Già attivo? → redirect gentile
+    # =========================
+    # 4. SE GIA ATTIVO → LOGIN PAGE
+    # =========================
     if user.is_active:
-        logger.info(f"✅ Utente {user.email} già attivo")
         messages.info(request, "Il tuo account è già attivo. Effettua il login.")
         return redirect("accounts:login")
-
-    # 5️⃣ Debug token (SOLO in sviluppo)
-    if settings.DEBUG:
-        logger.info(f"🔐 Token check per {user.email}:")
-        logger.info(f"   - Token ricevuto: {token[:20]}...")
-        logger.info(f"   - Password hash: {user.password[:20]}...")
-        logger.info(f"   - Last login: {user.last_login}")
-        logger.info(f"   - Date joined: {user.date_joined}")
-
-    # 6️⃣ Verifica token
-    token_valid = default_token_generator.check_token(user, token)
-    logger.info(f"🔑 Token valido: {token_valid}")
-
-    if token_valid:
+    # =========================
+    # 5. VALIDAZIONE TOKEN e  ATTIVA UTENTE
+    # =========================
+    if default_token_generator.check_token(user, token):
         user.is_active = True
         user.save()
-        logger.info(f"🎉 Utente {user.email} attivato con successo!")
-
-        # Login automatico (opzionale)
         login(request, user)
         messages.success(request, "✅ Account attivato! Benvenuto.")
-
-        # Redirect intelligente
+        # =========================
+        # 7. RECUPERA PROFILO
+        # =========================
         profile = getattr(user, 'userprofile', None)
-        if profile and profile.role == 'lawyer':
-            return redirect("families:setup")  # o lawyer_dashboard
-        return redirect("families:setup")  # o family_dashboard
-    else:
-        # 🚨 FALLIMENTO: mostra pagina con opzioni di recupero
-        logger.warning(f"❌ Token non valido per {user.email}")
-        return render(request, "accounts/activation_invalid.html", {
-            "user_email": user.email,  # Per mostrare "Rinvia email a xxx"
-            "can_resend": True
-        })
+        role = profile.role if profile else "parent_a"
+
+        # =========================
+        # 8. CASO INVITO
+        # =========================
+        # ✅ FIX: Collega l'utente alla famiglia se c'era un invito in sessione
+        invitation_id = request.session.pop("invitation_id", None)
+        if invitation_id:
+            # ✅ Caso INVITO: accept_invitation crea FamilyMember
+            from families.services.invitation_service import accept_invitation
+            invitation = Invitation.objects.filter(id=invitation_id, status="pending").first()
+            if invitation:
+                accept_invitation(invitation, user)  # ← ✅ Crea FamilyMember qui!
+                messages.success(request, f"✅ Sei stato aggiunto a {invitation.family.name}")
+        # =========================
+        # 9. CASO REGISTRAZIONE DIRETTA (NO INVITO)
+        # =========================
+        else:
+            if not FamilyMember.objects.filter(user=user).exists():
+                #crea nuova famiglia
+                family_name = generate_family_name(user)
+                #crea famiglia
+                family = Family.objects.create(
+                    name=family_name,
+                    created_by=user,
+                    creator_role=role
+                )
+                #crea membership
+                FamilyMember.objects.create(
+                    family=family,
+                    user=user,
+                    role=role,
+                    is_primary=True
+                )
+
+                # Marca setup completo
+                if profile:
+                    profile.setup_complete = True
+                    profile.save()
+
+                messages.success(request, f"✅ Famiglia '{family.name}' creata!")
+            # =========================
+            # 10. REDIRECT INTELLIGENTE
+            # =========================
+            # ✅ Redirect intelligente: dashboard se ha famiglia, setup solo se manca
+
+        if profile and profile.role.startswith("lawyer"):
+            return redirect("lawyer_dashboard")
+
+        # Se ha una famiglia (dovrebbe averla ora), vai a dashboard
+        from families.utils import get_family_of_user
+        if get_family_of_user(user):
+            return redirect("families:family_dashboard")
+
+        # Fallback raro: se per qualche motivo manca, vai a setup
+        return redirect("families:setup")
+
+    logger.warning(f"⚠️ Token non valido per utente {user.pk}")
+
+    return render(request, "accounts/activation_invalid.html", {
+        "error": "Link di attivazione non valido o scaduto."
+    })
 
 
 # =========================
 # LOGIN
 # =========================
+# accounts/views.py
+
+
+# accounts/views.py
+from django.contrib.auth import login
+from django.contrib.auth.forms import AuthenticationForm
+from django.shortcuts import render, redirect
+from families.utils import get_family_of_user
+from core.choices import RoleChoices
+
+
 def login_view(request):
     if request.method == "POST":
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
             login(request, user)
-            # 🔥 GESTIONE INVITO PENDENTE
+
+            # 🔥 Gestione invito (tieni il tuo codice se presente)
+            # 🔑 GESTIONE INVITO PENDENTE (per avvocati con più famiglie)
             pending_token = request.session.pop("pending_invite_token", None)
-
             if pending_token:
-                invitation = Invitation.objects.filter(
-                    token=pending_token,
-                    status="pending"
-                ).first()
+                from families.services.invitation_service import accept_invitation
+                from families.models import Invitation
+                from django.contrib import messages
 
-                if invitation and not invitation.is_expired:
-                    add_user_to_family(user, invitation)
-                    invitation.mark_accepted(user)
-                    invitation.status = "accepted"
-                    invitation.accepted_at = timezone.now()
-                    invitation.invited_user = user
-                    invitation.save()
+                try:
+                    invitation = Invitation.objects.select_related('family').get(
+                        token=pending_token,
+                        status="pending"
+                    )
+                    # ✅ Aggiungi l'utente alla famiglia (crea FamilyMember)
+                    accept_invitation(invitation, user)
+                    messages.success(request, f"✅ Sei stato aggiunto a '{invitation.family.name}'")
+                except Invitation.DoesNotExist:
+                    messages.warning(request, "⚠️ Invito non valido o già utilizzato")
+                except Exception as e:
+                    # Logga l'errore per debugging, ma non esporlo all'utente
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.error(f"Errore accettazione invito {pending_token}: {e}")
+                    messages.error(request, "⚠️ Si è verificato un errore tecnico. Contatta il supporto.")
 
-                    return redirect("families:summary")
-            profile = UserProfile.objects.filter(user=user).first()
+            profile = getattr(user, 'profile', None)
+            if not profile:
+                return redirect('families:setup')
+
+            # 🎯 1. AVVOCATI
+            if profile.role in RoleChoices.lawyer_roles():
+                if profile.setup_complete:
+                    return redirect('families:lawyer_dashboard')
+                return redirect('families:summary')
+
+            # 🎯 2. GENITORI
             family = get_family_of_user(user)
-            # 🔴 1. se NON ha famiglia → setup
             if not family:
                 return redirect('families:setup')
 
-            # 🟡 2. se profilo incompleto
-            if not profile or not profile.setup_complete:
-                return redirect('families:setup')
+            if not profile.setup_complete:
+                return redirect('families:summary')
 
-            # 🟢 3. ruolo nella famiglia
-            membership = FamilyMember.objects.filter(user=user).first()
+            # ✅ Tutto ok
+            return redirect('families:family_dashboard')
 
-            if membership:
-                if membership.role.startswith("lawyer"):
-                    return redirect("families:setup")
-                else:
-                    return redirect("families:setup")
+        # ⚠️ Se il form NON è valido, il codice CONTINUA qui sotto
+        # e restituisce il form con gli errori evidenziati
 
-            # fallback
-            return redirect("families:summary")
     else:
         form = AuthenticationForm()
+
+    # 🔴 CRUCIALE: Questo return DEVE essere allo stesso livello di "if request.method"
+    # Se è indentato dentro l'if, Django restituisce None nei casi non gestiti.
     return render(request, "accounts/login.html", {"form": form})
 
+
+# =========================
+# IMPOSTAZIONI PROFILO (CON PROTEZIONE CAMPI BLOCCATI)
+# =========================
 @login_required
 def profile_settings_view(request):
     user = request.user
@@ -211,17 +289,32 @@ def profile_settings_view(request):
 
     if request.method == "POST":
         user_form = UserForm(request.POST, instance=user)
-        profile_form = UserProfileForm(request.POST, instance=profile)
+        profile_form = UserProfileForm(request.POST, instance=profile, role=profile.role)
 
         if user_form.is_valid() and profile_form.is_valid():
-            user_form.save()
-            profile_form.save()
+            # 🔐 PROTEZIONE ANTI-MANOMISSIONE: rimuovi campi bloccati dai dati validati
+            user_data = user_form.cleaned_data.copy()
+            profile_data = profile_form.cleaned_data.copy()
 
+            # Se il profilo esiste già → ignora tentativi di modifica dei campi bloccati
+            if user.pk:
+                for field in ["first_name", "last_name", "email"]:
+                    user_data.pop(field, None)
+            if profile.pk and 'phone' in profile_data:
+                profile_data.pop('phone', None)
+
+            # Salva SOLO i campi rimanenti
+            with transaction.atomic():
+                if user_data:
+                    User.objects.filter(pk=user.pk).update(**user_data)
+                if profile_data:
+                    UserProfile.objects.filter(pk=profile.pk).update(**profile_data)
+
+            messages.success(request, "✅ Profilo aggiornato")
             return redirect("accounts:settings")
-
     else:
         user_form = UserForm(instance=user)
-        profile_form = UserProfileForm(instance=profile)
+        profile_form = UserProfileForm(instance=profile, role=profile.role)
 
     return render(request, "accounts/settings.html", {
         "form_user": user_form,
@@ -229,41 +322,32 @@ def profile_settings_view(request):
     })
 
 
- # o senza login se vuoi permettere a chiunque
+# =========================
+# RESEND ACTIVATION
+# =========================
 def resend_activation(request):
-    if request.method == "POST":
-        email = request.POST.get("email")
-        user = User.objects.filter(email=email, is_active=False).first()
+    """View per richiedere un nuovo link di attivazione."""
 
-        if user:
-            # Rigenera token
-            uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
-            token = default_token_generator.make_token(user)
+    if request.method != "POST":
+        return render(request, "accounts/resend_activation.html")
 
-            # Invia nuova email
-            activation_link = request.build_absolute_uri(
-                f"/accounts/activate/?uidb64={uidb64}&token={token}"
-            )
+    email = request.POST.get("email", "").strip().lower()
 
-            html_message = render_to_string("emails/activation_email.html", {
-                "user": user,
-                "activation_link": activation_link,
-            })
+    # Cerca utente inattivo
+    user = User.objects.filter(email=email, is_active=False).first()
 
-            send_mail(
-                subject="Nuovo link di attivazione",
-                message="Clicca sul link per attivare il tuo account",
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
-                html_message=html_message
-            )
-            messages.success(request, "✅ Nuova email di attivazione inviata!")
-        else:
-            messages.error(request, "❌ Utente non trovato o già attivo.")
+    if user and send_activation_email(request, user, subject_prefix="Nuovo "):
+        messages.success(request, "✅ Nuova email di attivazione inviata!")
+    else:
+        # ⚠️ Security: non rivelare se l'utente esiste o meno
+        messages.success(
+            request,
+            "✅ Se l'email esiste ed è inattiva, riceverai un nuovo link di attivazione."
+        )
+        if not user:
+            logger.warning(f"⚠️ Tentativo resend per email non trovata/inattiva: {email}")
 
-        return redirect("accounts:login")
-
-    return render(request, "accounts/resend_activation.html")
+    return redirect("accounts:login")
 
 
 # =========================

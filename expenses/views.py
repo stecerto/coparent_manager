@@ -6,7 +6,8 @@ from django.db.models import Sum, F, ExpressionWrapper, DecimalField
 from django.http import HttpResponseForbidden, FileResponse, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
-
+from django.db import transaction
+from core.choices import RoleChoices
 from documents.models import Document
 from families.utils import get_family_of_user
 from families.models import FamilyMember
@@ -16,6 +17,7 @@ from .pdf_utils import generate_expense_report  # ✅ Assicurati che il nome del
 from expenses.services.expences_service import create_expense, update_expense, approve_expense
 from .utils import get_expense_shares
 
+PARENT_ROLES = [RoleChoices.PARENT_A, RoleChoices.PARENT_B]
 
 @login_required
 def expenses_dashboard(request):
@@ -82,6 +84,7 @@ from django.contrib import messages
 
 
 @login_required
+@transaction.atomic
 def add_expense(request):
     family = get_family_of_user(request.user)
     if not family:
@@ -89,17 +92,28 @@ def add_expense(request):
         return redirect("expenses:expenses_list")
 
     membership = family.members.filter(user=request.user).first()
-    if not membership or membership.role not in ["parent_a", "parent_b"]:
+    if not membership or membership.role not in PARENT_ROLES:
         messages.error(request, "⚠️ Solo i genitori possono inserire spese")
         return redirect("expenses:expenses_list")
 
     if request.method == "POST":
         form = ExpenseForm(request.POST, request.FILES, user=request.user)
         if form.is_valid():
-            child = form.cleaned_data["child"]
+            #child = form.cleaned_data["child"]
 
             # ✅ Il service crea, salva e applica lo snapshot %
-            expense = create_expense(family, request.user, form.cleaned_data, child, membership)
+            cleaned = form.cleaned_data
+
+            expense = create_expense(
+                family=family,
+                user=request.user,
+                child=cleaned["child"],
+                expense_type=cleaned["expense_type"],
+                amount=cleaned["amount"],
+                description=cleaned.get("description", ""),
+                expense_date=cleaned["expense_date"],
+                membership=membership
+            )
 
             # ✅ Il service imposta l'approvazione FK correttamente
             approve_expense(expense, request.user, membership.role)
@@ -182,6 +196,7 @@ def expense_history(request, pk):
 
 @require_POST
 @login_required
+@transaction.atomic
 def update_expense_status(request):
     """AJAX: Aggiorna accepted/rejected dai pulsanti 🔵🔴"""
     import json
@@ -286,7 +301,7 @@ def send_rejection_message(request):
         content = (
             f"🔴 *Rifiuto spesa*\n\n"
             f"📅 Data: {expense.expense_date.strftime('%d/%m/%Y')}\n"
-            f"🏷️ Categoria: {expense.expense_type.display_name if expense.expense_type else 'N/D'}\n"
+            f"🏷️ Categoria: {expense.category_name_snapshot if expense.expense_type else 'N/D'}\n"
             f"💰 Importo: € {expense.amount}\n"
             f"👤 Inserita da: {expense.created_by.display_name}\n\n"
             f"❌ Motivazione: {reason}"
@@ -374,7 +389,8 @@ def expense_day_detail(request, date):
 
 @login_required
 def expenses_riepilogo_spese(request):
-    family = get_family_of_user(request.user)
+    #family = get_family_of_user(request.user)
+    return redirect("expenses:expenses_dashboard")
 
 
 # ========================================================================
@@ -430,3 +446,145 @@ def calculate_parent_debt(expense_amount, child):
     amount_a = expense_amount * pct_a
     amount_b = expense_amount * pct_b
     return amount_a, amount_b
+
+
+
+
+#________________________GESTIONE CATEGORIE E SPESE SOLO ADMIN________________________________________
+
+
+
+from django.contrib.admin.views.decorators import staff_member_required, user_passes_test
+from django.shortcuts import render
+from .models import ExpenseCategory
+def superadmin_only(user):
+    return user.is_superuser
+def admin_required(view_func):
+    return user_passes_test(lambda u: u.is_superuser)(view_func)
+
+@admin_required
+@staff_member_required
+def categories_list(request):
+
+    categories = ExpenseCategory.objects.select_related(
+        "group"
+    ).all()
+
+    return render(
+        request,
+        "expenses/categories/list.html",
+        {
+            "categories": categories
+        }
+    )
+
+from django.shortcuts import redirect
+from .forms import ExpenseCategoryForm
+#@admin_required
+@staff_member_required
+def category_create(request):
+
+    form = ExpenseCategoryForm(
+        request.POST or None
+    )
+
+    if form.is_valid():
+
+        category = form.save()
+
+        return redirect("categories_list")
+
+    return render(
+        request,
+        "expenses/categories/form.html",
+        {
+            "form": form
+        }
+    )
+
+from django.shortcuts import get_object_or_404
+
+from django.utils import timezone
+
+from .models import (
+    ExpenseCategory,
+    ExpenseCategoryHistory
+)
+
+#@admin_required
+@staff_member_required
+def category_update(request, pk):
+
+    old_category = get_object_or_404(
+        ExpenseCategory,
+        pk=pk
+    )
+
+    form = ExpenseCategoryForm(
+        request.POST or None,
+        instance=old_category
+    )
+
+    if form.is_valid():
+
+        old_category.valid_to = timezone.now()
+        old_category.is_active = False
+        old_category.save()
+
+        new_category = form.save(commit=False)
+
+        new_category.pk = None
+
+        new_category.version = old_category.version + 1
+
+        new_category.previous_version = old_category
+
+        new_category.valid_from = timezone.now()
+
+        new_category.is_active = True
+
+        new_category.save()
+
+        ExpenseCategoryHistory.objects.create(
+            category=new_category,
+            action="updated",
+            old_name=old_category.display_name,
+            new_name=new_category.name,
+            old_color=old_category.color,
+            new_color=new_category.color,
+            changed_by=request.user
+        )
+
+        return redirect("categories_list")
+
+    return render(
+        request,
+        "expenses/categories/form.html",
+        {
+            "form": form,
+            "category": old_category
+        }
+    )
+#@admin_required
+@staff_member_required
+def category_delete(request, pk):
+
+    category = get_object_or_404(
+        ExpenseCategory,
+        pk=pk
+    )
+
+    category.is_active = False
+
+    category.valid_to = timezone.now()
+
+    category.save()
+
+    ExpenseCategoryHistory.objects.create(
+        category=category,
+        action="deleted",
+        old_name=category.display_name,
+        changed_by=request.user
+    )
+
+    return redirect("categories_list")

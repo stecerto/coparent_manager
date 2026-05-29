@@ -12,10 +12,11 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 from decouple import config
+from django.conf.global_settings import EMAIL_USE_SSL
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+AUTH_USER_MODEL = "users.User"
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -49,10 +50,11 @@ INSTALLED_APPS = [
     'accounts',
     'families',
     'children',
-    'calendar_app',
+    "calendar_app.apps.CalendarAppConfig",
     'expenses',
     'chat',
     'documents',
+    'notifications'
 
 
 
@@ -77,10 +79,12 @@ TEMPLATES = [
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
+                'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                "families.context_processors.family_membership",
+                'families.context_processors.family_membership',
+                'families.context_processors.lawyer_nav_context',
                 "core.context_processors.breadcrumbs",
             ],
         },
@@ -181,13 +185,37 @@ CRISPY_TEMPLATE_PACK = "bootstrap5"
 #EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'#'mailjet.backends.MailjetBackend'
 MAILJET_API_KEY = os.getenv("MAILJET_API_KEY")
 MAILJET_SECRET_KEY = os.getenv("MAILJET_SECRET_KEY")
-#EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = "smtp.gmail.com" #"in-v3.mailjet.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
-EMAIL_HOST_USER = os.getenv("MAILJET_API_KEY")
-EMAIL_HOST_PASSWORD =  os.getenv("MAILJET_SECRET_KEY")
-DEFAULT_FROM_EMAIL = "no-reply@mailjet.com"  #"sc.assistenza.pc@gmail.com"
+EMAIL_USE_SSL = False
 
+EMAIL_HOST_USER = config("EMAIL_HOST_USER")    #os.getenv("MAILJET_API_KEY")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD") #os.getenv("MAILJET_SECRET_KEY")
+#DEFAULT_FROM_EMAIL = "no-reply@mailjet.com"
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+SERVER_EMAIL = EMAIL_HOST_USER
 #SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  produzione
 
+
+# config/settings.py
+
+# ⚡ CONFIGURAZIONE CELERY
+CELERY_BROKER_URL = "redis://localhost:6379/0"  # Broker standard (Redis)
+CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE  # Usa il tuo fuso orario già definito
+
+# 🧪 FALLBACK SVILUPPO (se NON hai Redis installato):
+# Esegue i task in modo sincrono, senza bisogno di broker/worker
+CELERY_TASK_ALWAYS_EAGER = True
+CELERY_BEAT_SCHEDULE = {
+    'send-event-reminders-every-5-minutes': {
+        'task': 'calendar_app.tasks.send_event_reminder',
+        'schedule': 300.0,  # ogni 5 minuti
+        'options': {'expires': 240},  # evita accavallamenti se il worker è lento
+    },
+}

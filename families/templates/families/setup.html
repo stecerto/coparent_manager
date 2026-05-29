@@ -4,6 +4,33 @@
 
 {% block title %}Setup Profilo{% endblock %}
 
+{% block extra_css %}
+<style>
+/* Animazione sottile per la progress bar */
+.progress-bar-animated {
+    animation: progress-load 0.6s ease-out;
+}
+@keyframes progress-load {
+    from { width: 0%; }
+}
+
+/* Highlight dei campi completati nel form */
+.form-control:disabled,
+.form-control[readonly] {
+    background-color: #f8f9fa;
+    border-color: #28a745;
+    box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.1);
+    opacity: 0.7;
+}
+.profile-complete {
+    border-color: #28a745 !important;
+    background-color: #f8fff8 !important; /* Leggero sfondo verde per maggiore visibilità */
+    box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.15) !important;
+    transition: all 0.2s ease; /* Animazione morbida */
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="card p-3 mb-2 shadow custom-card text-center">
     {% if is_edit_mode %}
@@ -12,7 +39,61 @@
         <h2>Configurazione Profilo</h2>
     {% endif %}
 </div>
+<!-- invio messaggi errore alla pagina -->
+{% if messages %}
+<div class="container mt-3">
+    {% for message in messages %}
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+<!-- fine invio messaggi alla pagina -->
+    <!-- 📊 PROGRESS BAR SETUP -->
+    <div class="card p-3 mb-3 shadow-sm border-success">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <h5 class="mb-0 text-success">📈 Completamento profilo</h5>
+            <span class="badge bg-success">{{ setup_progress_pct }}%</span>
+        </div>
 
+        <!-- Barra visiva Bootstrap -->
+        <div class="progress mb-2" style="height: 10px;">
+            <div class="progress-bar bg-success progress-bar-striped progress-bar-animated"
+                 role="progressbar"
+                 style="width: {{ setup_progress_pct }}%"
+                 aria-valuenow="{{ setup_progress_pct }}"
+                 aria-valuemin="0"
+                 aria-valuemax="100">
+            </div>
+        </div>
+
+        <!-- Messaggio dinamico -->
+        <div class="text-muted small">
+
+            <div>
+                {{ setup_progress_message }}
+            </div>
+
+            {% if setup_completed_labels %}
+                <div class="mt-2">
+                    {% for label in setup_completed_labels %}
+                        <span class="badge bg-success me-1 mb-1">
+                            ✓ {{ label }}
+                        </span>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            {% if setup_missing_count > 0 %}
+                <div class="mt-2 text-danger">
+                    Mancano ancora {{ setup_missing_count }} campo/i
+                </div>
+            {% endif %}
+
+        </div>
+    </div>
 <div class="card-body">
     <form method="post" enctype="multipart/form-data" id="profile-form">
         {% csrf_token %}
@@ -52,8 +133,6 @@
              {% if active_children %}  <!-- ✅ SEMPLICE: lista già filtrata -->
                 <div class="list-group list-group-flush">
 
-
-
                     {% for child in active_children %}
                     <a href="{% url 'children:child_edit' child.pk %}"
                        class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
@@ -62,7 +141,7 @@
                             <small class="d-block text-muted">
                                 Nato il {{ child.birth_date|date:"d/m/Y" }} •
                                 {% if child.contribution_pct_parent_a is not None%}
-                                    Ripartizione: {{ child.contribution_pct_parent_a }}% A / {{ child.effective_split_pct_parent_a|add:"-100"|default:"50.00" }}% B
+                                    Ripartizione: {{ child.contribution_pct_parent_a }}% A / {{ child.effective_split_pct_parent_a|add:"+(-100,00)"|default:"50.00" }}% B
                                 {% else %}
                                     Ripartizione: da definire
                                 {% endif %}
@@ -131,6 +210,6 @@
 {% endblock %}
 
 {% block extra_js %}
-<!-- <script src="{% static 'js/pages/children.js' %}"></script> -->
+<script src="{% static 'js/pages/setup.js' %}"></script> -->
 
 {% endblock %}

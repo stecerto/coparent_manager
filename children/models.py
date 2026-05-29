@@ -4,6 +4,7 @@ from decimal import Decimal
 from django.conf import settings
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
+from django.db.models import Q
 
 
 class ChildProfile(models.Model):
@@ -163,7 +164,8 @@ class ChildProfile(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.name} {self.surname}"
+        # ✅ Capitalizza prima lettera di nome e cognome
+        return f"{self.name.capitalize()} {self.surname.capitalize()}"
 
 class ChildSupport(models.Model):
     child = models.ForeignKey(
@@ -201,4 +203,4 @@ class ChildSupport(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.child.name} - {self.amount} € (v{self.version})"
+        return f"{self.child.name.capitalize()} - {self.amount} € (v{self.version})"

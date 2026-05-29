@@ -151,3 +151,52 @@ document.addEventListener("DOMContentLoaded", function () {
 
     console.log("✅ Setup JS inizializzato correttamente");
 });
+
+document.addEventListener('DOMContentLoaded', function() {
+    // Seleziona tutti i campi del form
+    const fields = document.querySelectorAll('.form-control, .form-select');
+
+    // Funzione per verificare se un campo è "completo"
+    function isFieldComplete(field) {
+        const value = field.value.trim();
+        // Per checkbox/radio: controlla se sono selezionati
+        if (field.type === 'checkbox' || field.type === 'radio') {
+            return field.checked;
+        }
+        // Per select: controlla che non sia il placeholder
+        if (field.tagName === 'SELECT') {
+            return value && value !== field.querySelector('option[value=""]')?.value;
+        }
+        // Per text/email/tel/etc: controlla che non sia vuoto
+        return value.length > 0;
+    }
+
+    // Applica/rimuovi la classe in base allo stato
+    function updateFieldStyle(field) {
+        if (isFieldComplete(field)) {
+            field.classList.add('profile-complete');
+        } else {
+            field.classList.remove('profile-complete');
+        }
+    }
+
+    // Inizializza tutti i campi
+    fields.forEach(field => {
+        updateFieldStyle(field);
+        // Aggiungi listener per aggiornamenti in tempo reale
+        field.addEventListener('input', () => updateFieldStyle(field));
+        field.addEventListener('change', () => updateFieldStyle(field));
+        field.addEventListener('blur', () => updateFieldStyle(field));
+    });
+
+    // Bonus: evidenzia il campo attivo con un focus più visibile
+    fields.forEach(field => {
+        field.addEventListener('focus', function() {
+            this.style.boxShadow = '0 0 0 3px rgba(40, 167, 69, 0.25)';
+        });
+        field.addEventListener('blur', function() {
+            this.style.boxShadow = '';
+            updateFieldStyle(this); // Riapplica lo stato dopo il blur
+        });
+    });
+});

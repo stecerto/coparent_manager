@@ -1,26 +1,35 @@
+import logging
 from datetime import datetime
 
+from django.db import transaction
 from django.utils import timezone
 
 from calendar_app.services.calendar_service import create_event
 from chat.models import FamilyMessage, MessageAttachment
 from documents.models import Document, DocumentAuditLog
+from calendar_app.models import CalendarEvent
+
+logger = logging.getLogger(__name__)
 
 
+@transaction.atomic
 def send_message(
-    family,
-    sender,
-    content,
-    recipient=None,
-    files=None,
-    create_calendar_event=False,
-    event_data=None,
-    reply_to=None
+        family,
+        sender,
+        content,
+        recipient=None,
+        files=None,
+        create_calendar_event=False,
+        event_data=None,
+        reply_to=None
 ):
     """
-    Invia un messaggio con eventuali allegati.
+    Invia un messaggio con eventuali allegati e crea evento calendario (se richiesto).
+    ✅ FIX: Crea CalendarEvent direttamente con dati filtrati per evitare TypeError('amount').
     """
+    files = files or []
 
+    # 1. Crea messaggio
     message = FamilyMessage.objects.create(
         family=family,
         sender=sender,
@@ -29,7 +38,7 @@ def send_message(
         reply_to=reply_to
     )
 
-    # Allegati
+    # 2. Gestione Allegati (Logica originale mantenuta intatta)
     if files:
         for f in files:
             attachment = MessageAttachment.objects.create(
@@ -63,35 +72,56 @@ def send_message(
                 action="upload"
             )
 
+    # 3. Evento Calendario (MODIFICA CHIRURGICA)
+    # ✅ FIX: Usiamo safe_data per creare l'evento direttamente, bypassando create_event service
+    # che probabilmente passava **kwargs includendo 'amount'.
     # Evento calendario
-    event_data = event_data or {}
-
     if create_calendar_event and event_data:
-        start_time_str = str(event_data.get("start_time"))
-        end_time_str = str(event_data.get("end_time"))
+        try:
+            start_time_str = str(event_data.get("start_time"))
+            end_time_str = str(event_data.get("end_time"))
 
-        if start_time_str and end_time_str:
-            start_time = datetime.fromisoformat(start_time_str)
-            end_time = datetime.fromisoformat(end_time_str)
+            if start_time_str and end_time_str:
+                start_time = datetime.fromisoformat(start_time_str)
+                end_time = datetime.fromisoformat(end_time_str)
 
-            # se hai timezone aware (consigliato in Django)
-            if timezone.is_naive(start_time):
-                start_time = timezone.make_aware(start_time)
+                if timezone.is_naive(start_time):
+                    start_time = timezone.make_aware(start_time)
+                if timezone.is_naive(end_time):
+                    end_time = timezone.make_aware(end_time)
 
-            if timezone.is_naive(end_time):
-                end_time = timezone.make_aware(end_time)
+                # ✅ Estrai e rimuovi children_ids prima di creare l'evento
+                children_ids = event_data.pop("children_ids", [])
 
-            event = create_event(
-                family=family,
-                title=event_data.get("title", content[:50]),
-                start_time=start_time,
-                end_time=end_time,
-                created_by=sender,
-                description=event_data.get("description", content)
-            )
+                safe_data = {
+                    "family": family,
+                    "created_by": sender,
+                    "title": str(event_data.get("title", content[:50]))[:200],
+                    "description": str(event_data.get("description", content)),
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "event_type": event_data.get("event_type", "other"),
+                    "source": event_data.get("source", "chat"),
+                    "linked_id": event_data.get("linked_id"),
+                }
+                safe_data = {k: v for k, v in safe_data.items() if v is not None}
 
-            message.linked_event = event
-            message.save()
+                # Creazione evento
+                event = CalendarEvent.objects.create(**safe_data)
+
+                # ✅ Collegamento figli (ManyToMany richiede .set() dopo il create)
+                if children_ids:
+                    from children.models import ChildProfile
+                    # Sicurezza: prende solo figli appartenenti a questa famiglia
+                    children = ChildProfile.objects.filter(id__in=children_ids, family=family, is_active=True)
+                    event.children.set(children)
+
+                message.linked_event = event
+                message.save()
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"❌ Errore creazione evento calendario: {e}", exc_info=True)
+
     return message
 
 def update_message(message, user, new_content, files=None, create_calendar_event=False, event_data=None):

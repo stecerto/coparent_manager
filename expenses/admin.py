@@ -20,8 +20,8 @@ class ExpenseAdmin(admin.ModelAdmin):
 
 @admin.register(ExpenseCategory)
 class ExpenseCategoryAdmin(admin.ModelAdmin):
-    list_display = ('display_name', 'name', 'color')
-    search_fields = ('display_name','name')
+    list_display = ("id", "display_name", "group", "is_active", "version", 'color')
+    search_fields = ('display_name','slug')
     ordering = ('display_name',)
 
     # 🔒 SOLO STAFF/ADMIN può aggiungere/modificare/cancellare

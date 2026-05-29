@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block content %}
+
+<div class="container">
+
+    <div class="d-flex justify-content-between mb-3">
+        <h2>Categorie Spese</h2>
+
+        <a href="{% url 'category_create' %}"
+           class="btn btn-primary">
+            Nuova Categoria
+        </a>
+    </div>
+
+    <table class="table table-striped">
+
+        <thead>
+            <tr>
+                <th>Gruppo</th>
+                <th>Nome</th>
+                <th>Versione</th>
+                <th>Attiva</th>
+                <th></th>
+            </tr>
+        </thead>
+
+        <tbody>
+
+        {% for c in categories %}
+
+            <tr>
+
+                <td>{{ c.group }}</td>
+
+                <td>
+                    <span class="badge"
+                          style="background: {{ c.color }}">
+                        {{ c.name }}
+                    </span>
+                </td>
+
+                <td>v{{ c.version }}</td>
+
+                <td>
+                    {% if c.is_active %}
+                        ✅
+                    {% else %}
+                        ❌
+                    {% endif %}
+                </td>
+
+                <td>
+
+                    <a href="{% url 'category_update' c.id %}"
+                       class="btn btn-sm btn-warning">
+                        Modifica
+                    </a>
+
+                    <a href="{% url 'category_delete' c.id %}"
+                       class="btn btn-sm btn-danger">
+                        Disattiva
+                    </a>
+
+                </td>
+
+            </tr>
+
+        {% endfor %}
+
+        </tbody>
+
+    </table>
+
+</div>
+
+{% endblock %}

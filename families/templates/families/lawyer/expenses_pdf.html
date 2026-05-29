@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="utf-8">
+    <title>Report Spese - {{ family.name }}</title>
+    <style>
+        /* Reset & Base */
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+            font-size: 11px;
+            color: #2c3e50;
+            line-height: 1.4;
+            margin: 0;
+            padding: 0;
+        }
+
+        /* Pagine PDF */
+        @page { size: A4; margin: 12mm; }
+
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 2px solid #0d6efd;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+        .logo {
+            font-size: 20px;
+            font-weight: bold;
+            color: #0d6efd;
+        }
+        .meta { text-align: right; }
+        .meta h1 { font-size: 16px; margin: 0 0 2px 0; color: #1a1a1a; }
+        .meta p { margin: 0; font-size: 10px; color: #6c757d; }
+
+        /* Stats */
+        .stats {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+            background: #f8f9fa;
+            padding: 8px;
+            border-radius: 4px;
+        }
+        .stat-item { flex: 1; text-align: center; border-right: 1px solid #dee2e6; }
+        .stat-item:last-child { border-right: none; }
+        .stat-label { font-size: 9px; color: #6c757d; margin: 0; }
+        .stat-value { font-size: 13px; font-weight: bold; margin: 2px 0 0 0; }
+
+        /* Tabella */
+        table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+        th {
+            background: #e9ecef;
+            text-align: left;
+            padding: 6px 8px;
+            font-size: 9px;
+            font-weight: bold;
+            border-bottom: 2px solid #adb5bd;
+        }
+        td {
+            padding: 5px 8px;
+            border-bottom: 1px solid #dee2e6;
+            font-size: 10px;
+        }
+        .amount { text-align: right; font-family: 'Courier New', monospace; }
+
+        /* Stati */
+        .status { padding: 2px 5px; border-radius: 3px; font-size: 8px; font-weight: bold; }
+        .status.pending { background: #fff3cd; color: #856404; }
+        .status.approved { background: #d4edda; color: #155724; }
+        .status.rejected { background: #f8d7da; color: #721c24; }
+        .status.paid { background: #cce5ff; color: #004085; }
+
+        /* Footer */
+        .footer {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            text-align: center;
+            font-size: 8px;
+            color: #999;
+            border-top: 1px solid #ddd;
+            padding-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="logo">⚖️ CoParent Manager</div>
+        <div class="meta">
+            <h1>Report Spese: {{ family.name }}</h1>
+            <p>Generato il: {{ generated_at|date:"d/m/Y H:i" }}</p>
+            <p>Avvocato: {{ lawyer_name }}</p>
+        </div>
+    </div>
+
+    <div class="stats">
+        <div class="stat-item">
+            <p class="stat-label">TOTALE</p>
+            <p class="stat-value">€ {{ stats.total|floatformat:2 }}</p>
+        </div>
+        <div class="stat-item">
+            <p class="stat-label">APPROVATE</p>
+            <p class="stat-value" style="color:#198754">€ {{ stats.approved|floatformat:2 }}</p>
+        </div>
+        <div class="stat-item">
+            <p class="stat-label">IN ATTESA</p>
+            <p class="stat-value" style="color:#ffc107">€ {{ stats.pending|floatformat:2 }}</p>
+        </div>
+        <div class="stat-item">
+            <p class="stat-label">RIFIUTATE</p>
+            <p class="stat-value" style="color:#dc3545">€ {{ stats.rejected|floatformat:2 }}</p>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th width="12%">Data</th>
+                <th width="18%">Categoria</th>
+                <th width="35%">Descrizione</th>
+                <th width="12%" style="text-align:right">Importo</th>
+                <th width="13%">Stato</th>
+                <th width="10%">Utente</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for exp in expenses %}
+            <tr>
+                <td>{{ exp.expense_date|date:"d/m/Y" }}</td>
+                <td>{{ exp.category.name|default:"-" }}</td>
+                <td>{{ exp.description|default:"-"|truncatechars:35 }}</td>
+                <td class="amount">€ {{ exp.amount|floatformat:2 }}</td>
+                <td>
+                    {% if exp.status == 'pending' %}<span class="status pending">⏳ In attesa</span>
+                    {% elif exp.status == 'approved' %}<span class="status approved">✅ Approvata</span>
+                    {% elif exp.status == 'rejected' %}<span class="status rejected">❌ Rifiutata</span>
+                    {% elif exp.status == 'paid' %}<span class="status paid">💰 Pagata</span>
+                    {% else %}{{ exp.get_status_display }}
+                    {% endif %}
+                </td>
+                <td>{{ exp.created_by.last_name|default:exp.created_by.username }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" style="text-align:center; color:#999; padding:15px;">Nessuna spesa trovata</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        © {{ generated_at|date:"Y" }} CoParent Manager | Documento generato automaticamente per uso interno
+    </div>
+</body>
+</html>

@@ -183,6 +183,9 @@
                 </thead>
                 <tbody>
                     {% for expense in expenses %}
+                        <span class="badge" style="background-color:{{ exp.category_color_snapshot }}; color: #fff;">
+                          {{ exp.category_name_snapshot }} ({{ exp.get_group_snapshot_display }})
+                      </span>
                     <tr data-expense-id="{{ expense.id }}"
                         data-version="{{ expense.version }}"
                         data-is-creator="{% if expense.created_by == request.user %}true{% else %}false{% endif %}"

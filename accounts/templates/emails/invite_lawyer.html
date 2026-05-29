@@ -7,7 +7,14 @@
         {{ assistito_nome }} {{ assistito_cognome }}
     </strong>
     <p>da parte di {{ user.username }}</p>
-
+    <!-- invite_accept.html -->
+    {% if user_exists %}
+    <div class="alert alert-info">
+        👋 Hai già un account con questa email?
+        <a href="{% url 'accounts:login' %}" class="fw-bold">Accedi ora</a>
+        per accettare l'invito automaticamente.
+    </div>
+    {˚% else %}
 
     <p>Clicca qui per accettare l'invito:</p>
 
@@ -32,6 +39,7 @@
         <br>
         {{ invite_link }}
     </p>
+    {% endif %}
 </div>
 
 
