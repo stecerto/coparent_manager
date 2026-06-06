@@ -27,7 +27,7 @@ AUTH_USER_MODEL = "users.User"
 SECRET_KEY = config("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = False
 
 CSRF_TRUSTED_ORIGINS = ["https://*.herokuapp.com"]
 
@@ -50,7 +50,7 @@ INSTALLED_APPS = [
 	"crispy_bootstrap5",
     'core',
     'accounts',
-    'families',
+    'families.apps.FamiliesConfig',
     'children',
     "calendar_app.apps.CalendarAppConfig",
     'expenses',
@@ -58,9 +58,6 @@ INSTALLED_APPS = [
     'documents',
     'notifications',
     "django.contrib.humanize",
-
-
-
 ]
 
 MIDDLEWARE = [
@@ -304,3 +301,23 @@ CELERY_BEAT_SCHEDULE = {
 }
 PRIVACY_VERSION = "1.0"  # Incrementa a "1.1", "2.0" quando aggiorni la policy
 ENCRYPTION_KEY=os.environ.get("ENCRYPTION_KEY")
+
+# settings.py (esempio base di logging per produzione)
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'file': {
+            'level': 'INFO',
+            'class': 'logging.FileHandler',
+            'filename': 'debug.log', # Assicurati che questa cartella sia scrivibile
+        },
+    },
+    'loggers': {
+        'families': {  # Cattura tutti i log che iniziano con 'families.'
+            'handlers': ['file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
