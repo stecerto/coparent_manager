@@ -22,8 +22,8 @@ class Notification(models.Model):
     message = models.TextField()
 
     # Link opzionale per deep-linking
-    target_url = models.CharField(max_length=500, blank=True)
-    target_model = models.CharField(max_length=50, blank=True, help_text="Es: 'Expense', 'FamilyMessage'")
+    target_url = models.CharField(max_length=500, blank=True, null=True)
+    target_model = models.CharField(max_length=50, blank=True, null=True, help_text="Es: 'Expense', 'FamilyMessage'")
     target_id = models.PositiveIntegerField(null=True, blank=True)
 
     # Metadata flessibile (es. expense_id, family_id, etc.)

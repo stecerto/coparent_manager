@@ -1,24 +1,38 @@
 {% extends "base.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
+
+{% block title %}📤 Carica Documento Privato{% endblock %}
+
 {% block content %}
+{% if is_pro_or_higher %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h2 class="fw-bold mb-0">📤 Carica Documento Privato</h2>
+        <a href="{% url 'documents:documents_list' %}" class="btn btn-outline-secondary">← Torna alla lista</a>
+    </div>
 
-
-<div class="card p-3 mb-2 shadow custom-card text-center">
-        <h2>Carica documenti</h2>
-</div>
-
-<div class="card-body">
-        <div class="card p-3 mb-2 shadow custom-card">
-
-            <form method="post" enctype="multipart/form-data" class="card p-3">
+    <div class="card shadow-sm">
+        <div class="card-header bg-light fw-bold d-flex align-items-center gap-2">
+            🔒 <span>Visibile solo a te e ai tuoi legali autorizzati</span>
+        </div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
                 {% csrf_token %}
-                {{ form.as_p }}
+                {{ form|crispy }}
 
-                <button type="submit" class="btn btn-success btn-style">
-                    Upload
-                </button>
+                <div class="alert alert-info small mt-3 mb-4">
+                    💡 <strong>Suggerimento:</strong> I documenti privati vengono crittografati automaticamente e non sono visibili all'altro genitore.
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-success btn-lg">📤 Carica Documento Privato</button>
+                </div>
             </form>
         </div>
+    </div>
 </div>
+{% else %}
+    {% include "includes/upgrade_placeholder.html" with title="Caricamento Documenti" feature="upload privati e condivisi con versioning e firme digitali" %}
+{% endif %}
 {% endblock %}

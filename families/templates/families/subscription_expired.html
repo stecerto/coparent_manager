@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow text-center p-4">
+                <div class="display-1 text-danger mb-3">🔒</div>
+                <h2 class="h4 mb-3">Account Disattivato</h2>
+                
+                <p class="text-muted mb-4">
+                    Il tuo account è stato disattivato perché l'abbonamento è scaduto 
+                    da più di 5 giorni.
+                </p>
+                
+                <div class="alert alert-info">
+                    <h5>💳 Come riattivare:</h5>
+                    <ol class="text-start">
+                        <li>Effettua il pagamento dell'abbonamento</li>
+                        <li>Richiedi un link di riattivazione via email</li>
+                        <li>Clicca sul link per riattivare l'account</li>
+                    </ol>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <a href="{% url 'accounts:resend_activation' %}" class="btn btn-primary">
+                        📧 Richiedi link di riattivazione
+                    </a>
+                    <a href="{% url 'home' %}" class="btn btn-outline-secondary">
+                        🏠 Torna alla Home
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

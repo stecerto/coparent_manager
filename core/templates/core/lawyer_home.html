@@ -1,26 +1,35 @@
-{% extends "base_lawyer.html" %}
+{% extends "base.html" %}
 {% load static %}
 
-{% block title %}⚖️ CoParent Manager - Area Avvocati{% endblock %}
+{% block title %}⚖️ CoParent Manager - Area Avvocati {{ active_family_name|default:"Studio Legale" }}{% endblock %}
 
 {% block content %}
+
+
+<!-- ✅ LISTA FAMIGLIE AVVOCATO (Appare solo se pertinente) -->
+{% if lawyer_nav_families and request.user.profile.role in "lawyer_a,lawyer_b" %}
+    <div class="alert alert-info py-2 small">
+        <strong>⚖️ Studio legale:</strong> Seleziona una famiglia dal menu in alto per operare nel suo contesto.
+    </div>
+{% endif %}
+
 <div class="container py-5">
     {% if user.is_authenticated %}
     <!-- 👋 Benvenuto -->
     <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
-        <span class="fw-bold">⚖️ Area Legale & Consulenza {{ role|upper }}</span>
+        <!-- <span class="fw-bold">⚖️ Area Legale & Consulenza {{ role|upper }}</span>  -->
 
     </div>
     <div class="text-center mb-5">
-        <h1 class="display-5 fw-bold mb-3">Benvenuto, Avv. {{ user.last_name|default:user.email }}</h1>
+        <h1 class="display-5 fw-bold mb-3">⚖️ Benvenuto nell' Area Legale & Consulenza</h1>
+        <p class="display-5 fw-bold mb-3">Avv. {{ user.last_name|default:user.email }}</p>
         <p class="lead text-muted">Seleziona un'azione per iniziare a gestire i tuoi casi.</p>
     </div>
 
     <!-- 🚀 Pulsante Principale -->
     <div class="text-center mb-5">
-        <a href="{% url 'families:lawyer_dashboard' %}" class="btn btn-success btn-style">
-            📊 Vai al pannello di controllo Avvocato
-        </a>
+        <a href="{% url 'families:professional_dashboard' %}" class="btn btn-success btn-style" >📊 Vai al Pannello di controllo Avvocato</a>
+
    <!--     <div class="mt-3">
             <a href="{% url 'families:setup' %}" class="text-muted text-decoration-none">⚙️ Impostazioni Profilo</a>
         </div> -->

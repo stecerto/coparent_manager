@@ -12,6 +12,8 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 import os
 from pathlib import Path
 from decouple import config
+from dotenv import load_dotenv
+load_dotenv()
 from django.conf.global_settings import EMAIL_USE_SSL
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -54,7 +56,8 @@ INSTALLED_APPS = [
     'expenses',
     'chat',
     'documents',
-    'notifications'
+    'notifications',
+    "django.contrib.humanize",
 
 
 
@@ -85,7 +88,9 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'families.context_processors.family_membership',
                 'families.context_processors.lawyer_nav_context',
-                "core.context_processors.breadcrumbs",
+                'families.context_processors.family_context',
+                'core.context_processors.breadcrumbs',
+                'core.context_processors.subscription_context',
             ],
         },
     },
@@ -156,8 +161,69 @@ AUTH_PASSWORD_VALIDATORS = [
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
 ]
+#Log errori inviati via email (admin)
+#Monitoraggio uptime (UptimeRobot, Healthchecks.io)
+#Alert se il sito va giù
+#Log accessi sospetti (IP strani, tentativi login falliti)
+if DEBUG:
+    # 🛠️ IN SVILUPPO: Logga solo sulla console, nessun file necessario
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+            },
+        },
+        'loggers': {
+            'django': {
+                'handlers': ['console'],
+                'level': 'INFO',
+            },
+            'accounts': {  # Log della tua app accounts
+                'handlers': ['console'],
+                'level': 'DEBUG',
+            },
+            'families': {  # Log della tua app families
+                'handlers': ['console'],
+                'level': 'DEBUG',
+            },
+        },
+    }
+else:
+    # 🚀 IN PRODUZIONE: Logga su file e avvisa gli admin per errori critici
+    LOG_DIR = BASE_DIR / 'logs'
+    LOG_DIR.mkdir(exist_ok=True)  # Crea la cartella 'logs' automaticamente se non esiste
 
-
+    LOGGING = {
+        'version': 1,
+        'disable_existing_loggers': False,
+        'formatters': {
+            'verbose': {
+                'format': '{levelname} {asctime} {module} {message}',
+                'style': '{',
+            },
+        },
+        'handlers': {
+            'file': {
+                'level': 'ERROR',
+                'class': 'logging.FileHandler',
+                'filename': LOG_DIR / 'error.log',
+                'formatter': 'verbose',
+            },
+            'mail_admins': {
+                'level': 'ERROR',
+                'class': 'django.utils.log.AdminEmailHandler',
+            },
+        },
+        'loggers': {
+            'django': {
+                'handlers': ['file', 'mail_admins'],
+                'level': 'ERROR',
+                'propagate': True,
+            },
+        },
+    }
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
@@ -183,9 +249,10 @@ LOGOUT_REDIRECT_URL = "/"
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 #EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'#'mailjet.backends.MailjetBackend'
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 MAILJET_API_KEY = os.getenv("MAILJET_API_KEY")
 MAILJET_SECRET_KEY = os.getenv("MAILJET_SECRET_KEY")
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+
 EMAIL_HOST = "smtp.gmail.com" #"in-v3.mailjet.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
@@ -197,9 +264,25 @@ EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD") #os.getenv("MAILJET_SECRET_K
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 SERVER_EMAIL = EMAIL_HOST_USER
 #SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  produzione
+# Sicurezza extra
 
+#SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+#SECURE_HSTS_PRELOAD = True
+# In fondo al tuo settings.py
 
-# config/settings.py
+if DEBUG:
+    # 🛠️ IN SVILUPPO: Disabilita le forzature HTTPS
+    SECURE_SSL_REDIRECT = False
+    SESSION_COOKIE_SECURE = False
+    CSRF_COOKIE_SECURE = False
+    SECURE_HSTS_SECONDS = 0
+else:
+    # 🚀 IN PRODUZIONE: Abilita la sicurezza HTTPS
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000  # 1 anno
+
 
 # ⚡ CONFIGURAZIONE CELERY
 CELERY_BROKER_URL = "redis://localhost:6379/0"  # Broker standard (Redis)
@@ -219,3 +302,5 @@ CELERY_BEAT_SCHEDULE = {
         'options': {'expires': 240},  # evita accavallamenti se il worker è lento
     },
 }
+PRIVACY_VERSION = "1.0"  # Incrementa a "1.1", "2.0" quando aggiorni la policy
+ENCRYPTION_KEY=os.environ.get("ENCRYPTION_KEY")

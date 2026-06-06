@@ -6,6 +6,8 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.db.models import Q
 
+from core.fields import EncryptedCharField, EncryptedTextField
+
 
 class ChildProfile(models.Model):
     AFFIDAMENTO_GENITORI = [
@@ -20,11 +22,12 @@ class ChildProfile(models.Model):
         related_name="children"
     )
 
-    name = models.CharField(max_length=255)
-    surname = models.CharField(max_length=255)
+    name = EncryptedCharField(max_length=255)
+    surname = EncryptedCharField(max_length=255)
+    medical_notes = EncryptedTextField(blank=True, null=True)
     birth_date = models.DateField()
 
-    notes = models.TextField(blank=True)
+    notes = EncryptedTextField(blank=True, null=True, default="")
     # ✅ NUOVI CAMPI
     custody_type = models.CharField(
         max_length=20,
@@ -60,8 +63,7 @@ class ChildProfile(models.Model):
     @property
     def effective_maintenance_amount(self):
         """Priorità: 1. ChildSupport attivo → 2. Manuale (legacy) → 3. None"""
-        from django.db.models import Q
-        from datetime import date
+
         if not self.pk:
             return self.manual_maintenance_amount
 
@@ -204,3 +206,22 @@ class ChildSupport(models.Model):
 
     def __str__(self):
         return f"{self.child.name.capitalize()} - {self.amount} € (v{self.version})"
+
+
+
+class ChildSplitHistory(models.Model):
+    """Traccia ogni modifica alla % di ripartizione spese per un figlio"""
+    child = models.ForeignKey("ChildProfile", on_delete=models.CASCADE, related_name="split_history")
+    old_pct = models.DecimalField("Vecchia % Genitore A", max_digits=5, decimal_places=2, null=True, blank=True)
+    new_pct = models.DecimalField("Nuova % Genitore A", max_digits=5, decimal_places=2)
+    changed_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True)
+    changed_at = models.DateTimeField(auto_now_add=True)
+    notes = models.TextField(blank=True, help_text="Motivazione opzionale della modifica")
+
+    class Meta:
+        ordering = ["-changed_at"]
+        verbose_name = "Storico Ripartizione"
+        verbose_name_plural = "Storici Ripartizione"
+
+    def __str__(self):
+        return f"{self.child.name}: {self.old_pct}% → {self.new_pct}% ({self.changed_at.strftime('%d/%m/%Y')})"

@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}📊 Analisi Spese - {{ family.name }}{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chart-container { position: relative; height: 300px; width: 100%; }
+    .kpi-card { border-left: 4px solid #0d6efd; transition: transform 0.2s; }
+    .kpi-card:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); }
+    .trend-up { color: #198754; }
+    .trend-down { color: #dc3545; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    <!-- 🎯 Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1">📊 Analisi Avanzata Spese</h2>
+            <p class="text-muted mb-0">Famiglia: <strong>{{ family.name }}</strong> | Ultimi {{ months_back }} mesi</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'expenses:expenses_dashboard' %}" class="btn btn-outline-secondary">← Dashboard</a>
+            <button class="btn btn-primary" onclick="window.print()">🖨️ Stampa Report</button>
+        </div>
+    </div>
+
+    <!-- 📅 Filtro mesi -->
+    <form method="get" class="card p-3 mb-4 shadow-sm">
+        <div class="row g-3 align-items-end">
+            <div class="col-md-3">
+                <label class="form-label fw-bold">Periodo analisi</label>
+                <select name="months" class="form-select" onchange="this.form.submit()">
+                    <option value="3" {% if months_back == 3 %}selected{% endif %}>Ultimi 3 mesi</option>
+                    <option value="6" {% if months_back == 6 %}selected{% endif %}>Ultimi 6 mesi</option>
+                    <option value="12" {% if months_back == 12 %}selected{% endif %}>Ultimi 12 mesi</option>
+                    <option value="24" {% if months_back == 24 %}selected{% endif %}>Ultimi 24 mesi</option>
+                </select>
+            </div>
+            <div class="col-md-9 text-end">
+                <small class="text-muted">Dati aggiornati al {{ end_date|date:"d/m/Y" }}</small>
+            </div>
+        </div>
+    </form>
+
+    <!-- 📈 KPI Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card kpi-card shadow-sm h-100">
+                <div class="card-body">
+                    <h6 class="text-muted mb-1">Totale Spese</h6>
+                    <h3 class="fw-bold mb-0">€ {{ kpi.total|floatformat:2 }}</h3>
+                    <small class="{% if kpi.trend == 'up' %}trend-up{% else %}trend-down{% endif %}">
+                        {% if kpi.trend == 'up' %}📈{% else %}📉{% endif %} vs inizio periodo
+                    </small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card kpi-card shadow-sm h-100" style="border-left-color: #198754;">
+                <div class="card-body">
+                    <h6 class="text-muted mb-1">Media per Spesa</h6>
+                    <h3 class="fw-bold mb-0">€ {{ kpi.average|floatformat:2 }}</h3>
+                    <small class="text-muted">{{ kpi.count }} transazioni</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card kpi-card shadow-sm h-100" style="border-left-color: #0dcaf0;">
+                <div class="card-body">
+                    <h6 class="text-muted mb-1">Quota Genitore A</h6>
+                    <h3 class="fw-bold mb-0">€ {{ parent_comparison.parent_a|floatformat:2 }}</h3>
+                    <small class="text-muted">{{ parent_comparison.higher|yesno:"Maggiore,Minore,Pareggio" }}</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card kpi-card shadow-sm h-100" style="border-left-color: #dc3545;">
+                <div class="card-body">
+                    <h6 class="text-muted mb-1">Quota Genitore B</h6>
+                    <h3 class="fw-bold mb-0">€ {{ parent_comparison.parent_b|floatformat:2 }}</h3>
+                    <small class="text-muted">Diff: € {{ parent_comparison.difference|floatformat:2 }}</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 📊 Grafici -->
+    <div class="row g-4 mb-4">
+        <!-- Trend Mensile -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white fw-bold d-flex justify-content-between">
+                    <span>📈 Trend Mensile</span>
+                    <small class="text-muted">Importo totale per mese</small>
+                </div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Categorie -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm h-100">
+                <div class="card-header bg-white fw-bold">🥧 Categorie</div>
+                <div class="card-body">
+                    <div class="chart-container">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ⚖️ Comparativo Genitori -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-white fw-bold">⚖️ Ripartizione Quote tra Genitori</div>
+        <div class="card-body">
+            <div class="chart-container" style="height: 250px;">
+                <canvas id="parentChart"></canvas>
+            </div>
+            <div class="text-center mt-3">
+                {% if parent_comparison.difference > 0.01 %}
+                    <span class="badge bg-warning text-dark">
+                        Squilibrio: € {{ parent_comparison.difference|floatformat:2 }} a favore del Genitore {{ parent_comparison.higher }}
+                    </span>
+                {% else %}
+                    <span class="badge bg-success">✅ Quote perfettamente bilanciate</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- 🏆 Top 5 Spese -->
+    <div class="card shadow-sm">
+        <div class="card-header bg-white fw-bold">🏆 Top 5 Spese del Periodo</div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Data</th>
+                        <th>Categoria</th>
+                        <th>Figlio</th>
+                        <th class="text-end">Importo</th>
+                        <th>Quota A / B</th>
+                        <th>Inserita da</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for exp in top_expenses %}
+                    <tr>
+                        <td>{{ exp.expense_date|date:"d/m/Y" }}</td>
+                        <td>
+                            <span class="badge" style="background-color:{{ exp.expense_type.color }}; color: #fff;">
+                                {{ exp.expense_type.display_name }}
+                            </span>
+                        </td>
+                        <td>{{ exp.child.name|default:"-" }}</td>
+                        <td class="text-end fw-bold">€ {{ exp.amount|floatformat:2 }}</td>
+                        <td>
+                            {% if exp.child %}
+                                <small>{{ exp.child.split_percentage_a|default:50 }}% / {{ exp.child.split_percentage_b|default:50 }}%</small>
+                            {% else %}
+                                <small class="text-muted">N/D</small>
+                            {% endif %}
+                        </td>
+                        <td><small>{{ exp.created_by.first_name|default:exp.created_by.username }}</small></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" class="text-center text-muted py-4">Nessuna spesa approvata nel periodo selezionato</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // ✅ Dati iniettati dal backend (sicuri, già serializzati)
+    const trendData = {{ monthly_trend_json|safe }};
+    const categoryData = {{ category_breakdown_json|safe }};
+    const parentData = {{ parent_comparison|safe }};
+    
+    // 📈 Trend Chart (Line)
+    const trendCtx = document.getElementById('trendChart');
+    if (trendCtx) {
+        new Chart(trendCtx, {
+            type: 'line',
+            data: {
+                labels: trendData.map(d => {
+                    const [y, m] = d.month.split('-');
+                    return `${m}/${y.slice(2)}`;
+                }),
+                datasets: [{
+                    label: 'Spese (€)',
+                    data: trendData.map(d => d.total),
+                    borderColor: '#0d6efd',
+                    backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                    fill: true,
+                    tension: 0.4,
+                    pointRadius: 4,
+                    pointHoverRadius: 6
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { callback: v => '€' + v } }
+                }
+            }
+        });
+    }
+    
+    // 🥧 Category Chart (Doughnut)
+    const catCtx = document.getElementById('categoryChart');
+    if (catCtx) {
+        new Chart(catCtx, {
+            type: 'doughnut',
+            data: {
+                labels: categoryData.map(d => d.label),
+                datasets: [{
+                    data: categoryData.map(d => d.value),
+                    backgroundColor: categoryData.map(d => d.color),
+                    borderWidth: 2,
+                    borderColor: '#fff'
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'right', labels: { boxWidth: 12, font: { size: 10 } } }
+                }
+            }
+        });
+    }
+    
+    // ⚖️ Parent Comparison Chart (Bar)
+    const parentCtx = document.getElementById('parentChart');
+    if (parentCtx) {
+        new Chart(parentCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Genitore A', 'Genitore B'],
+                datasets: [{
+                    label: 'Totale Quote (€)',
+                    data: [parentData.parent_a, parentData.parent_b],
+                    backgroundColor: ['#0d6efd', '#dc3545'],
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    y: { beginAtZero: true, ticks: { callback: v => '€' + v } }
+                }
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

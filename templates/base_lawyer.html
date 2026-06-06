@@ -1,157 +1,413 @@
-
+<!DOCTYPE html>
 {% load static %}
 {% load crispy_forms_tags %}
+
 
 <html lang="it">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="CoParent Manager - Area Professionisti Legali">
+
+    <!-- Favicon -->
     <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
     <link rel="apple-touch-icon" href="{% static 'images/apple-touch-icon.png' %}">
-    
+
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
     <!-- FullCalendar -->
-    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css' rel='stylesheet'/>
+    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css' rel='stylesheet' crossorigin='anonymous'/>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js' defer></script>
+
     <!-- Custom CSS -->
-    <link href="{% static 'css/style.css' %}" rel="stylesheet">
-    
-    <title>{% block title %}⚖️ CoParent Manager - Avvocato{% endblock %}</title>
+    <!-- <link href="{% static 'css/style.css' %}" rel="stylesheet">
+    <link href="{% static 'css/lawyer_style.css' %}" rel="stylesheet"> -->
+
+    <title>{% block title %}⚖️ CoParent Manager - Area Avvocati{% endblock %}</title>
     {% block extra_css %}{% endblock %}
 </head>
+
+<body>
 <!-- 🖼️ BRAND BANNER (Logo grande, fuori dalla navbar) -->
 <header class="brand-banner py-4 bg-white border-bottom">
     <div class="container text-center">
         {% with role=user.profile.role|default:"" %}
-            {% if role == "lawyer_a" or role == "lawyer_b" %}
+            {% if role == "lawyer_a" or role == "lawyer_b" or role.value == "lawyer_a" or role.value == "lawyer_b" %}
                 <a href="{% url 'lawyer_home' %}">
+                    <img src="{% static 'images/logo-coparent.svg' %}"
+                         alt="CoParent Manager"
+                         class="brand-logo img-fluid"
+                         style="max-height: 60px; cursor: pointer;">
+                </a>
             {% else %}
                 <a href="{% url 'home' %}">
+                    <img src="{% static 'images/logo-coparent.svg' %}"
+                         alt="CoParent Manager"
+                         class="brand-logo img-fluid"
+                         style="max-height: 60px; cursor: pointer;">
+                </a>
             {% endif %}
         {% endwith %}
-            <img src="{% static 'images/logo-coparent.svg' %}"
-                 alt="CoParent Manager"
-                 class="brand-logo img-fluid">
-        </a>
     </div>
 </header>
-<body>
 
 <!-- 🔹 NAVBAR AVVOCATO - MINIMALISTA -->
 <nav class="navbar navbar-expand-lg bg-light shadow-sm">
     <div class="container">
-
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
-                data-bs-target="#mainMenu" aria-controls="mainMenu"
+                data-bs-target="#lawyerMenu" aria-controls="lawyerMenu"
                 aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
+
         <div class="collapse navbar-collapse" id="lawyerMenu">
             <ul class="navbar-nav ms-auto mb-2 mb-lg-0">
-                <!-- ✅ UNICO LINK: DASHBOARD -->
-                {% with role=user.profile.role|default:"" %}
-                        {% if user.is_authenticated %}
+
+                <!-- 🏠 Home Avvocato -->
                 <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'setup' %}active{% endif %}"
-
-                            {% if role == "lawyer_a" or role == "lawyer_b" %}
-                               <a href="{% url 'families:lawyer_dashboard' %}">📊 Vai al Pannello di controllo Avvocato</a>
-                            {% else %}
-                                 <a href="{% url 'families:family_dashboard' %}">🚀 Vai al Pannello di controllo</a>
-                            {% endif %}
-
+                    <a class="nav-link {% if request.resolver_match.url_name == 'lawyer_home' %}active{% endif %}"
+                       href="{% url 'lawyer_home' %}">
+                        🏠 Home Studio
+                    </a>
                 </li>
 
+                <!-- 📊 Dashboard Professionale -->
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'professional_dashboard' %}active{% endif %}"
+                       href="{% url 'families:professional_dashboard' %}">
+                        📊 Dashboard
+                    </a>
+                </li>
 
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'setup' %}active{% endif %}"
-                            href="{% url 'families:setup' %}">⚙️ Impostazioni</a>
-                    </li>
-
-                    <li class="nav-item">
-                        <a class="nav-link {% if request.resolver_match.url_name == 'logout' %}active{% endif %}"
-                            href="{% url 'accounts:logout' %}">Logout</a>
-                    </li>
+                <!-- 💳 Gestione Piano (con indicatore) -->
+                {% if user.is_authenticated and current_plan %}
+                <li class="nav-item">
+                    <a class="nav-link d-flex align-items-center gap-1" href="{% url 'pricing' %}">
+                        <span class="badge bg-{% if is_pro_or_higher %}success{% else %}secondary{% endif %} py-1 px-2" style="font-size: 0.7rem;">
+                            {{ current_plan|title }}
+                        </span>
+                        <span>Gestisci Piano</span>
+                    </a>
+                </li>
                 {% endif %}
-                {% endwith %}
+
+                <!-- ⚙️ Impostazioni -->
+                <li class="nav-item">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'setup' %}active{% endif %}"
+                       href="{% url 'families:setup' %}">
+                        ⚙️ Impostazioni
+                    </a>
+                </li>
+
+                <!-- 🔔 Notifiche (opzionale per avvocati) -->
+                {% if user.is_authenticated %}
+                <li class="nav-item dropdown">
+                    <a class="nav-link dropdown-toggle position-relative" href="#" id="notifDropdown" role="button" data-bs-toggle="dropdown">
+                        🔔
+                        <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.65rem; display: none;"></span>
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end p-0" style="min-width: 320px; max-height: 400px; overflow-y: auto;">
+                        <li class="p-2 border-bottom bg-light">
+                            <div class="d-flex justify-content-between align-items-center">
+                                <strong class="small">🔔 Notifiche</strong>
+                                <button id="markAllReadBtn" class="btn btn-link btn-sm p-0 text-decoration-none small">Segna tutte</button>
+                            </div>
+                        </li>
+                        <li id="notifWrapper" class="p-0">
+                            <div id="notifSpinner" class="text-center text-muted py-3 small">
+                                <div class="spinner-border spinner-border-sm text-primary me-2" role="status"></div>
+                                Caricamento...
+                            </div>
+                            <ul id="notifList" class="list-unstyled mb-0"></ul>
+                        </li>
+                        <li class="p-2 border-top text-center">
+                            <a href="{% url 'notifications:dashboard' %}" class="small text-decoration-none">Vedi tutte →</a>
+                        </li>
+                    </ul>
+                </li>
+                {% endif %}
+
+                <!-- 👋 Logout -->
+                <li class="nav-item">
+                    <a class="nav-link text-danger fw-bold" href="{% url 'accounts:logout' %}">Logout</a>
+                </li>
             </ul>
-
-
         </div>
     </div>
 </nav>
 
+<!-- ✅ TOPBAR UNIFICATA (Zero crash, Zero conflitti) -->
+<div class="d-flex justify-content-between align-items-center flex-wrap px-3 py-2 border-bottom bg-light">
 
-<!-- 🔹 BARRA CONTESTO FAMIGLIA (con dati dalla view) -->
-{% if selected_family_data %}
-{% with family=selected_family_data.family membership=selected_family_data.membership client=selected_family_data.client %}
-<div class="bg-light border-bottom py-2">
-    <div class="container d-flex justify-content-between align-items-right flex-wrap gap-2">
-        <div>
-            <span class="badge bg-primary me-2">🏠 {{ family.name }}</span>
-            <span class="badge bg-info text-dark">
-                {% if membership.role == 'lawyer_a' %}Avvocato A{% else %}Avvocato B{% endif %}
-            </span>
-        </div>
-
-        {# 🔹 PULSANTE CHAT PRIVATA #}
-        {% if client %}
-            <a href="{% url 'chat:chat_private' family.id client.id %}"
-               class="btn btn-success btn-style">
-                💬 Chat con {{ client.last_name }}
-            </a>
-        {% endif %}
-    </div>
-</div>
-{% endwith %}
-{% endif %}
-
-<!-- 🔹 BREADCRUMB -->
-<div class="container py-2">
+    <!-- 🔹 BREADCRUMB -->
     {% if breadcrumbs %}
-    <nav aria-label="breadcrumb">
+    <nav aria-label="breadcrumb" class="flex-grow-1">
         <ol class="breadcrumb mb-0">
             {% for crumb in breadcrumbs %}
-                {% if crumb.url %}
-                    <li class="breadcrumb-item"><a href="{{ crumb.url }}">{{ crumb.name }}</a></li>
-                {% else %}
-                    <li class="breadcrumb-item active text-primary fw-bold">{{ crumb.name }}</li>
-                {% endif %}
+                <li class="breadcrumb-item {% if forloop.last %}active text-danger fw-bold{% endif %}">
+                    {% if crumb.url %}
+                        {% if forloop.first %}
+                            <a href="{% url 'lawyer_home' %}">{{ crumb.name }}</a>
+                        {% else %}
+                            <a href="{{ crumb.url }}">{{ crumb.name }}</a>
+                        {% endif %}
+                    {% else %}
+                        {{ crumb.name }}
+                    {% endif %}
+                </li>
             {% endfor %}
         </ol>
     </nav>
     {% endif %}
+
+    <!-- 🏠 CONTESTO FAMIGLIA (Appare SOLO quando l'avvocato entra in una famiglia) -->
+    {% if active_family_name %}
+        <div class="d-flex align-items-center gap-2 px-3 py-2 rounded-pill bg-white border border-danger shadow-sm">
+            <span class="fw-semibold text-dark small">👨‍👩‍👧 {{ active_family_name }}</span>
+            {% if active_role_label %}
+                <span class="badge bg-danger text-white" style="font-size: 0.7rem;">{{ active_role_label }}</span>
+            {% endif %}
+            <!-- Pulsante "Esci dal contesto" -->
+            <a href="{% url 'families:exit_family_context' %}"
+               class="btn btn-sm btn-outline-danger ms-2 py-0"
+               style="font-size: 0.7rem;"
+               title="Torna alla dashboard senza contesto famiglia">
+               ✕ Esci
+            </a>
+        </div>
+    {% endif %}
+
+    <!-- ⚖️ DROPDOWN FAMIGLIE ASSEGNATE (Sempre visibile per avvocati con famiglie) -->
+    {% if lawyer_nav_families %}
+        <div class="dropdown">
+            <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                ⚖️ Seleziona Famiglia ({{ lawyer_nav_families|length }})
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow" style="min-width: 280px; max-height: 400px; overflow-y: auto;">
+                {% for item in lawyer_nav_families %}
+                    <li>
+                        <a class="dropdown-item d-flex flex-column"
+                           href="{% url 'families:professional_dashboard' %}?family_id={{ item.family.id }}">
+                            <span class="fw-bold">{{ item.family.name }}</span>
+                            {% if item.client %}
+                                <small class="text-muted">→ Assistito: {{ item.client.first_name }} {{ item.client.last_name|slice:":1" }}.</small>
+                            {% endif %}
+                            <small class="text-muted">Ruolo: {{ item.membership.get_role_display }}</small>
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% elif not active_family_name %}
+        <!-- Messaggio se non ci sono famiglie assegnate -->
+        <span class="text-muted small">Nessuna famiglia assegnata</span>
+    {% endif %}
 </div>
+
+
 
 <!-- 🔹 MAIN CONTENT -->
 <main>
     <div class="container py-4">
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            {% endfor %}
-        {% endif %}
-        
         {% block content %}{% endblock %}
     </div>
 </main>
 
-
 <!-- 🔹 FOOTER -->
 <footer class="bg-light border-top py-4 mt-5">
     <div class="container text-center">
-        <p class="mb-0 text-muted small">© 2026 CoParent Manager - Area Avvocati</p>
+        <p class="mb-1 text-muted small fw-bold">© 2026 CoParent Manager - Area Professionisti</p>
+        <p class="mb-0 text-muted small">
+            <a href="#" class="text-decoration-none me-2">Privacy</a> |
+            <a href="#" class="text-decoration-none me-2">Termini</a> |
+            <a href="#" class="text-decoration-none">Supporto</a>
+        </p>
+        <p class="mt-2 text-muted small" style="font-size: 0.75rem;">
+            Dati crittografati end-to-end • GDPR Compliant • Backup giornalieri
+        </p>
     </div>
 </footer>
+
+<!-- ✅ MODALE UPGRADE (Globale, per piani starter) -->
+<div class="modal fade" id="upgradeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-primary">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title">🚀 Sblocca tutte le funzionalità Pro</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-3">Passa al piano <strong>Pro</strong> per il tuo studio e accedi a:</p>
+        <ul class="list-unstyled mb-4">
+            <li class="mb-2">✅ <strong>Esportazione PDF illimitata</strong> di chat e report</li>
+            <li class="mb-2">✅ <strong>Cronologia completa</strong> messaggi eliminati</li>
+            <li class="mb-2">✅ <strong>Eventi calendario avanzati</strong> con allegati</li>
+            <li class="mb-2">✅ <strong>Supporto prioritario</strong> dedicato agli studi legali</li>
+            <li class="mb-2">✅ <strong>Audit log avanzato</strong> per compliance</li>
+        </ul>
+        <div class="alert alert-info small">
+            💡 <strong>Suggerimento:</strong> Il piano Pro è deducibile come costo professionale.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Più tardi</button>
+        <a href="{% url 'pricing' %}" class="btn btn-primary">Confronta i piani Studio →</a>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- JS Libraries -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js'></script>
 <script src="{% static 'js/base.js' %}"></script>
+<script src="{% static 'js/lawyer_utils.js' %}"></script>
 
 {% block extra_js %}{% endblock %}
+
+<!-- 🔔 Script Notifiche (solo se loggato) -->
+{% if user.is_authenticated %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const badge = document.getElementById('notifBadge');
+    const notifList = document.getElementById('notifList');
+    const notifSpinner = document.getElementById('notifSpinner');
+    const markAllBtn = document.getElementById('markAllReadBtn');
+    const dropdownToggle = document.getElementById('notifDropdown');
+
+    if (!badge || !notifList) return;
+
+    function getCSRF() {
+        return document.querySelector('[name=csrfmiddlewaretoken]')?.value ||
+            document.cookie.split('; ').find(c => c.startsWith('csrftoken='))?.split('=')[1] || '';
+    }
+
+    async function fetchUnreadCount() {
+        try {
+            const res = await fetch("{% url 'notifications:unread_count' %}", { cache: 'no-store' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return (await res.json()).unread_count ?? 0;
+        } catch { return 0; }
+    }
+
+    async function fetchNotificationList() {
+        try {
+            const res = await fetch("{% url 'notifications:api_list' %}", { cache: 'no-store' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            return (await res.json()).notifications ?? [];
+        } catch { return []; }
+    }
+
+    function renderList(notifications) {
+        notifList.innerHTML = '';
+        if (!notifications.length) {
+            notifList.innerHTML = `<li class="dropdown-item text-center text-muted py-3 small">📭 Nessuna notifica</li>`;
+            return;
+        }
+        notifications.forEach(n => {
+            const li = document.createElement('li');
+            li.innerHTML = `
+                <a href="${n.url}" class="dropdown-item d-flex flex-column py-2 ${n.is_read ? 'text-muted' : 'fw-bold bg-light'}" data-notif-id="${n.id}">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <span class="flex-grow-1 me-2">${n.title}</span>
+                        ${!n.is_read ? '<span class="badge bg-primary rounded-pill" style="font-size: 0.6rem;">NEW</span>' : ''}
+                    </div>
+                    <small class="text-muted mt-1">${n.message}</small>
+                    <div class="d-flex justify-content-between mt-1">
+                        <span class="badge bg-secondary" style="font-size: 0.65rem;">${n.type}</span>
+                        <span class="text-muted small" style="font-size: 0.75rem;">${n.created_at}</span>
+                    </div>
+                </a>`;
+            notifList.appendChild(li);
+        });
+    }
+
+    function updateBadge(count) {
+        const safe = Math.min(count, 99);
+        badge.textContent = safe > 0 ? safe : '';
+        badge.style.display = safe > 0 ? 'inline-block' : 'none';
+    }
+
+    async function loadNotifications() {
+        if (notifSpinner) notifSpinner.style.display = 'block';
+        const list = await fetchNotificationList();
+        if (notifSpinner) notifSpinner.style.display = 'none';
+        renderList(list);
+    }
+
+    fetchUnreadCount().then(updateBadge);
+    dropdownToggle?.addEventListener('shown.bs.dropdown', loadNotifications);
+
+    document.addEventListener('click', async (e) => {
+        const link = e.target.closest('[data-notif-id]');
+        if (!link) return;
+        const id = link.dataset.notifId;
+        try {
+            await fetch(`/notifications/api/mark-read/${id}/`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCSRF() }
+            });
+            setTimeout(() => {
+                fetchUnreadCount().then(updateBadge);
+                if (dropdownToggle?.classList.contains('show')) loadNotifications();
+            }, 300);
+        } catch (err) { console.warn("Mark-read error:", err); }
+    });
+
+    markAllBtn?.addEventListener('click', async (e) => {
+        e.preventDefault();
+        try {
+            await fetch("{% url 'notifications:mark_as_read_all' %}", {
+                method: 'POST',
+                headers: { 'X-CSRFToken': getCSRF() }
+            });
+            fetchUnreadCount().then(updateBadge);
+            if (dropdownToggle?.classList.contains('show')) loadNotifications();
+        } catch (err) { console.warn("Mark-all error:", err); }
+    });
+
+    // Polling ottimizzato: 120s + visibilità tab
+    (function() {
+        if (window.__notifPoller) clearInterval(window.__notifPoller);
+        async function fetchCount() {
+            try {
+                const res = await fetch("{% url 'notifications:unread_count' %}", { cache: 'no-store' });
+                return res.ok ? (await res.json()).unread_count ?? 0 : 0;
+            } catch { return 0; }
+        }
+        function render(count) {
+            const v = Math.min(count, 99);
+            badge.textContent = v > 0 ? v : '';
+            badge.style.display = v > 0 ? 'inline-block' : 'none';
+        }
+        window.__notifPoller = setInterval(() => {
+            if (document.visibilityState === 'visible') { fetchCount().then(render); }
+        }, 120000);
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') fetchCount().then(render);
+        });
+        fetchCount().then(render);
+        window.addEventListener('beforeunload', () => clearInterval(window.__notifPoller));
+    })();
+});
+</script>
+{% endif %}
+
+<!-- ✅ Script per pulsanti piano (disabilitati per starter) -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // Auto-apri modale upgrade se clicchi su un pulsante disabilitato con data-bs-target="#upgradeModal"
+    document.querySelectorAll('[data-bs-target="#upgradeModal"][disabled]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const modal = new bootstrap.Modal(document.getElementById('upgradeModal'));
+            modal.show();
+        });
+    });
+});
+</script>
+
+{% block extra_body_js %}{% endblock %}
 </body>
 </html>

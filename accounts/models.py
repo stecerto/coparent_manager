@@ -1,10 +1,12 @@
+
+
 from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.db import models
+from django.utils import timezone
 from phonenumber_field.modelfields import PhoneNumberField
-from core.choices import RoleChoices
 
-from children.models import ChildProfile
+from core.choices import RoleChoices
 
 
 # =========================
@@ -47,18 +49,50 @@ class User(AbstractUser):
 class UserProfile(models.Model):
     role = models.CharField(
         max_length=20,
-        choices=RoleChoices.choices,
+        choices=[
+            (RoleChoices.PARENT, 'Genitore'),
+            (RoleChoices.LAWYER, 'Avvocato'),
+            (RoleChoices.MEDIATOR, 'Mediatore'),
+            (RoleChoices.CONSULTANT, 'Consulente'),
+        ],
+        default=RoleChoices.PARENT
     )
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
 
     # Dati personali
     address = models.CharField(max_length=255, blank=True)
+    birth_date = models.DateField(default=timezone.now)
+
     birth_place = models.CharField(max_length=255, blank=True)
     phone = PhoneNumberField(null=True, blank=True)
-    firm_name = models.CharField(max_length=100, blank=True)
 
+    firm_name = models.CharField(max_length=100, blank=True)
+    partita_iva = models.CharField(
+        max_length=20,
+        blank=True,
+        verbose_name="Partita IVA",
+        help_text="Obbligatoria per avvocati e professionisti"
+    )
+
+
+    # ✅ NUOVO: Piano scelto alla registrazione
+    plan = models.CharField(
+        max_length=20,
+        choices=[
+            ("starter", "Starter"),
+            ("pro", "Pro"),
+            ("enterprise", "Enterprise"),
+        ],
+        default="starter",
+        help_text="Piano di abbonamento scelto"
+    )
+    plan_started_at = models.DateTimeField(null=True, blank=True)
+    plan_expires_at = models.DateTimeField(null=True, blank=True)
     # Stato
     setup_complete = models.BooleanField(default=False)
+    # privacy
+    privacy_accepted_at = models.DateTimeField("Data accettazione privacy", null=True, blank=True)
+    privacy_version_accepted = models.CharField("Versione policy accettata", max_length=10, default="1.0")
 
     def __str__(self):
         return f"Profilo di {self.user.email}"

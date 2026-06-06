@@ -156,6 +156,9 @@
         <p class="text-muted small"><strong>Totale:
             {{ total_expenses }} € </strong>
         </p>
+        <a href="{% url 'expenses:download_expense_pdf' %}" class="btn btn-success btn-style mb-2">
+            📄 Scarica Report PDF
+            </a>
     </div>
 <div class="card p-3 mb-2 shadow custom-card">
         <!-- Tabella -->
@@ -186,10 +189,18 @@
                         <span class="badge" style="background-color:{{ exp.category_color_snapshot }}; color: #fff;">
                           {{ exp.category_name_snapshot }} ({{ exp.get_group_snapshot_display }})
                       </span>
+                    <!-- expenses_list.html - riga <tr> corretta -->
                     <tr data-expense-id="{{ expense.id }}"
                         data-version="{{ expense.version }}"
                         data-is-creator="{% if expense.created_by == request.user %}true{% else %}false{% endif %}"
-                        data-is-confirmed="{{ expense.approved_by_parent_b|yesno:'true,false' }}"  {# ✅ NUOVO #}
+
+                        <!--# ✅ FIX: isConfirmed dipende dal RUOLO dell'utente loggato, non hardcoded su parent_b -->
+                        {% if request.user.profile.role == "parent_a" or request.user.profile.role.value == "parent_a" %}
+                            data-is-confirmed="{% if expense.approved_by_parent_a %}true{% else %}false{% endif %}"
+                        {% else %}
+                            data-is-confirmed="{% if expense.approved_by_parent_b %}true{% else %}false{% endif %}"
+                        {% endif %}
+
                         data-status="{{ expense.status }}"
                         data-payment-state="{{ expense.payment_state|default:'unpaid' }}"
                         data-amount="{{ expense.amount }}">
@@ -203,12 +214,19 @@
                         <!-- ✅ STATI CON BORDO VIOLA -->
                         <td class="status-col text-center">
                             <div class="d-flex flex-column align-items-center">
-                                <div class="d-flex gap-1 mb-1">
-                                    <button class="btn btn-sm status-btn btn-pending has-purple-border" data-status="pending" title="In Sospeso">🟡</button>
-                                    <button class="btn btn-sm status-btn btn-accepted has-purple-border" data-status="accepted" title="Accettata">🔵</button>
-                                    <button class="btn btn-sm status-btn btn-rejected has-purple-border" data-status="rejected" title="Rifiutata">🔴</button>
-                                    <button class="btn btn-sm status-btn btn-paid-trigger has-purple-border" data-status="paid" title="Pagata">🟢</button>
-                                </div>
+                                {% if can_manage_expenses %}
+                                    <div class="d-flex gap-1 mb-1">
+                                        <button class="btn btn-sm status-btn btn-pending has-purple-border" data-status="pending" title="In Sospeso">🟡</button>
+                                        <button class="btn btn-sm status-btn btn-accepted has-purple-border" data-status="accepted" title="Accettata">🔵</button>
+                                        <button class="btn btn-sm status-btn btn-rejected has-purple-border" data-status="rejected" title="Rifiutata">🔴</button>
+                                        <button class="btn btn-sm status-btn btn-paid-trigger has-purple-border" data-status="paid" title="Pagata">🟢</button>
+                                    </div>
+                                    {% else %}
+                                        <div class="d-flex gap-1 mb-1 opacity-0" style="height: 32px;">
+                                            <!-- Placeholder invisibile per mantenere l'allineamento della tabella -->
+                                        </div>
+                                    {% endif %}
+                                
                                 <span class="badge status-badge
                                     {% if expense.status == 'pending' %}bg-warning text-dark
                                     {% elif expense.status == 'accepted' %}bg-primary
@@ -340,6 +358,7 @@
         const isConfirmed = row.dataset.isConfirmed === 'true';
         const status = row.dataset.status?.trim();
         const paymentState = row.dataset.paymentState;
+        console.log(`🔧 renderRow: expense=${row.dataset.expenseId}, isCreator=${isCreator}, isConfirmed=${isConfirmed}, status=${status}`);
 
         const btns = {
             pending: row.querySelector(".btn-pending"),

@@ -1,6 +1,9 @@
 from django.urls import path
+from django.views.generic import RedirectView
 
-from families.views import family_summary, lawyer_expenses_dashboard_view
+from families.views import family_summary, lawyer_expenses_dashboard_view, professional_dashboard, set_active_family, \
+    lawyer_exit_family_context, exit_family_context
+from chat.views import delete_message_view
 from .views import (
     approve_expense_view,
     dashboard_view,
@@ -34,7 +37,7 @@ urlpatterns = [
     path("invite/", invite_member_view, name="invite_member"),
     path("invite/<str:token>/", invitation_landing_view, name="invitation_landing"),
     path("invite/<uuid:token>/confirm/", confirm_invitation_view, name="invite_confirm"),
-
+    path("message/<int:pk>/delete/", delete_message_view, name="delete_message"),
     path("accept-invite/<str:token>/", accept_invite_view, name="accept_invite"),
 
     # =========================
@@ -54,5 +57,17 @@ urlpatterns = [
 
     path('lawyer/expenses/', lawyer_expenses_dashboard_view, name='lawyer_expenses'),
     path('lawyer/expenses/<int:family_id>/', lawyer_expenses_dashboard_view, name='lawyer_expenses'),
+
+    path('professional/dashboard/', professional_dashboard, name='professional_dashboard'),
+    path('set-active/<int:family_id>/', set_active_family, name='set_active_family'),
+    path("families/exit-lawyer-context/", lawyer_exit_family_context, name="exit_lawyer_context"),
+    path("families/exit-context/", exit_family_context, name="exit_family_context"),
+    # 🔄 Redirect delle vecchie route (compatibilità)
+    path('lawyer/home/', RedirectView.as_view(pattern_name='lawyer_home', permanent=False),
+         name='lawyer_home'),
+    path('mediator/home/', RedirectView.as_view(pattern_name='lawyer_home', permanent=False),
+         name='mediator_home'),
+    path('consultant/home/', RedirectView.as_view(pattern_name='lawyer_home', permanent=False),
+         name='consultant_home'),
 
 ]

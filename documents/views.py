@@ -3,10 +3,17 @@ from pathlib import Path
 
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
-from django.http import FileResponse, HttpResponseForbidden
+from django.http import FileResponse, HttpResponseForbidden, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.shortcuts import render, redirect
-
+import os, base64
+from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect
+from django.template.loader import render_to_string
+from django.utils import timezone
+from weasyprint import HTML
+from core.plans import PLAN_LEVELS  # o il tuo import per i piani
 from calendar_app.models import CalendarEvent
 from chat.models import FamilyMessage
 from families.models import FamilyMember
@@ -17,12 +24,12 @@ from .permissions import can_access_document
 from .services.documents_checklist_service import get_essential_checklist
 from .services.documents_signature_service import sign_document
 from .services.workflow_service import approve_document
+from .validators import check_file_sizes
 
 
 @login_required
 def document_list_view(request):
-    family = get_family_of_user(request.user)
-
+    family = get_family_of_user(request.user, request=request)
     membership = FamilyMember.objects.filter(
         family=family,
         user=request.user
@@ -42,7 +49,7 @@ def document_list_view(request):
             )
 
         elif role == "lawyer_a":
-            assisted_user = family.memberships.filter(role="parent_a").first()
+            assisted_user = family.members.filter(role="parent_a").first()
             if assisted_user:
                 private_docs = Document.objects.filter(
                     family=family,
@@ -52,7 +59,7 @@ def document_list_view(request):
                 )
 
         elif role == "lawyer_b":
-            assisted_user = family.memberships.filter(role="parent_b").first()
+            assisted_user = family.members.filter(role="parent_b").first()
             if assisted_user:
                 private_docs = Document.objects.filter(
                     family=family,
@@ -111,15 +118,25 @@ def document_preview_view(request, doc_id):
     return response
 
 
+from django.core.exceptions import ValidationError
+from django.contrib import messages
 @login_required
 def upload_document_view(request):
-    family = get_family_of_user(request.user)
+    family = get_family_of_user(request.user, request=request)
 
     if request.method == "POST":
         form = DocumentUploadForm(request.POST, request.FILES)
 
         if form.is_valid():
             files = request.FILES.getlist("files")
+            category = form.cleaned_data["category"]
+
+            # ✅ VALIDAZIONE DIMENSIONI (non tocca la logica esistente)
+            size_error = check_file_sizes(files, category)
+            if size_error:
+                from django.contrib import messages
+                messages.error(request, size_error)
+                return render(request, "documents/documents_upload.html", {"form": form})
 
             custom_title = form.cleaned_data["title"]
             category = form.cleaned_data["category"]
@@ -201,13 +218,21 @@ def upload_document_view(request):
 
 @login_required
 def upload_shared_document_view(request):
-    family = get_family_of_user(request.user)
+    family = get_family_of_user(request.user, request=request)
 
     if request.method == "POST":
         files = request.FILES.getlist("files")
         category = request.POST.get("category", "chat")
-        title_prefix = request.POST.get("title", "").strip()
 
+        # ✅ VALIDAZIONE DIMENSIONI
+        size_error = check_file_sizes(files, category)
+        if size_error:
+            from django.contrib import messages
+            messages.error(request, size_error)
+            return render(request, "documents/documents_upload_shared.html", {})
+
+        title_prefix = request.POST.get("title", "").strip()
+        # 👇 IL TUO CODICE ORIGINALE CONTINUA ESATTAMENTE QUI
         for index, uploaded_file in enumerate(files, start=1):
             original_name = Path(uploaded_file.name).stem
 
@@ -237,6 +262,7 @@ def upload_shared_document_view(request):
                 action="upload"
             )
 
+
         return redirect("documents:documents_list")
 
     return render(
@@ -244,6 +270,71 @@ def upload_shared_document_view(request):
         "documents/documents_upload_shared.html"
     )
 
+
+# documents/views.py
+from django.db.models import Sum
+from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
+
+
+# documents/views.py
+@login_required
+def storage_usage_view(request):
+    from documents.models import Document
+    from core.plans import PLAN_LEVELS
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    family = get_family_of_user(request.user, request=request)
+    if not family:
+        return redirect('documents:documents_list')
+
+    profile = getattr(request.user, 'profile', None)
+    plan = getattr(profile, 'plan', 'starter') if profile else 'starter'
+
+    plan_limits = {'starter': 2 * 1024 ** 3, 'pro': 10 * 1024 ** 3, 'enterprise': 20 * 1024 ** 3}
+    storage_limit = plan_limits.get(plan, plan_limits['starter'])
+
+    # ✅ CALCOLO SICURO: ignora file mancanti/corrotti senza crash
+    storage_used = 0
+    doc_sizes = []
+    docs = Document.objects.filter(family=family, is_active=True)
+
+    for doc in docs:
+        try:
+            if doc.file and doc.file.name:
+                size = doc.file.storage.size(doc.file.name)
+                storage_used += size
+                doc_sizes.append((doc, size))
+        except (FileNotFoundError, OSError, TypeError) as e:
+            logger.warning(f"[Storage] File mancante per doc #{doc.id}: {doc.file.name}")
+            continue
+
+    storage_available = max(0, storage_limit - storage_used)
+    usage_percentage = (storage_used / storage_limit * 100) if storage_limit > 0 else 0
+
+    # ✅ TOP 5: ordinamento sicuro (già calcolato sopra)
+    doc_sizes.sort(key=lambda x: x[1], reverse=True)
+    top_docs_with_size = doc_sizes[:5]
+    total_docs = docs.count()
+    # ✅ CALCOLI MATOMATICI (SPOSTATI DALLA VIEW AL TEMPLATE)
+    danger_threshold = storage_limit / 10 if storage_limit > 0 else 0  # 10% del limite
+    avg_doc_size = (storage_used / total_docs) if total_docs > 0 else 0  # Dimensione media
+
+    context = {
+        'family': family,
+        'storage_used': storage_used,
+        'storage_limit': storage_limit,
+        'storage_available': storage_available,
+        'danger_threshold': danger_threshold,
+        'avg_doc_size': avg_doc_size,
+        'usage_percentage': usage_percentage,
+        'total_docs': docs.count(),
+        'plan': plan,
+        'top_large_docs': top_docs_with_size,  # ✅ Lista di tuple (doc, size)
+    }
+    return render(request, 'documents/storage_usage.html', context)
 
 @login_required
 def download_document_view(request, doc_id):
@@ -303,7 +394,7 @@ def sign_document_view(request, doc_id):
 @login_required
 def document_detail_view(request, doc_id):
     document = get_object_or_404(Document, id=doc_id)
-    family = get_family_of_user(request.user)
+    family = get_family_of_user(request.user, request=request)
 
     if document.family != family:
         return HttpResponseForbidden()
@@ -323,7 +414,7 @@ def document_detail_view(request, doc_id):
 @login_required
 def approve_document_view(request, doc_id):
     document = get_object_or_404(Document, id=doc_id)
-    family = get_family_of_user(request.user)
+    family = get_family_of_user(request.user, request=request)
 
     if document.family != family:
         return HttpResponseForbidden()
@@ -342,33 +433,90 @@ def approve_document_view(request, doc_id):
 
 
 @login_required
+# documents/views.py (o families/views.py)
+
 def family_dossier_view(request):
-    family = get_family_of_user(request.user)
-
+    family = get_family_of_user(request.user, request=request)
     if not family:
-        return HttpResponseForbidden()
+        return redirect('home')
 
-    documents = Document.objects.filter(
+    # ... tue query esistenti per documents, events ...
+
+    # ✅ LIMITA CHAT A 10 MESSAGGI + ORDINA PER DATA (più recenti prima)
+    from chat.models import FamilyMessage
+    recent_messages = FamilyMessage.objects.filter(
         family=family,
-        is_active=True
-    ).select_related("family")
+        is_active=True,
+        recipient__isnull=True  # Solo chat famiglia, non private
+    ).select_related('sender').order_by('-created_at')[:10]
 
-    messages = FamilyMessage.objects.filter(
-        family=family,
-        is_active=True
-    ).order_by("-created_at")[:20]
+    # ✅ Inverti l'ordine per visualizzazione cronologica corretta (dal più vecchio al più recente)
+    recent_messages = list(reversed(recent_messages))
 
+    context = {
+        # ... tuoi context esistenti ...
+        "messages": recent_messages,  # ✅ Solo 10 messaggi, ordinati
+        # ...
+    }
+    return render(request, "documents/dossier.html", context)
+
+# documents/views.py
+
+
+def _get_logo_base64():
+    """Helper sicuro per embeddare il logo nel PDF"""
+    paths = [
+        os.path.join(settings.BASE_DIR, 'static', 'images', 'logo-coparent.svg'),
+        os.path.join(settings.BASE_DIR, 'static', 'images', 'logo_coparent.png'),
+    ]
+    for p in paths:
+        if os.path.exists(p):
+            with open(p, 'rb') as f:
+                return base64.b64encode(f.read()).decode('utf-8')
+    return None
+
+@login_required
+def dossier_export_pdf(request):
+    """Esporta il fascicolo familiare in PDF (Solo Pro/Enterprise)"""
+    family = get_family_of_user(request.user, request=request)
+    if not family:
+        return redirect('documents:documents_list')
+
+    # 🔒 Controllo piano manuale (se non usi il decorator)
+    profile = getattr(request.user, 'profile', None)
+    plan = getattr(profile, 'plan', 'starter') if profile else 'starter'
+    if PLAN_LEVELS.get(plan, 1) < 2:
+        from django.contrib import messages
+        messages.error(request, "📊 Funzione riservata al piano Pro. Effettua l'upgrade.")
+        return redirect('pricing')
+
+    # 📦 Dati identici al dossier view
+    from documents.models import Document
+    from chat.models import FamilyMessage
+    from calendar_app.models import CalendarEvent
+
+    docs = Document.objects.filter(family=family, is_active=True).order_by('-created_at')[:20]
+    recent_msgs = FamilyMessage.objects.filter(
+        family=family, is_active=True, recipient__isnull=True
+    ).select_related('sender').order_by('-created_at')[:15]
     events = CalendarEvent.objects.filter(
-        family=family
-    ).order_by("-start_time")[:10]
+        family=family, is_active=True, start_time__gte=timezone.now().date()
+    ).order_by('start_time')[:10]
 
-    return render(
-        request,
-        "documents/dossier.html",
-        {
-            "family": family,
-            "documents": documents,
-            "messages": messages,
-            "events": events
-        }
-    )
+    context = {
+        'family': family,
+        'documents': docs,
+        'messages': list(reversed(recent_msgs)),  # Ordine cronologico
+        'events': events,
+        'generated_at': timezone.now(),
+        'user': request.user,
+        'logo_base64': _get_logo_base64(),
+    }
+
+    html_string = render_to_string('documents/dossier_pdf.html', context)
+    pdf_bytes = HTML(string=html_string, base_url=request.build_absolute_uri('/')).write_pdf()
+
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    filename = f"Fascicolo_{family.name.replace(' ', '_')}_{timezone.now().strftime('%Y%m%d')}.pdf"
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+    return response

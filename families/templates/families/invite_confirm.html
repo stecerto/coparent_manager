@@ -1,33 +1,45 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}Conferma Invito{% endblock %}
 
 {% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-7 col-lg-5">
+            <div class="card shadow border-0 rounded-4 text-center">
+                <div class="card-body p-5">
 
-<div class="card shadow-sm mb-4">
-    <div class="card-header text-center">
-        <h2 class="mb-0">✅ Invito confermato</h2>
-    </div>
-    <div class="card-body">
+                    <div class="mb-4">
+                        <span class="display-4">📩</span>
+                        <h3 class="fw-bold mt-3">Invito Ricevuto</h3>
+                        <p class="text-muted">
+                            Sei stato invitato da <strong>{{ invitation.invited_by.get_full_name|default:invitation.invited_by.email }}</strong>
+                        </p>
+                    </div>
 
-        <div class="card p-3 mb-2 shadow custom-card text-center">
+                    <hr class="my-4">
 
-            <p>
-                Ora puoi accedere o registrarti
-                per entrare nella famiglia
-                <strong>{{ invitation.family.name }}</strong>.
-            </p>
+                    <div class="alert alert-light border mb-4 text-start">
+                        <p class="mb-0 small">
+                            👋 <strong>Ciao!</strong> Per accettare questo invito e iniziare a gestire la famiglia,
+                            devi prima creare il tuo account personale sulla piattaforma.
+                            È gratuito e richiede solo un minuto.
+                        </p>
+                    </div>
 
-            <div class="d-flex justify-content-center gap-2">
-                <a href="{% url 'login' %}"
-                   class="btn btn-primary">
-                    🔐 Accedi
-                </a>
+                    {# ✅ SOLO IL PULSANTE REGISTRATI #}
+                    <a href="{% url 'accounts:register' %}?invite_token={{ invitation.token }}"
+                       class="btn btn-success btn-lg w-100 fw-bold mb-3 shadow-sm">
+                        📝 Registrati e Accetta l'Invito
+                    </a>
 
-                <a href="{% url 'register' %}"
-                   class="btn btn-success">
-                    📝 Registrati
-                </a>
+                    <p class="small text-muted mt-4">
+                        Dopo la registrazione, riceverai un'email per attivare il tuo account.
+                    </p>
+
+                </div>
             </div>
-
         </div>
     </div>
 </div>

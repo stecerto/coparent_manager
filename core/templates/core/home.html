@@ -2,58 +2,53 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block title %}CoParentManager - Gestione Famiglia{% endblock title %}
+{% block title %}CoParentManager - Gestione Famiglia{% endblock %}
 
 {% block content %}
 <div class="container py-5">
     {% if user.is_authenticated %}
         <!-- 👤 UTENTE LOGGATO -->
         <div class="text-center mb-5">
-            <h1 class="display-5 fw-bold">Bentornato/a, {{ user.first_name|default:user.username }}! </h1>
+            <h1 class="display-5 fw-bold">Bentornato/a, {{ user.first_name|default:user.username }}!</h1>
             <p class="lead text-muted">Ecco come sfruttare al meglio la piattaforma.</p>
         </div>
 
         <div class="row g-4 justify-content-center">
-
-                <!-- 👨‍👩‍👧 GENITORE -->
-                <div class="col-md-8">
-                    <div class="card shadow h-100 border-success">
-                        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
-                            <span class="fw-bold">👨‍👩‍👧 Gestione Famiglia</span>
-                            <span class="badge bg-light text-success">{{ role|default:"Genitore"|upper }}</span>
-                        </div>
-                        <div class="card-body">
-                            <ul class="list-group list-group-flush">
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    👥 Aggiorna i dati nel tuo Riepilogo Profilo
-                                    <span class="badge bg-success rounded-pill">Setup</span>
-                                </li>
-                                <li class="list-group-item">💬 Partecipa alla chat familiare o rispondi al tuo avvocato</li>
-                                <li class="list-group-item">💶 Inserisci nuove spese o verifica quelle in attesa</li>
-                                <li class="list-group-item">📅 Sincronizza turni e appuntamenti nel calendario</li>
-                            </ul>
-                        </div>
-                        <div class="card-footer text-center bg-light">
-                            {% with role=user.profile.role|default:"" %}
-                            {% if user.is_authenticated %}
-                                {% if role == "lawyer_a" or role == "lawyer_b" %}
-                                    <a href="{% url 'families:lawyer_dashboard' %}" class="btn btn-success btn-style">
-                                        📊 Vai al Pannello di controllo Avvocato
-                                    </a>
-                                {% else %}
-                                     <a href="{% url 'families:family_dashboard' %}" class="btn btn-success btn-style">
-                                        🚀 Vai al Pannello di controllo
-                                     </a>
-                                {% endif %}
-                            {% endif %}
-                        {% endwith %}
-
-                        </div>
+            <!-- 👨‍👩‍👧 GENITORE / AVVOCATO -->
+            <div class="col-md-8">
+                <div class="card shadow h-100 {% if user.profile.role in 'lawyer_a,lawyer_b' %}border-primary{% else %}border-success{% endif %}">
+                    <div class="card-header {% if user.profile.role in 'lawyer_a,lawyer_b' %}bg-primary{% else %}bg-success{% endif %} text-white d-flex justify-content-between align-items-center">
+                        <span class="fw-bold">
+                            {% if user.profile.role in 'lawyer_a,lawyer_b' %}⚖️ Area Legale{% else %}👨‍👩‍👧 Gestione Famiglia{% endif %}
+                        </span>
+                        <span class="badge bg-light {% if user.profile.role in 'lawyer_a,lawyer_b' %}text-primary{% else %}text-success{% endif %}">
+                            {{ user.profile.role|default:"Genitore"|upper }}
+                        </span>
+                    </div>
+                    <div class="card-body">
+                        <ul class="list-group list-group-flush">
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                👥 Aggiorna i dati nel tuo Riepilogo Profilo
+                                <span class="badge bg-secondary rounded-pill">Setup</span>
+                            </li>
+                            <li class="list-group-item">💬 Partecipa alla chat familiare o rispondi al tuo avvocato</li>
+                            <li class="list-group-item">💶 Inserisci nuove spese o verifica quelle in attesa</li>
+                            <li class="list-group-item">📅 Sincronizza turni e appuntamenti nel calendario</li>
+                        </ul>
+                    </div>
+                    <div class="card-footer text-center bg-light">
+                        {% if user.profile.role in "lawyer_a,lawyer_b" %}
+                            <a href="{% url 'families:professional_dashboard' %}" class="btn btn-primary btn-style">
+                                📊 Pannello Avvocato
+                            </a>
+                        {% else %}
+                            <a href="{% url 'families:family_dashboard' %}" class="btn btn-success btn-style">
+                                🚀 Pannello Famiglia
+                            </a>
+                        {% endif %}
                     </div>
                 </div>
-
-
-
+            </div>
         </div>
 
     {% else %}
@@ -90,24 +85,24 @@
         <div class="row g-4 mt-5 justify-content-center">
             <div class="col-md-4">
                 <div class="card p-3 h-100 text-center border-0 shadow-sm">
-                    💬<br><strong>Chat Riservata</strong><br>Comunica in tempo reale con l'altro genitore o il tuo legale.
+                    💬<br><strong>Chat Riservata</strong><br><small class="text-muted">Comunica in tempo reale con l'altro genitore o il tuo legale.</small>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="card p-3 h-100 text-center border-0 shadow-sm">
-                    💶<br><strong>Spese Condivise</strong><br>Gestisci, approva e traccia i pagamenti in trasparenza.
+                    💶<br><strong>Spese Condivise</strong><br><small class="text-muted">Gestisci, approva e traccia i pagamenti in trasparenza.</small>
                 </div>
             </div>
             <div class="col-md-4">
                 <div class="card p-3 h-100 text-center border-0 shadow-sm">
-                    📅<br><strong>Calendario Sync</strong><br>Coordina turni, visite e appuntamenti medici.
+                    📅<br><strong>Calendario Sync</strong><br><small class="text-muted">Coordina turni, visite e appuntamenti medici.</small>
                 </div>
             </div>
         </div>
     {% endif %}
 </div>
-{% endblock content %}
+{% endblock %}
 
 {% block extra_js %}
 <script src="{% static 'js/coparentmanager.js' %}"></script>
-{% endblock extra_js %}
+{% endblock %}

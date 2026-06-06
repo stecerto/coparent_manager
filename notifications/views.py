@@ -47,10 +47,10 @@ def list_notifications(request):
         "id": n.id,
         "type": n.notification_type,
         "title": n.title,
-        "message": n.message,
-        "url": n.target_url,
+        "message": n.message[:100] + ("..." if len(n.message) > 100 else ""),
+        "url": n.target_url or "#",
         "is_read": n.is_read,
-        "created_at": n.created_at.isoformat(),
+        "created_at": n.created_at.strftime("%H:%M %d/%m"),
     } for n in notifications]
 
     return JsonResponse({"notifications": data})

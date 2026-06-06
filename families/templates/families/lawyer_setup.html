@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}⚙️ Setup Studio Legale - CoParent Manager{% endblock %}
+
+{% block content %}
+<!-- DEBUG: rimuovi dopo il fix
+<div class="alert alert-info small mb-3">
+    <strong>DEBUG:</strong> Ruolo profilo: <code>{{ user.profile.role }}</code> |
+    is_lawyer: <code>{{ is_lawyer }}</code>
+</div>
+FINE DEBUG -->
+
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            
+            <!-- Header -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body text-center py-4">
+                    <h2 class="fw-bold mb-2">⚖️ Setup del Tuo Studio Legale</h2>
+                    <p class="text-muted mb-0">Completa i dati del tuo profilo professionale per iniziare</p>
+                </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="fw-bold">Progresso completamento</span>
+                        <span class="badge bg-primary">{{ setup_progress_pct }}%</span>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar bg-success" role="progressbar" 
+                             style="width: {{ setup_progress_pct }}%" 
+                             aria-valuenow="{{ setup_progress_pct }}" 
+                             aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <small class="text-muted d-block mt-2">{{ setup_progress_message }}</small>
+                </div>
+            </div>
+
+            <!-- Form Setup -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-light fw-bold">
+                    📝 Dati Personali e Professionali
+                </div>
+                <div class="card-body">
+                    <form method="POST" enctype="multipart/form-data">
+                        {% csrf_token %}
+
+                        <!-- Dati personali -->
+                        <h6 class="fw-bold mb-3">👤 Dati Personali</h6>
+                        {{ form_user|crispy }}
+
+                        <hr class="my-4">
+
+                        <!-- Dati professionali (solo avvocati) -->
+                        <h6 class="fw-bold mb-3">⚖️ Dati Professionali</h6>
+
+                        <div class="alert alert-warning small">
+                            <strong>⚠️ Campi obbligatori per avvocati:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>Ragione sociale / Nome studio</li>
+                                <li>Partita IVA (per fatturazione elettronica)</li>
+                                <li>Numero di telefono</li>
+                            </ul>
+                        </div>
+
+                        {{ form_profile|crispy }}
+
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                ✅ Salva e Completa Setup
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Info Box -->
+            <div class="card shadow-sm mt-4 border-0 bg-light">
+                <div class="card-body">
+                    <h6 class="fw-bold">💡 Cosa succede dopo?</h6>
+                    <ol class="small mb-0">
+                        <li>Completa il setup con i dati del tuo studio</li>
+                        <li>Riceverai inviti dalle famiglie che ti assegnano come legale</li>
+                        <li>Per ogni famiglia, potrai accedere a dashboard, documenti e chat dedicate</li>
+                        <li>Il tuo piano <strong>{{ user.profile.plan|title }}</strong> ti permette di gestire fino a 
+                            {% if user.profile.plan == "studio_base" %}5 famiglie
+                            {% elif user.profile.plan == "studio_pro" %}25 famiglie
+                            {% else %}50 famiglie{% endif %}
+                        </li>
+                    </ol>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

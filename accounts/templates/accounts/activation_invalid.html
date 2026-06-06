@@ -1,42 +1,99 @@
 {% extends "base.html" %}
-{% load static %}
-{% load crispy_forms_tags %}
 
-{% block title %}Bilance Family Conferma Email{% endblock title %}
+{% block title %}Invito non valido{% endblock %}
 
-{%block content %}
-<div class="container-fluid mt-4">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-             <h2>❌ Link non valido</h2>
-            <div class="card p-4 shadow custom-card">
-                <form method="POST">
-                    {% csrf_token %}
-                    {{ form|crispy }}
-                    <h4>Ciao {{ user.username }},</h4>
+{% block content %}
+<div class="container py-5 text-center">
+    <div class="card shadow-sm mx-auto" style="max-width: 500px;">
+        <div class="card-body py-5">
 
-                    <p>Il link di attivazione potrebbe essere:<br>
-                        • Scaduto<br>
-                        • Già utilizzato<br>
-                        • Modificato dopo la registrazione</p>
+            {# ✅ CASO 1: Invito già accettato #}
+            {% if invitation and invitation.status == 'accepted' %}
+                <div class="display-1 text-success mb-3">✅</div>
+                <h3 class="mb-3">Hai già accettato questo invito!</h3>
+                <p class="text-muted mb-4">
+                    Il tuo account è attivo e sei già membro della famiglia
+                    <strong>{{ invitation.family.name }}</strong>.
+                </p>
+                <div class="d-grid gap-2">
+                    <a href="{% url 'accounts:login' %}" class="btn btn-primary btn-lg">
+                        🔑 Accedi al tuo account
+                    </a>
+                    <a href="{% url 'home' %}" class="btn btn-outline-secondary">
+                        🏠 Torna alla Home
+                    </a>
+                </div>
 
-                    <!-- ✅ Pulsante per richiedere nuovo link -->
+            {# ✅ CASO 2: Invito scaduto #}
+            {% elif reason == "expired" %}
+                <div class="display-4 text-danger mb-3">⏰</div>
+                <h3 class="mb-3">Invito Scaduto</h3>
+                <p class="text-muted mb-4">
+                    L'invito per <strong>{{ invitation.email }}</strong> è scaduto.
+                </p>
+                <div class="alert alert-info text-start">
+                    <small>
+                        <strong>💡 Come procedere:</strong><br>
+                        Contatta <strong>{{ invitation.invited_by.get_full_name|default:invitation.invited_by.email }}</strong>
+                        per farti reinviare l'invito dalla sua dashboard.
+                    </small>
+                </div>
+                <div class="d-grid gap-2">
+                    <a href="{% url 'home' %}" class="btn btn-primary">🏠 Torna alla Home</a>
+                    <a href="{% url 'accounts:register' %}" class="btn btn-outline-secondary">
+                        📝 Registrati con un'altra email
+                    </a>
+                </div>
+
+            {# ✅ CASO 3: Invito non valido / già usato #}
+            {% elif reason == "invalid" %}
+                <div class="display-4 text-danger mb-3">⚠️</div>
+                <h3 class="mb-3">Invito Non Valido</h3>
+                <p class="text-muted mb-4">
+                    {% if invitation %}
+                        L'invito per <strong>{{ invitation.email }}</strong> non è valido o è stato già utilizzato.
+                    {% else %}
+                        Questo link di invito non è valido o non esiste più.
+                    {% endif %}
+                </p>
+                <div class="d-grid gap-2">
+                    <a href="{% url 'home' %}" class="btn btn-primary">🏠 Torna alla Home</a>
+                    <a href="{% url 'accounts:register' %}" class="btn btn-outline-secondary">
+                        📝 Registrati con un'altra email
+                    </a>
                     <a href="{% url 'accounts:resend_activation' %}" class="btn btn-outline-primary mb-3">
                         🔁 Richiedi nuovo link di attivazione
                     </a>
+                </div>
+                {% if invitation and invitation.invited_by %}
+                    <div class="alert alert-info mt-4 text-start">
+                        <small>
+                            <strong>💡 Suggerimento:</strong><br>
+                            Contatta <strong>{{ invitation.invited_by.get_full_name|default:invitation.invited_by.email }}</strong>
+                            per farti reinviare l'invito.
+                        </small>
+                    </div>
+                {% endif %}
 
-                    <a href="/">Torna alla home</a>
-                </form>
-                <hr style="border: 1px solid #ccc; width: 50%; margin: 20px auto;">
-                <a href="/accounts/register/">Registrati di nuovo</a>
-            </div>
+            {# ✅ CASO 4: Errore generico #}
+            {% else %}
+                <div class="display-4 text-danger mb-3">❌</div>
+                <h3 class="mb-3">Errore</h3>
+                <p class="text-muted mb-4">Si è verificato un errore con questo link di invito.</p>
+                <div class="d-grid gap-2">
+                    <a href="{% url 'home' %}" class="btn btn-primary">🏠 Torna alla Home</a>
+                </div>
+            {% endif %}
+
         </div>
     </div>
 </div>
-{% endblock content %}
-{% block scripts %}
-<script src="{% static 'js/coparentmanager.js' %}"></script>
-{% endblock scripts%}
+{% endblock %}
+
+
+
+
+
 
 
 

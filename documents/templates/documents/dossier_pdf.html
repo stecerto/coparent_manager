@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="utf-8">
+    <title>Fascicolo {{ family.name }}</title>
+    <style>
+        @page { size: A4; margin: 20mm; @bottom-center { content: "CoParent Manager • Pagina " counter(page) " di " counter(pages); font-size: 8pt; color: #666; } }
+        body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 9pt; color: #333; margin: 0; padding: 0; }
+        .header { text-align: center; border-bottom: 2px solid #0d6efd; padding-bottom: 10px; margin-bottom: 20px; }
+        .logo { max-height: 45px; margin-bottom: 8px; }
+        .brand { font-size: 14pt; font-weight: bold; color: #0d6efd; margin: 4px 0; }
+        .section { margin-bottom: 18px; page-break-inside: avoid; }
+        .section h3 { font-size: 11pt; color: #0d6efd; border-bottom: 1px solid #ddd; padding-bottom: 4px; margin-bottom: 8px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 10px; font-size: 8.5pt; }
+        th, td { padding: 5px 6px; border-bottom: 1px solid #eee; text-align: left; vertical-align: top; }
+        th { background: #f8f9fa; font-weight: 600; color: #555; }
+        .msg { margin-bottom: 8px; padding: 6px; border-left: 3px solid #0d6efd; background: #f8f9fa; }
+        .msg.meta { font-size: 7.5pt; color: #666; margin-bottom: 3px; }
+        .msg.content { white-space: pre-wrap; line-height: 1.3; }
+        .footer { text-align: center; font-size: 7pt; color: #999; border-top: 1px solid #ccc; margin-top: 25px; padding-top: 5px; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        {% if logo_base64 %}<img src="data:image/png;base64,{{ logo_base64 }}" alt="CoParent" class="logo">{% endif %}
+        <div class="brand">CoParent Manager</div>
+        <h2 style="margin:5px 0;">📁 Fascicolo Famigliare</h2>
+        <p>Famiglia: <strong>{{ family.name }}</strong> | Generato il: {{ generated_at|date:"d/m/Y H:i" }}</p>
+    </div>
+
+    <!-- 📄 Documenti -->
+    <div class="section">
+        <h3>📄 Documenti Recenti</h3>
+        {% if documents %}
+        <table>
+            <tr><th>Titolo</th><th>Categoria</th><th>Stato</th><th>Data</th></tr>
+            {% for doc in documents %}
+            <tr>
+                <td>{{ doc.title|default:"Senza titolo" }}</td>
+                <td>{{ doc.get_category_display }}</td>
+                <td>{{ doc.get_status_display }}</td>
+                <td>{{ doc.created_at|date:"d/m/Y" }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% else %}<p style="color:#888;">Nessun documento caricato.</p>{% endif %}
+    </div>
+
+    <!-- 💬 Chat Recente -->
+    <div class="section">
+        <h3>💬 Chat Recente (Ultimi 15 messaggi)</h3>
+        {% for msg in messages %}
+        <div class="msg">
+            <div class="meta">
+                <strong>{{ msg.sender.first_name|default:msg.sender.username }}</strong> • {{ msg.created_at|date:"d/m/Y H:i" }}
+            </div>
+            <div class="content">{{ msg.content|truncatechars:150 }}</div>
+        </div>
+        {% empty %}<p style="color:#888;">Nessun messaggio recente.</p>{% endfor %}
+    </div>
+
+    <!-- 📅 Eventi -->
+    <div class="section">
+        <h3>📅 Prossimi Eventi</h3>
+        {% if events %}
+        <table>
+            <tr><th>Data</th><th>Titolo</th><th>Tipo</th></tr>
+            {% for ev in events %}
+            <tr>
+                <td>{{ ev.start_time|date:"d/m/Y H:i" }}</td>
+                <td>{{ ev.title }}</td>
+                <td>{{ ev.event_type|default:"Appuntamento" }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+        {% else %}<p style="color:#888;">Nessun evento programmato.</p>{% endif %}
+    </div>
+
+    <div class="footer">
+        CoParent Manager © {% now "Y" %} | Documento riservato • Generato automaticamente • Non valido come atto ufficiale
+    </div>
+</body>
+</html>

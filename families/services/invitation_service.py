@@ -9,7 +9,7 @@ from psycopg.types import none
 
 from families.models import FamilyMember
 from families.models import Invitation
-from families.utils import get_user_role_in_family
+from families.utils import get_user_role_in_family, can_lawyer_add_family
 
 User = get_user_model()
 
@@ -107,8 +107,16 @@ def build_whatsapp_link(request,invitation):
 def accept_invitation(invitation, user):
     """
     Accetta un invito e sincronizza FamilyMember + UserProfile.
-    ✅ Idempotente: se l'utente è già membro con lo stesso ruolo, non duplica nulla.
+    ✅ Se l'invito non ha una famiglia (invito da avvocato a nuovo genitore), la crea automaticamente.
     """
+    # 🛡️ 0. Controllo email
+    if invitation.email and user.email.lower() != invitation.email.lower():
+        from django.core.exceptions import PermissionDenied
+        raise PermissionDenied(
+            f"⚠️ Questo invito è destinato a {invitation.email}, non a {user.email}. "
+            f"Registrati con l'email corretta o contatta chi ti ha invitato."
+        )
+
     # 🛡️ 1. Controlli preliminari
     if invitation.is_expired:
         invitation.mark_expired()
@@ -117,28 +125,70 @@ def accept_invitation(invitation, user):
     if invitation.status != "pending":
         return invitation
 
-    # ✅ 2. Crea o aggiorna FamilyMember (la tua logica originale)
+    # ✅ CONTROLLO LIMITE SE L'UTENTE È UN AVVOCATO
+    if invitation.role in ["lawyer_a", "lawyer_b"] and hasattr(user, 'profile'):
+        can_add, limit, current = can_lawyer_add_family(user)
+        if not can_add:
+            from django.core.exceptions import PermissionDenied
+            raise PermissionDenied(
+                f"Hai raggiunto il limite di {limit} famiglie per il piano {user.profile.plan}. "
+                f"Contatta l'amministratore per upgrade."
+            )
+
+    # 🌟 2. SE NON C'È UNA FAMIGLIA, LA CREAMO ORA!
+    if not invitation.family:
+        from families.utils import generate_family_name
+        from families.models import Family
+
+        # Crea la famiglia con il nome del genitore che accetta
+        family_name = generate_family_name(user)
+        new_family = Family.objects.create(
+            name=family_name,
+            created_by=user,
+            creator_role="parent_a"
+        )
+
+        # Aggiorna l'invito con la nuova famiglia
+        invitation.family = new_family
+        invitation.save()
+
+        # Assegna il ruolo parent_a all'utente che sta accettando
+        FamilyMember.objects.create(
+            family=new_family,
+            user=user,
+            role="parent_a",
+            is_primary=True
+        )
+
+        # Assegna il ruolo all'avvocato che ha inviato l'invito
+        if invitation.invited_by:
+            FamilyMember.objects.create(
+                family=new_family,
+                user=invitation.invited_by,
+                role="lawyer_a",
+                is_primary=False
+            )
+
+    # ✅ 3. Crea o aggiorna FamilyMember (logica esistente)
     member, created = FamilyMember.objects.get_or_create(
         family=invitation.family,
         user=user,
-        defaults={"role": invitation.role}  # ✅ Importante: imposta il ruolo se è nuovo
+        defaults={"role": invitation.role}
     )
 
-    # ✅ 3. Aggiorna ruolo se cambiato (es. da lawyer_a a lawyer_b in un'altra famiglia)
-    # ✅ Aggiorna ruolo se è cambiato (es. da lawyer_b a lawyer_a in un'altra famiglia)
+    # ✅ 4. Aggiorna ruolo se cambiato
     if not created and member.role != invitation.role:
         member.role = invitation.role
         member.save()
 
-    # ⚠️ NON sovrascrivere userprofile.role se già impostato!
-    # Un avvocato può essere lawyer_a in una famiglia e lawyer_b in un'altra.
-    # Il profilo utente ha un solo campo 'role', quindi lo impostiamo solo alla prima registrazione.
+    # ⚠️ NON sovrascrivere userprofile.role se già impostato
     profile = getattr(user, 'userprofile', None)
-    if profile and not profile.role:  # ✅ Aggiorna solo se il ruolo è vuoto (evita overwrite)
-        profile.role = invitation.role
+    if profile and not profile.role:
+        generic_role = invitation.role.replace('_a', '').replace('_b', '')
+        profile.role = generic_role
         profile.save()
 
-    # ✅ 5. Marca invito come accettato (usa il tuo metodo esistente)
+    # ✅ 5. Marca invito come accettato
     invitation.mark_accepted(user)
 
     return invitation

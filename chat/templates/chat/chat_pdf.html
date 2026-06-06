@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="it">
+<head>
+    <meta charset="utf-8">
+    <title>{{ title }}</title>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10pt; color: #333; margin: 20mm; }
+        .header { text-align: center; border-bottom: 2px solid #0d6efd; padding-bottom: 10px; margin-bottom: 20px; }
+        .logo { max-height: 50px; margin-bottom: 10px; }
+        .brand-name { font-size: 14pt; font-weight: bold; color: #0d6efd; margin: 5px 0; }
+        .msg { margin-bottom: 15px; padding: 10px; border: 1px solid #dee2e6; border-radius: 4px; page-break-inside: avoid; }
+        .msg.meta { font-size: 8pt; color: #666; margin-bottom: 4px; }
+        .msg.content { white-space: pre-wrap; line-height: 1.4; }
+        .footer { text-align: center; font-size: 7pt; color: #999; border-top: 1px solid #ccc; margin-top: 30px; padding-top: 5px; }
+        @page { size: A4; margin: 20mm; @bottom-center { content: "CoParent Manager • Pagina " counter(page) " di " counter(pages); } }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <!-- ✅ LOGO BASE64: appare SEMPRE, zero dipendenze esterne -->
+        {% if logo_base64 %}
+            <img src="data:image/png;base64,{{ logo_base64 }}" alt="CoParent Manager" class="logo">
+        {% elif logo_path %}
+            <img src="{{ logo_path }}" alt="CoParent Manager" class="logo">
+        {% endif %}
+
+        <div class="brand-name">CoParent Manager</div>
+        <h2>{{ title }}</h2>
+        <p>Famiglia: {{ family.name }} | Generato il: {{ generated_at|date:"d/m/Y H:i" }}</p>
+    </div>
+
+    {% for msg in messages %}
+    <div class="msg">
+        <div class="meta">
+            <strong>{{ msg.sender.first_name|default:msg.sender.username }}</strong>
+            {% if msg.recipient %} → {{ msg.recipient.first_name|default:msg.recipient.username }}{% endif %}
+            • {{ msg.created_at|date:"d/m/Y H:i" }}
+            {% if msg.reply_to %}↩️ Risposta a: {{ msg.reply_to.sender.first_name|default:"Utente" }}{% endif %}
+        </div>
+        <div class="content">{{ msg.content }}</div>
+    </div>
+    {% empty %}
+    <p>Nessun messaggio attivo esportabile.</p>
+    {% endfor %}
+
+    <div class="footer">
+        CoParent Manager © {% now "Y" %} | Documento riservato
+    </div>
+</body>
+</html>

@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Privacy Policy - CoParent Manager{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4 p-md-5">
+                    <h1 class="h3 fw-bold mb-2">📜 Privacy Policy - CoParent Manager</h1>
+                    <p class="text-muted small mb-4">Ultimo aggiornamento: {% now "d F Y" %}</p>
+
+                    <div class="privacy-content">
+                        <!-- 1. Titolare e Finalità -->
+                        <h2 class="h5 fw-bold mt-4 mb-3">1. Chi siamo e perché questa policy</h2>
+                        <p>CoParent Manager è una piattaforma digitale dedicata alla gestione condivisa di spese, documenti, calendari e comunicazioni tra genitori separati/divorziati, con estensioni per avvocati e mediatori familiari.</p>
+                        <p class="mb-1"><strong>Titolare del trattamento:</strong><br>
+                        Stefano Certo<br>
+                        Sede legale: Wetzlare Straße, 4<br>
+                        P.IVA / CF: <span class="text-danger">[INSERISCI P.IVA]</span><br>
+                        Email privacy: <a href="mailto:privacy@tuodominio.it">privacy@tuodominio.it</a><br>
+                        PEC: <span class="text-danger">[INSERISCI PEC O RIMUOVI]</span></p>
+                        <p class="small text-muted">Questa policy è redatta ai sensi degli artt. 13-14 del Regolamento UE 2016/679 (GDPR) e del Codice Privacy italiano (D.Lgs. 196/2003 come modificato da D.Lgs. 101/2018).</p>
+
+                        <!-- 2. Tabella Dati Trattati -->
+                        <h2 class="h5 fw-bold mt-4 mb-3">2. Quali dati trattiamo e perché (Base Giuridica)</h2>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-sm small align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th style="width:18%">Categoria</th>
+                                        <th style="width:22%">Esempi</th>
+                                        <th style="width:25%">Finalità</th>
+                                        <th style="width:20%">Base Giuridica</th>
+                                        <th style="width:15%">Conservazione</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>Dati anagrafici</td><td>Nome, cognome, email, telefono, CF</td><td>Registrazione, autenticazione, comunicazioni di servizio</td><td>Esecuzione contratto (art. 6.1.b GDPR)</td><td>Fino a cancellazione + 10 anni (fiscali)</td></tr>
+                                    <tr><td>Dati familiari</td><td>Nomi figli, date nascita, affido, % mantenimento</td><td>Calcolo quote, calendario, reportistica</td><td>Esecuzione contratto + Interesse legittimo (art. 6.1.b/f)</td><td>Fino maggiore età ultimo figlio + 5 anni</td></tr>
+                                    <tr><td>Dati economici</td><td>Importi, categorie, prove pagamento, IBAN</td><td>Ripartizione spese, report PDF, budget</td><td>Esecuzione contratto + Obblighi di legge (art. 6.1.c)</td><td>10 anni (art. 2220 c.c.)</td></tr>
+                                    <tr><td>Documenti</td><td>PDF, immagini, verbali, accordi, sentenze</td><td>Archiviazione condivisa, versioning, firme</td><td>Esecuzione contratto + Consenso esplicito (art. 9.2.a)</td><td>Configurabile dall'utente + backup 30gg</td></tr>
+                                    <tr><td>Messaggi chat</td><td>Testi, allegati, timestamp</td><td>Comunicazione, cronologia audit</td><td>Esecuzione contratto + Interesse legittimo</td><td>Fino a cancellazione manuale</td></tr>
+                                    <tr><td>Log di accesso</td><td>IP, user agent, orari login</td><td>Sicurezza, prevenzione frodi, debugging</td><td>Interesse legittimo (art. 6.1.f) + Art. 132 D.Lgs. 196/03</td><td>12 mesi</td></tr>
+                                    <tr><td>Dati sanitari</td><td>Note mediche, certificati figli</td><td>Gestione esigenze specifiche minori</td><td>Consenso esplicito (art. 9.2.a) + Interesse vitale (art. 9.2.c)</td><td>Fino maggiore età + 5 anni → cancellazione sicura</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- 3. Misure di Sicurezza -->
+                        <h2 class="h5 fw-bold mt-4 mb-3">3. Come proteggiamo i tuoi dati (Misure di Sicurezza)</h2>
+                        <p>CoParent Manager adotta misure tecniche e organizzative proporzionate al rischio, in linea con l'art. 32 GDPR:</p>
+
+                        <h3>🔐 Crittografia</h3>
+                        <ul>
+                            <li><strong>Dati a riposo:</strong> Documenti e campi sensibili crittografati con Fernet (AES-128-CBC) prima del salvataggio.</li>
+                            <li><strong>Dati in transito:</strong> Tutte le comunicazioni via HTTPS/TLS 1.3.</li>
+                            <li><strong>Chiavi:</strong> Separate dal database, ruotate periodicamente, accesso ristretto.</li>
+                        </ul>
+
+                        <h3>👥 Controlli di Accesso</h3>
+                        <ul>
+                            <li>2FA opzionale, ruoli granulari (Genitore A/B, Avvocato, Mediatore).</li>
+                            <li>Audit log completo: ogni accesso/modifica/download è tracciato con timestamp, utente e IP.</li>
+                        </ul>
+
+                        <h3>🗄️ Backup & Disaster Recovery</h3>
+                        <ul>
+                            <li>Backup crittografati giornalieri su server UE. Piano di recovery testato (RTO &lt; 4h).</li>
+                            <li>Cancellazione sicura dei backup scaduti (sovrascrittura multi-pass).</li>
+                        </ul>
+
+                        <h3>🌍 Hosting</h3>
+                        <p>I dati sono ospitati esclusivamente in UE. Provider: <span class="text-danger">[INSERISCI HOSTING, es. AWS Frankfurt / Hetzner]</span>. Sub-processor (email, pagamenti) vincolati da DPA e clausole SCC.</p>
+
+                        <!-- 4. Condivisione Dati -->
+                        <h2 class="h5 fw-bold mt-4 mb-3">4. Con chi condividiamo i dati</h2>
+                        <p><strong>I tuoi dati non sono mai venduti a terzi.</strong></p>
+                        <div class="table-responsive">
+                            <table class="table table-striped table-sm small align-middle">
+                                <thead class="table-light">
+                                    <tr><th>Destinatario</th><th>Tipo di Dati</th><th>Finalità</th><th>Base Giuridica</th></tr>
+                                </thead>
+                                <tbody>
+                                    <tr><td>Altro genitore</td><td>Spese, documenti condivisi, chat famiglia, calendario</td><td>Gestione co-genitorialità</td><td>Esecuzione contratto</td></tr>
+                                    <tr><td>Avvocato/Mediatore</td><td>Dati famiglia assegnata</td><td>Assistenza legale/mediazione</td><td>Mandato professionale + Consenso</td></tr>
+                                    <tr><td>Fornitori tecnici</td><td>Dati tecnici, email, pagamenti</td><td>Erogazione servizio</td><td>Art. 28 GDPR (Responsabili)</td></tr>
+                                    <tr><td>Autorità competenti</td><td>Solo su richiesta motivata</td><td>Adempimenti di legge</td><td>Obbligo legale (art. 6.1.c)</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="alert alert-warning small mt-3">
+                            🔒 <strong>Nota:</strong> I documenti "Privati" sono visibili solo al caricatore e ai suoi legali diretti. Mai all'altro genitore, salvo ordine dell'Autorità Giudiziaria.
+                        </div>
+
+                        <!-- 5. Diritti GDPR -->
+                        <h2 class="h5 fw-bold mt-4 mb-3">5. Diritti dell'Interessato (Artt. 15-22 GDPR)</h2>
+                        <p>Puoi esercitare i seguenti diritti scrivendo a <a href="mailto:privacy@tuodominio.it">privacy@tuodominio.it</a>:</p>
+                        <ul>
+                            <li><strong>Accesso:</strong> Ricevi copia dei tuoi dati in formato strutturato.</li>
+                            <li><strong>Rettifica:</strong> Correggi dati inesatti o incompleti.</li>
+                            <li><strong>Cancellazione:</strong> Richiedi la rimozione definitiva ("diritto all'oblio").</li>
+                            <li><strong>Limitazione:</strong> Sospendi temporaneamente il trattamento.</li>
+                            <li><strong>Portabilità:</strong> Scarica i tuoi dati in CSV/JSON per trasferirli altrove.</li>
+                            <li><strong>Opposizione/Revoca:</strong> Opponiti al trattamento o revoca il consenso (solo per il futuro).</li>
+                        </ul>
+                        <p class="small text-muted">Risponderemo entro 30 giorni. Per reclami: <a href="https://www.garanteprivacy.it" target="_blank" rel="noopener">Garante Privacy</a>.</p>
+
+                        <!-- 6. Cookie -->
+                        <h2 class="h5 fw-bold mt-4 mb-3">6. Cookie e Tecnologie di Tracciamento</h2>
+                        <p>Utilizziamo <strong>solo cookie tecnici strettamente necessari</strong> (sessione, CSRF, preferenze UI). Nessun cookie di profilazione, analytics di terze parti o social plugin senza consenso esplicito.</p>
+                    </div>
+
+                    <!-- 📧 ESERCIZIO DIRITTI GDPR (INSERISCI QUI) -->
+                    <div class="card mt-4 border-info">
+                        <div class="card-header bg-info text-white fw-bold">📬 Esercita i tuoi Diritti GDPR</div>
+                        <div class="card-body">
+                            <p class="small text-muted mb-3">Per richiedere accesso, rettifica o cancellazione dei dati, usa il modello ufficiale:</p>
+
+                            <div class="d-flex gap-2 flex-wrap">
+                                <a id="mailtoLink" href="#" class="btn btn-outline-primary btn-sm">📤 Invia Email Precompilata</a>
+                                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="copyGDPR()">📋 Copia Modello</button>
+                            </div>
+
+                            <textarea id="gdprTemplate" class="form-control mt-3 small" rows="12" readonly style="display:none;">
+                    Gentile Team di CoParent Manager,
+
+                    Io sottoscritto/a [NOME COGNOME], nato/a a [LUOGO] il [DATA], CF [CODICE FISCALE],
+                    email registrata: [EMAIL REGISTRATA],
+
+                    con la presente richiedo di esercitare il seguente diritto ai sensi degli artt. 15-22 del Regolamento UE 2016/679:
+
+                    [ ] Accesso ai miei dati personali
+                    [ ] Rettifica di dati inesatti (specificare: _______________)
+                    [ ] Cancellazione ("diritto all'oblio")
+                    [ ] Limitazione del trattamento
+                    [ ] Portabilità dei dati (formato: CSV/JSON)
+                    [ ] Opposizione al trattamento (motivazione: _______________)
+                    [ ] Revoca del consenso (trattamento: _______________)
+
+                    Allego copia del documento di identità in corso di validità.
+                    Resto in attesa di riscontro entro 30 giorni all'indirizzo email sopra indicato.
+
+                    Cordiali saluti,
+                    [NOME COGNOME]
+                    [DATA]
+                            </textarea>
+                            <small id="copyFeedback" class="text-success fw-bold mt-1" style="display:none;">✅ Copiato negli appunti!</small>
+                        </div>
+                    </div>
+
+                    <script>
+                    document.addEventListener('DOMContentLoaded', () => {
+                        const template = document.getElementById('gdprTemplate').value.trim();
+                        const mailto = document.getElementById('mailtoLink');
+                        const encodedBody = encodeURIComponent(template);
+                        mailto.href = `mailto:privacy@tuodominio.it?subject=Richiesta%20esercizio%20diritti%20GDPR%20%E2%80%93%20CoParent%20Manager&body=${encodedBody}`;
+                    });
+
+                    function copyGDPR() {
+                        const textarea = document.getElementById('gdprTemplate');
+                        textarea.style.display = 'block';
+                        textarea.select();
+                        textarea.setSelectionRange(0, 99999);
+                        navigator.clipboard.writeText(textarea.value.trim()).then(() => {
+                            document.getElementById('copyFeedback').style.display = 'inline';
+                            setTimeout(() => { document.getElementById('copyFeedback').style.display = 'none'; }, 2000);
+                        });
+                    }
+                    </script>
+                    <!-- FINE BLOCCO GDPR -->
+
+                    <hr class="my-5">
+
+                    <div class="text-center text-muted small">
+                        <p class="mb-1">Per esercitare i tuoi diritti o per domande:</p>
+                        <p class="mb-0">
+                            📧 <a href="mailto:privacy@tuodominio.it" class="text-decoration-none fw-bold">privacy@tuodominio.it</a>
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .privacy-content h2 { font-size: 1.15rem; font-weight: 600; color: #212529; margin: 2rem 0 0.75rem; padding-bottom: 0.25rem; border-bottom: 1px solid #e9ecef; }
+    .privacy-content h3 { font-size: 1.05rem; font-weight: 500; color: #495057; margin: 1.25rem 0 0.5rem; }
+    .privacy-content p { margin-bottom: 0.8rem; line-height: 1.65; color: #333; }
+    .privacy-content ul { margin: 0.5rem 0 1rem 1.25rem; }
+    .privacy-content li { margin-bottom: 0.3rem; line-height: 1.5; color: #444; }
+    .privacy-content a { color: #0d6efd; text-decoration: none; }
+    .privacy-content a:hover { text-decoration: underline; }
+    .privacy-content .table th { font-weight: 600; font-size: 0.85rem; color: #495057; }
+    .privacy-content .table td { font-size: 0.9rem; color: #333; }
+</style>
+{% endblock %}

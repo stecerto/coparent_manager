@@ -2,6 +2,8 @@ from django.db import models
 from django.conf import settings
 
 from core.choices import RoleChoices
+from core.fields import EncryptedCharField
+from core.storage import EncryptedFileSystemStorage
 from families.models import Family
 
 
@@ -16,6 +18,8 @@ def family_document_path(instance, filename):
 
     return f"families/{family_name}/{folder}/{filename}"
 
+# ✅ Storage criptato per i documenti
+encrypted_storage = EncryptedFileSystemStorage(location="media/encrypted_docs")
 
 class Document(models.Model):
     CATEGORY_CHOICES = [
@@ -60,7 +64,7 @@ class Document(models.Model):
         related_name="uploaded_documents"
     )
 
-    title = models.CharField(max_length=255)
+    title = EncryptedCharField(max_length=255)
 
     category = models.CharField(
         max_length=20,
@@ -80,7 +84,7 @@ class Document(models.Model):
         default="draft"
     )
 
-    file = models.FileField(upload_to=family_document_path)
+    file = models.FileField(upload_to=family_document_path, storage=encrypted_storage)
 
     reference_year = models.IntegerField(
         null=True,
@@ -115,6 +119,12 @@ class Document(models.Model):
         verbose_name="Documento Riservato",
         help_text="Se attivo, il documento sarà visibile solo ai partecipanti della chat privata."
     )
+    file_size = models.BigIntegerField(null=True, blank=True, editable=False)
+
+    def save(self, *args, **kwargs):
+        if self.file and not self.file_size:
+            self.file_size = self.file.size
+        super().save(*args, **kwargs)
 
     class Meta:
         ordering = ['-created_at']
@@ -130,7 +140,7 @@ class DocumentVersion(models.Model):
         related_name="version_history"
     )
 
-    file = models.FileField(upload_to=family_document_path)
+    file = models.FileField(upload_to=family_document_path, storage=encrypted_storage)
 
     version = models.IntegerField()
 

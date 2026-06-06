@@ -1,0 +1,75 @@
+<div class="tab-pane fade show active" id="pricing-genitori" role="tabpanel">
+    <div class="row g-4 justify-content-center">
+
+        <!-- ✅ NUOVO: STARTER €5/mese -->
+        <div class="col-md-3">
+            <div class="card h-100 shadow-sm border">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Starter</h5>
+                    <h2 class="display-6 fw-bold">€5,00<span class="fs-6 text-muted">/mese</span></h2>
+                    <p class="text-muted small">Dopo i 14 giorni di prova</p>
+                    <p class="text-muted">Gestione base familiare</p>
+                    <ul class="list-unstyled text-start mb-4 small">
+                        <li>✅ Gestione spese illimitata</li>
+                        <li>✅ Chat familiare sicura</li>
+                        <li>✅ Calendario turni base</li>
+                        <li>✅ Archivio documenti (2 GB)</li>
+                        <li>❌ Grafici e report avanzati</li>
+                        <li>❌ Export PDF illimitato</li>
+                    </ul>
+                    <a href="{% url 'accounts:register' %}?role={{ role }}&plan=starter" class="btn btn-outline-success w-100">
+                        🎁 Prova 14 giorni gratis
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- PRO €12/mese (modificato prezzo) -->
+        <div class="col-md-3">
+            <div class="card h-100 shadow border-success">
+                <div class="card-header bg-success text-white text-center fw-bold">⭐ PIÙ SCELTO</div>
+                <div class="card-body text-center">
+                    <h5 class="card-title">Pro</h5>
+                    <h2 class="display-6 fw-bold">€12,00<span class="fs-6 text-muted">/mese</span></h2>
+                    <p class="text-muted small">Dopo i 14 giorni di prova</p>
+                    <p class="text-muted">Per famiglie esigenti</p>
+                    <ul class="list-unstyled text-start mb-4 small">
+                        <li>✅ Tutto di Starter</li>
+                        <li>✅ Grafici spese per categoria</li>
+                        <li>✅ Trend mensili e comparativi</li>
+                        <li>✅ Export PDF illimitato</li>
+                        <li>✅ Fascicolo famigliare stampabile</li>
+                        <li>✅ Archivio documenti (10 GB)</li>
+                    </ul>
+                    <a href="{% url 'accounts:register' %}?role={{ role }}&plan=pro" class="btn btn-success w-100">
+                        🎁 Prova 14 giorni gratis
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- ENTERPRISE €19,90/mese (modificato prezzo) -->
+        <div class="col-md-3">
+            <div class="card h-100 shadow-sm border">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Enterprise</h5>
+                    <h2 class="display-6 fw-bold">€19,90<span class="fs-6 text-muted">/mese</span></h2>
+                    <p class="text-muted small">Dopo i 14 giorni di prova</p>
+                    <p class="text-muted">Per famiglie complesse</p>
+                    <ul class="list-unstyled text-start mb-4 small">
+                        <li>✅ Tutto di Pro</li>
+                        <li>✅ Archivio documenti (20 GB)</li>
+                        <li>✅ Monitoraggio spazio in tempo reale</li>
+                        <li>✅ Audit log completo</li>
+                        <li>✅ Crittografia avanzata</li>
+                        <li>✅ Supporto prioritario</li>
+                    </ul>
+                    <a href="{% url 'accounts:register' %}?role={{ role }}&plan=enterprise" class="btn btn-outline-dark w-100">
+                        🎁 Prova 14 giorni gratis
+                    </a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+</div>

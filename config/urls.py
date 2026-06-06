@@ -22,27 +22,21 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("accounts/", include("accounts.urls")),
+#Core
     path("", include("core.urls")),
-
 # Children
     path("children/", include("children.urls")),
 #Documents
     path("documents/", include("documents.urls")),
-
-    #Families
+#Families
     path("families/", include("families.urls")),
-
-    # Expenses
+# Expenses
     path("expenses/", include("expenses.urls")),
-
-    # Calendar
+# Calendar
     path("calendar/", include("calendar_app.urls")),
-
-    # Chat
+# Chat
     path("chat/", include("chat.urls")),
-
-    #notification
-    # ✅ CORRETTO
+#notification
     path("notifications/", include("notifications.urls", namespace='notifications')),
 ]
 

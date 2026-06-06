@@ -2,17 +2,41 @@
 
 
 
-<h2>Storico versioni - {{ document.title }}</h2>
+{% extends "base.html" %}
+{% block title %}📜 Versioni - {{ document.title }}{% endblock %}
 
-<ul class="list-group">
-    <li class="list-group-item">
-        Versione attuale: v{{ document.version }}
-    </li>
-
-    {% for version in versions %}
-        <li class="list-group-item">
-            v{{ version.version }}
-            - {{ version.created_at }}
-        </li>
-    {% endfor %}
-</ul>
+{% block content %}
+{% if is_pro_or_higher %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h3 class="fw-bold">📜 Storico Versioni: <span class="text-primary">{{ document.title }}</span></h3>
+        <a href="{% url 'documents:documents_detail' document.id %}" class="btn btn-outline-secondary">← Torna al documento</a>
+    </div>
+    <div class="card shadow-sm">
+        <ul class="list-group list-group-flush">
+            <li class="list-group-item bg-light fw-bold">
+                ✅ Versione Corrente: v{{ document.version }} <small class="text-muted ms-2">({{ document.updated_at|date:"d/m/Y H:i" }})</small>
+            </li>
+            {% for version in versions %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <div>
+                        <span class="fw-medium">v{{ version.version }}</span>
+                        <small class="text-muted ms-2">{{ version.created_at|date:"d/m/Y H:i" }}</small>
+                        {% if version.uploaded_by %}
+                            <small class="text-muted ms-2">di {{ version.uploaded_by.first_name|default:version.uploaded_by.username }}</small>
+                        {% endif %}
+                    </div>
+                    {% if version.file %}
+                        <a href="{{ version.file.url }}" class="btn btn-sm btn-outline-primary">📥 Scarica v{{ version.version }}</a>
+                    {% endif %}
+                </li>
+            {% empty %}
+                <li class="list-group-item text-muted text-center py-4">Nessuna versione precedente disponibile.</li>
+            {% endfor %}
+        </ul>
+    </div>
+</div>
+{% else %}
+    {% include "includes/upgrade_placeholder.html" with title="Storico Versioni" feature="versioning documenti" %}
+{% endif %}
+{% endblock %}

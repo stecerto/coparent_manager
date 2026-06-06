@@ -104,3 +104,23 @@ def breadcrumbs(request):
         pass
 
     return {"breadcrumbs": crumbs}
+
+
+from core.plans import PLAN_FEATURES, PLAN_LEVELS
+
+
+def subscription_context(request):
+    if not request.user.is_authenticated:
+        return {"current_plan": "starter", "plan_features": {}, "plan_level": 1}
+
+    profile = getattr(request.user, 'profile', None)
+    plan = getattr(profile, 'plan', 'starter') if profile else 'starter'
+    level = PLAN_LEVELS.get(plan, 1)
+    features = PLAN_FEATURES.get(plan, PLAN_FEATURES["starter"])
+
+    return {
+        "current_plan": plan,
+        "plan_level": level,
+        "plan_features": features,
+        "is_pro_or_higher": level >= 2,
+    }

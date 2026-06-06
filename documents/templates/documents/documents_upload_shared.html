@@ -1,48 +1,60 @@
 {% extends "base.html" %}
 {% load static %}
-{% load crispy_forms_tags %}
+
+{% block title %}🔗 Carica Documento Condiviso{% endblock %}
+
 {% block content %}
-
-
-<div class="card p-3 mb-2 shadow custom-card text-center">
-        <h4>Carica documento condiviso</h4>
-</div>
-
-    <div class="card-body">
-        <div class="card p-3 mb-2 shadow custom-card">
-
-                <form method="post" enctype="multipart/form-data" class="card p-3">
-                    {% csrf_token %}
-
-                    <div class="mb-3">
-                        <label>Titolo (opzionale)</label>
-                        <input type="text" name="title" class="form-control">
-                    </div>
-
-                    <div class="mb-3">
-                        <label>Categoria</label>
-                        <select name="category" class="form-control">
-                            <option value="chat">Documento chat</option>
-                            <option value="agreement">Accordo</option>
-                            <option value="minutes">Verbale</option>
-                            <option value="generic">Generico</option>
-                        </select>
-                    </div>
-
-                    <div class="mb-3">
-                        <label>File</label>
-                        <input type="file"
-                               name="files"
-                               multiple
-                               class="form-control">
-                    </div>
-
-                    <button type="submit" class="btn btn-success btn-style">
-                        Upload Shared
-                    </button>
-                </form>
-            
-        </div>
+{% if is_pro_or_higher %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h2 class="fw-bold mb-0">🔗 Carica Documento Condiviso</h2>
+        <a href="{% url 'documents:documents_list' %}" class="btn btn-outline-secondary">← Torna alla lista</a>
     </div>
 
-            {% endblock %}
+    <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white fw-bold d-flex align-items-center gap-2">
+            👨‍👩‍👧 <span>Visibile a tutti i membri della famiglia e legali associati</span>
+        </div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data">
+                {% csrf_token %}
+
+                <div class="mb-3">
+                    <label for="doc_title" class="form-label fw-bold">Titolo documento <small class="text-muted">(opzionale)</small></label>
+                    <input type="text" id="doc_title" name="title" class="form-control" placeholder="Es. Verbale incontro del 15/05">
+                </div>
+
+                <div class="mb-3">
+                    <label for="doc_category" class="form-label fw-bold">Categoria</label>
+                    <select id="doc_category" name="category" class="form-select">
+                        <option value="generic">📄 Generico</option>
+                        <option value="chat">💬 Documento da chat</option>
+                        <option value="agreement">🤝 Accordo</option>
+                        <option value="minutes">📝 Verbale</option>
+                        <option value="payslip">💰 Busta paga</option>
+                        <option value="tax_return">📑 Dichiarazione redditi</option>
+                        <option value="payment_proof">💳 Prova di pagamento</option>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label for="doc_files" class="form-label fw-bold">File da caricare</label>
+                    <input type="file" id="doc_files" name="files" multiple class="form-control" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx">
+                    <div class="form-text">Puoi selezionare più file contemporaneamente. Formati supportati: PDF, immagini, Office.</div>
+                </div>
+
+                <div class="alert alert-warning small mb-4">
+                    ⚠️ <strong>Attenzione:</strong> I documenti condivisi saranno accessibili a tutti i membri autorizzati della famiglia. Verifica di non caricare dati sensibili non pertinenti.
+                </div>
+
+                <div class="d-grid gap-2">
+                    <button type="submit" class="btn btn-primary btn-lg">📤 Carica Documento Condiviso</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% else %}
+    {% include "includes/upgrade_placeholder.html" with title="Caricamento Documenti Condivisi" feature="condivisione sicura, categorie automatiche e tracciabilità completa" %}
+{% endif %}
+{% endblock %}

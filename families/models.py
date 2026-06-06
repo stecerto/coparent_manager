@@ -1,11 +1,17 @@
 import uuid
 
 from django.conf import settings
+from django.db import models
+from django.contrib.auth import get_user_model
+from django.utils import timezone
+from datetime import timedelta
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.db.models import F
 from core.choices import RoleChoices
+from core.fields import EncryptedCharField
+
 
 class Family(models.Model):
     CREATOR_ROLE_CHOICES = [
@@ -14,7 +20,7 @@ class Family(models.Model):
     ]
 
 
-    name = models.CharField(max_length=255)
+    name = EncryptedCharField(max_length=255)
     # 🔑 Identificativo univoco (per inviti, link, API)
     code = models.UUIDField("Codice famiglia", default=uuid.uuid4, unique=False, editable=True)
 
@@ -195,7 +201,9 @@ class Invitation(models.Model):
     family = models.ForeignKey(
         "families.Family",
         on_delete=models.CASCADE,
-        related_name="invitations"
+        related_name="invitations",
+        null = True,  # ✅ Consente NULL nel database
+        blank = True
     )
 
     invited_by = models.ForeignKey(
@@ -307,3 +315,91 @@ class Invitation(models.Model):
     def __str__(self):
         return f"{self.email} - {self.role} ({self.status})"
 
+
+class PaymentSubscription(models.Model):
+    """Gestisce lo stato dei pagamenti per utenti a pagamento."""
+
+    STATUS_CHOICES = [
+        ('active', 'Attivo'),
+        ('grace_period', 'Periodo di grazia (5 giorni)'),
+        ('suspended', 'Sospeso'),
+        ('cancelled', 'Cancellato'),
+    ]
+
+    user = models.OneToOneField(
+        get_user_model(),
+        on_delete=models.CASCADE,
+        related_name='subscription'
+    )
+
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+
+    # Date chiave
+    subscription_start = models.DateTimeField(default=timezone.now)
+    subscription_end = models.DateTimeField()  # Scadenza attuale
+    grace_period_end = models.DateTimeField(null=True, blank=True)  # Fine periodo di grazia
+
+    # Storico pagamenti
+    last_payment_date = models.DateTimeField(null=True, blank=True)
+    next_payment_date = models.DateTimeField(null=True, blank=True)
+
+    # Metodo pagamento (per integrazione futura con Stripe/PayPal)
+    payment_method = models.CharField(max_length=50, blank=True)
+    payment_provider_id = models.CharField(max_length=100, blank=True)  # ID Stripe/PayPal
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['subscription_end']),
+            models.Index(fields=['status']),
+        ]
+
+    def __str__(self):
+        return f"{self.user.email} - {self.get_status_display()}"
+
+    @property
+    def is_expired(self):
+        """Verifica se l'abbonamento è scaduto."""
+        return timezone.now() > self.subscription_end
+
+    @property
+    def is_in_grace_period(self):
+        """Verifica se è nel periodo di grazia (5 giorni dopo scadenza)."""
+        if not self.grace_period_end:
+            return False
+        return self.subscription_end < timezone.now() <= self.grace_period_end
+
+    def mark_as_suspended(self):
+        """Segna l'account come sospeso dopo il periodo di grazia."""
+        self.status = 'suspended'
+        self.save()
+
+        # Disattiva l'utente
+        self.user.is_active = False
+        self.user.save()
+
+    def extend_subscription(self, months=1):
+        """Estende l'abbonamento di N mesi."""
+        from dateutil.relativedelta import relativedelta
+
+        # Parti dalla data di scadenza attuale (non da oggi)
+        new_end = self.subscription_end + relativedelta(months=months)
+
+        self.subscription_end = new_end
+        self.grace_period_end = new_end + timedelta(days=5)
+        self.status = 'active'
+        self.last_payment_date = timezone.now()
+        self.save()
+
+        # Riattiva l'utente se era sospeso
+        if not self.user.is_active:
+            self.user.is_active = True
+            self.user.save()
+
+    def save(self, *args, **kwargs):
+        """Imposta automaticamente grace_period_end alla creazione."""
+        if not self.grace_period_end and self.subscription_end:
+            self.grace_period_end = self.subscription_end + timedelta(days=5)
+        super().save(*args, **kwargs)

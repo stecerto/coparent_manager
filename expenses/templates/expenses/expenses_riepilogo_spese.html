@@ -2,85 +2,328 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block title %}Bilance Family Dashboard Spese{% endblock title %}
+{% block title %}📊 Riepilogo Spese - {{ family.name|default:"Famiglia" }}{% endblock %}
 
-{%block content %}
-<div class="container-fluid mt-4">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-             <h2>Dashboard</h2>
-            <div class="card p-4 shadow custom-card">
-                <form method="POST">
-                    {% csrf_token %}
-                    {% load crispy_forms_tags %}
-                    <p>Totale spese: {{ total_expenses }} €</p>
+{% block extra_css %}
+<style>
+    .expense-card { transition: transform 0.2s, box-shadow 0.2s; }
+    .expense-card:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(0,0,0,0.12) !important; }
+    .kpi-value { font-size: 1.8rem; font-weight: 700; }
+    .kpi-label { font-size: 0.85rem; color: #6c757d; text-transform: uppercase; letter-spacing: 0.5px; }
+    .chart-wrapper { position: relative; height: 280px; }
+    .status-badge { font-size: 0.75rem; padding: 0.35em 0.65em; }
+    .action-btn { width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; transition: all 0.15s; }
+    .action-btn:hover { transform: scale(1.1); }
+    .action-btn.edit { background: #e7f1ff; color: #0d6efd; }
+    .action-btn.delete { background: #ffe7e7; color: #dc3545; }
+    .table th { font-weight: 600; color: #495057; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.3px; }
+    .table td { vertical-align: middle; font-size: 0.95rem; }
+    .empty-state { text-align: center; padding: 3rem 1rem; color: #6c757d; }
+    .empty-state i { font-size: 3rem; opacity: 0.3; margin-bottom: 1rem; display: block; }
+</style>
+{% endblock %}
 
-<!-- Grafico spese per categoria -->
-                    <canvas id="categoryChart" width="200" height="100"></canvas>
-                    
+{% block content %}
+<div class="container-fluid py-4">
 
-                    <hr style="border: 1px solid #e9d5ff; width: 50%; margin: 20px auto;">
+    <!-- 🎯 HEADER CONTESTUALE -->
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+        <div>
+            <h2 class="mb-1 fw-bold">📊 Riepilogo Spese</h2>
+            <p class="text-muted mb-0">
+                Famiglia: <strong>{{ family.name }}</strong>
+                {% if active_role_label %} • <span class="badge bg-danger">{{ active_role_label }}</span>{% endif %}
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'expenses:add_expense' %}" class="btn btn-success btn-style">
+                ➕ Nuova Spesa
+            </a>
+            {% if is_pro_or_higher %}
+                <a href="{% url 'expenses:download_expense_pdf' %}" class="btn btn-outline-primary">
+                    📄 Esporta PDF
+                </a>
+                <a href="{% url 'expenses:expenses_analytics' %}" class="btn btn-outline-info">
+                    📈 Analisi Avanzata
+                </a>
+            {% endif %}
+        </div>
+    </div>
 
-                    <h3>Mantenimento per figli</h3>
-                    <table border="1" cellpadding="5">
-                    <tr>
-                        <th>Figlio</th>
-                        <th>Età</th>
-                        <th>Pagatore</th>
-                        <th>Mantenimento (€)</th>
-                        <th>Spese condivise (€)</th>
-                    </tr>
-                    {% for child, info in maintenance_info.items %}
-                    <tr>
-                        <td>{{ child }}</td>
-                        <td>{{ info.age }}</td>
-                        <td>{{ info.payer }}</td>
-                        <td>{{ info.amount }}</td>
-                        <td>{{ info.shared_expenses }}</td>
-                    </tr>
-                    {% endfor %}
-                    </table>
-
-<!-- Bottone per PDF -->
-                    <br>
-                    <a href="{% url 'expenses:download_expense_pdf' %}" class="btn btn-primary">📄 Scarica report PDF</a><br>
-                    <br>
-                    <a href="{% url 'expenses:add_expense' %}">➕ Aggiungi Spesa</a>
-                    <table border="1" cellpadding="5">
-                    <tr>
-                        <th>Data</th>
-                        <th>Categoria</th>
-                        <th>Importo (€)</th>
-                        <th>Creato da</th>
-                        <th>Azioni</th>
-                    </tr>
-                    {% for expense in expenses %}
-                    <tr>
-                        <td>{{ expense.date }}</td>
-                        <td>{{ expense.category }}</td>
-                        <td>{{ expense.amount }}</td>
-                        <td>{{ expense.created_by.username }}</td>
-                        <td>
-                            <a href="{% url 'expenses:edit_expense' expense.pk %}">✏️ Modifica</a>
-                            <a href="{% url 'expenses:delete_expense' expense.pk %}">🗑️ Elimina</a>
-                        </td>
-                    </tr>
-                    {% endfor %}
-                    </table>
-
-                </form>
-                <hr style="border: 1px solid #ccc; width: 50%; margin: 20px auto;">
-
+    <!-- 📈 KPI CARDS (solo Pro+) -->
+    {% if is_pro_or_higher %}
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card expense-card shadow-sm h-100 border-0" style="border-left: 4px solid #0d6efd;">
+                <div class="card-body">
+                    <div class="kpi-label">Totale Spese</div>
+                    <div class="kpi-value text-primary">€ {{ total_expenses|floatformat:2 }}</div>
+                    <small class="text-muted">{{ expenses|length }} transazioni</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card expense-card shadow-sm h-100 border-0" style="border-left: 4px solid #198754;">
+                <div class="card-body">
+                    <div class="kpi-label">Media per Spesa</div>
+                    <div class="kpi-value text-success">€ {{ average_expense|floatformat:2 }}</div>
+                    <small class="text-muted">Importo medio</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card expense-card shadow-sm h-100 border-0" style="border-left: 4px solid #0dcaf0;">
+                <div class="card-body">
+                    <div class="kpi-label">Quota Genitore A</div>
+                    <div class="kpi-value text-info">€ {{ parent_a_total|floatformat:2 }}</div>
+                    <small class="text-muted">{{ child.split_percentage_a|default:50 }}% ripartizione</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card expense-card shadow-sm h-100 border-0" style="border-left: 4px solid #dc3545;">
+                <div class="card-body">
+                    <div class="kpi-label">Quota Genitore B</div>
+                    <div class="kpi-value text-danger">€ {{ parent_b_total|floatformat:2 }}</div>
+                    <small class="text-muted">{{ child.split_percentage_b|default:50 }}% ripartizione</small>
+                </div>
             </div>
         </div>
     </div>
+    {% endif %}
+
+    <div class="row g-4">
+
+        <!-- 📊 GRAFICO CATEGORIE (solo Pro+) -->
+        <div class="col-lg-5">
+            <div class="card expense-card shadow-sm h-100 border-0">
+                <div class="card-header bg-white border-0 pt-3 pb-0">
+                    <h5 class="mb-0 fw-bold">🥧 Spese per Categoria</h5>
+                </div>
+                <div class="card-body">
+                    {% if is_pro_or_higher %}
+                        <div class="chart-wrapper">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                    {% else %}
+                        <div class="empty-state">
+                            <i>📊</i>
+                            <h6 class="fw-bold mb-2">Grafici disponibili nel piano Pro</h6>
+                            <p class="small text-muted mb-3">Visualizza report visivi, trend mensili e analisi comparative.</p>
+                            <a href="{% url 'pricing' %}" class="btn btn-sm btn-primary">Scopri i piani →</a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 👶 MANTENIMENTO FIGLI -->
+        <div class="col-lg-7">
+            <div class="card expense-card shadow-sm h-100 border-0">
+                <div class="card-header bg-white border-0 pt-3 pb-0 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0 fw-bold">👶 Mantenimento Figli</h5>
+                    <span class="badge bg-light text-dark border">{{ maintenance_info|length }} figli</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Figlio</th>
+                                    <th class="text-center">Età</th>
+                                    <th>Pagatore</th>
+                                    <th class="text-end">Mantenimento</th>
+                                    <th class="text-end">Spese Condivise</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for child_name, info in maintenance_info.items %}
+                                <tr>
+                                    <td>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="avatar-sm bg-primary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width:28px;height:28px;font-size:0.75rem;">
+                                                {{ child_name|slice:":1"|upper }}
+                                            </span>
+                                            <span class="fw-medium">{{ child_name }}</span>
+                                        </div>
+                                    </td>
+                                    <td class="text-center">
+                                        <span class="badge bg-light text-dark border">{{ info.age }} anni</span>
+                                    </td>
+                                    <td>
+                                        <small class="text-muted">{{ info.payer|default:"-" }}</small>
+                                    </td>
+                                    <td class="text-end fw-bold text-primary">€ {{ info.amount|floatformat:2 }}</td>
+                                    <td class="text-end text-secondary">€ {{ info.shared_expenses|floatformat:2 }}</td>
+                                </tr>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-4">
+                                        Nessun figlio configurato per il mantenimento
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 📋 LISTA SPESE -->
+    <div class="card expense-card shadow-sm mt-4 border-0">
+        <div class="card-header bg-white border-0 pt-3 pb-0 d-flex justify-content-between align-items-center">
+            <h5 class="mb-0 fw-bold">📋 Cronologia Spese</h5>
+            <span class="badge bg-light text-dark border">{{ expenses|length }} voci</span>
+        </div>
+        <div class="card-body p-0">
+            {% if expenses %}
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Data</th>
+                            <th>Categoria</th>
+                            <th>Importo</th>
+                            <th>Stato</th>
+                            <th>Inserita da</th>
+                            <th class="text-end">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for expense in expenses %}
+                        <tr>
+                            <td>{{ expense.expense_date|date:"d/m/Y" }}</td>
+                            <td>
+                                {% if expense.expense_type %}
+                                    <span class="badge" style="background-color:{{ expense.expense_type.color }}; color: #fff;">
+                                        {{ expense.expense_type.display_name }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ expense.category|default:"-" }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="fw-bold text-primary">€ {{ expense.amount|floatformat:2 }}</td>
+
+                            <!-- ✅ NUOVA CELLA STATO -->
+                            <td>
+                                {% if expense.status == "pending" %}
+                                    <span class="badge bg-warning text-dark">⏳ In Sospeso</span>
+                                {% elif expense.status == "accepted" %}
+                                    <span class="badge bg-success">✅ Accettata</span>
+                                {% elif expense.status == "rejected" %}
+                                    <span class="badge bg-danger">❌ Rifiutata</span>
+                                {% elif expense.status == "paid" %}
+                                    <span class="badge bg-info text-dark">💰 Pagata</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">{{ expense.get_status_display }}</span>
+                                {% endif %}
+                            </td>
+
+                            <td><small class="text-muted">{{ expense.created_by.first_name|default:expense.created_by.username }}</small></td>
+                            <td class="text-end">
+                                {% if expense.created_by == request.user %}
+                                    <div class="d-flex justify-content-end gap-1">
+                                        <a href="{% url 'expenses:edit_expense' expense.pk %}" class="action-btn edit" title="Modifica">✏️</a>
+                                        <a href="{% url 'expenses:delete_expense' expense.pk %}" class="action-btn delete" title="Elimina" onclick="return confirm('Eliminare?')">🗑️</a>
+                                    </div>
+                                {% else %}
+                                    <small class="text-muted">-</small>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <i>🧾</i>
+                <h6 class="fw-bold mb-2">Nessuna spesa registrata</h6>
+                <p class="small text-muted mb-3">Inizia aggiungendo la prima spesa per la tua famiglia.</p>
+                <a href="{% url 'expenses:add_expense' %}" class="btn btn-sm btn-success">➕ Aggiungi Spesa</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
 </div>
-{% endblock content %}
-{% block scripts %}
-<script src="{% static 'js/coparentmanager.js' %}"></script>
-{% endblock scripts %}
+{% endblock %}
 
+{% block extra_js %}
+<!-- Chart.js (caricato solo se necessario) -->
+{% if is_pro_or_higher and category_summary %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const ctx = document.getElementById('categoryChart');
+    if (!ctx) return;
 
+    // ✅ Dati dal backend (già filtrati per is_pro_or_higher nella view)
+    const labels = [{% for c in category_summary %}"{{ c.expense_type__display_name|default:'Altro'|escapejs }}",{% endfor %}];
+    const data = [{% for c in category_summary %}{{ c.total|floatformat:2 }},{% endfor %}];
+    const colors = [{% for c in category_summary %}'{{ c.expense_type__color|default:"#6c757d" }}',{% endfor %}];
 
-
-
+    new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+            labels: labels,
+            datasets: [{
+                data: data,
+                backgroundColor: colors,
+                borderWidth: 2,
+                borderColor: '#fff',
+                hoverOffset: 8
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            cutout: '65%',
+            plugins: {
+                legend: {
+                    position: 'right',
+                    labels: {
+                        boxWidth: 12,
+                        padding: 15,
+                        font: { size: 11 },
+                        generateLabels: function(chart) {
+                            const data = chart.data;
+                            if (data.labels.length && data.datasets.length) {
+                                return data.labels.map((label, i) => {
+                                    const value = data.datasets[0].data[i];
+                                    const total = data.datasets[0].data.reduce((a,b) => a+b, 0);
+                                    const percentage = total > 0 ? Math.round((value/total)*100) : 0;
+                                    return {
+                                        text: `${label} • ${percentage}%`,
+                                        fillStyle: data.datasets[0].backgroundColor[i],
+                                        strokeStyle: data.datasets[0].borderColor[i],
+                                        lineWidth: 2,
+                                        index: i
+                                    };
+                                });
+                            }
+                            return [];
+                        }
+                    }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const label = context.label || '';
+                            const value = context.parsed || 0;
+                            const total = context.dataset.data.reduce((a,b) => a+b, 0);
+                            const percentage = total > 0 ? Math.round((value/total)*100) : 0;
+                            return `${label}: € ${value.toFixed(2)} (${percentage}%)`;
+                        }
+                    }
+                }
+            }
+        }
+    });
+});
+</script>
+{% endif %}
+{% endblock %}

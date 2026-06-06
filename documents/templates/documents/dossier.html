@@ -1,58 +1,143 @@
-<h1>📁 Fascicolo Famigliare: {{ family.name }}</h1>
+{% extends "base.html" %}
+{% block title %}📁 Fascicolo Famigliare - {{ family.name }}{% endblock %}
 
-<hr>
+{% block extra_css %}
+/* 💬 Chat bubbles per dossier */
+<style>
+.chat-bubble {
+    max-width: 85%;
+    padding: 8px 12px;
+    border-radius: 16px;
+    font-size: 0.9rem;
+    position: relative;
+    word-wrap: break-word;
+}
 
-<div class="row">
+/* Mio messaggio: blu, allineato a destra */
+.chat-bubble.mine {
+    background: #0d6efd;
+    color: #fff;
+    border-bottom-right-radius: 4px;
+}
 
-    <!-- DOCUMENTI -->
-    <div class="col-md-6">
-        <h3>📄 Documenti</h3>
+/* Messaggio altrui: grigio, allineato a sinistra */
+.chat-bubble.other {
+    background: #f1f3f5;
+    color: #333;
+    border-bottom-left-radius: 4px;
+}
 
-        <ul class="list-group">
-            {% for doc in documents %}
-                <li class="list-group-item">
+/* Scrollbar personalizzata (opzionale, per Chrome/Safari) */
+.overflow-auto::-webkit-scrollbar {
+    width: 6px;
+}
+.overflow-auto::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 3px;
+}
+.overflow-auto::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+    border-radius: 3px;
+}
+.overflow-auto::-webkit-scrollbar-thumb:hover {
+    background: #a1a1a1;
+}
+</style>
+{% endblock %}
 
-                    <strong>{{ doc.title }}</strong>
+{% block content %}
+{% if is_pro_or_higher %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="fw-bold mb-0">📁 Fascicolo Famigliare: {{ family.name }}</h2>
+        <div>
+            {% if is_pro_or_higher %}
+                <a href="{% url 'documents:dossier_pdf' %}" class="btn btn-outline-primary">📥 Scarica PDF</a>
+            {% endif %}
+            <a href="{% url 'documents:documents_list' %}" class="btn btn-outline-secondary ms-2">← Ritorna ai documenti</a>
+        </div>
+    </div>
+    <div class="row g-4">
+        <!-- Documenti -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100">
+                <div class="card-header fw-bold d-flex justify-content-between">
+                    📄 Documenti Recenti
+                    <a href="{% url 'documents:documents_list' %}" class="btn btn-sm btn-outline-secondary">Vedi tutti →</a>
+                </div>
+                <ul class="list-group list-group-flush">
+                    {% for doc in documents %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span>{{ doc.title }} <span class="badge bg-info ms-2">{{ doc.get_status_display }}</span></span>
+                            <a href="{% url 'documents:documents_detail' doc.id %}" class="btn btn-sm btn-outline-primary">Apri</a>
+                        </li>
+                    {% empty %}
+                        <li class="list-group-item text-muted text-center py-3">Nessun documento caricato</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+        <!-- 💬 CHAT RECENTE (allineamento chat + scrollbar + limite 10) -->
+        <div class="col-lg-6">
+            <div class="card shadow-sm h-100 d-flex flex-column">
+                <div class="card-header fw-bold d-flex justify-content-between align-items-center">
+                    💬 Chat Recente
+                    <a href="{% url 'chat:chat_home' %}" class="btn btn-sm btn-outline-secondary">Vai alla chat →</a>
+                </div>
 
-                    <span class="badge bg-info">
-                        {{ doc.get_status_display }}
-                    </span>
+                <!-- Container con scrollbar verticale -->
+                <div class="card-body p-3 flex-grow-1 overflow-auto" style="max-height: 320px;">
 
-                    <a href="{% url 'documents:detail' doc.id %}"
-                       class="btn btn-sm btn-outline-primary mt-2">
-                        Apri
-                    </a>
+                    {% for msg in messages %}
+                        <!-- ✅ MESSAGGIO: allineato a destra se mio, sinistra se altrui -->
+                        <div class="d-flex {% if msg.sender == request.user %}justify-content-end{% else %}justify-content-start{% endif %} mb-2">
 
+                            <div class="chat-bubble {% if msg.sender == request.user %}mine{% else %}other{% endif %}">
+                                <!-- Mittente (solo per messaggi altrui in chat famiglia) -->
+                                {% if msg.sender != request.user %}
+                                    <small class="fw-bold text-muted d-block mb-1" style="font-size: 0.75rem;">
+                                        {{ msg.sender.first_name|default:msg.sender.username }}
+                                    </small>
+                                {% endif %}
+
+                                <!-- Contenuto messaggio -->
+                                <p class="mb-1 small" style="white-space: pre-wrap; line-height: 1.3;">
+                                    {{ msg.content|truncatechars:120 }}
+                                </p>
+
+                                <!-- Timestamp -->
+                                <small class="{% if msg.sender == request.user %}text-white-50{% else %}text-muted{% endif %}" style="font-size: 0.65rem;">
+                                    {{ msg.created_at|date:"H:i" }}
+                                </small>
+                            </div>
+                        </div>
+                    {% empty %}
+                        <p class="text-center text-muted small py-4 mb-0">Nessun messaggio recente</p>
+                    {% endfor %}
+
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- Eventi -->
+    <div class="card shadow-sm mt-4">
+        <div class="card-header fw-bold d-flex justify-content-between">
+            📅 Prossimi Eventi
+            <a href="{% url 'calendar:calendar_view' %}" class="btn btn-sm btn-outline-secondary">Calendario →</a>
+        </div>
+        <ul class="list-group list-group-flush">
+            {% for ev in events %}
+                <li class="list-group-item d-flex justify-content-between align-items-center">
+                    <span><strong>{{ ev.title }}</strong> <small class="text-muted ms-2">{{ ev.start_time|date:"d/m H:i" }}</small></span>
+                    <span class="badge bg-secondary">{{ ev.event_type|default:"Evento" }}</span>
                 </li>
+            {% empty %}
+                <li class="list-group-item text-muted text-center py-3">Nessun evento programmato</li>
             {% endfor %}
         </ul>
     </div>
-
-    <!-- CHAT -->
-    <div class="col-md-6">
-        <h3>💬 Chat recente</h3>
-
-        {% for msg in messages %}
-            <div class="card mb-2">
-                <div class="card-body">
-                    <strong>{{ msg.sender }}</strong><br>
-                    {{ msg.content|truncatechars:80 }}
-                </div>
-            </div>
-        {% endfor %}
-    </div>
-
 </div>
-
-<hr>
-
-<h3>📅 Eventi</h3>
-
-<ul class="list-group">
-    {% for ev in events %}
-        <li class="list-group-item">
-            <strong>{{ ev.title }}</strong><br>
-            {{ ev.start_time }}
-        </li>
-    {% endfor %}
-</ul>
+{% else %}
+    {% include "includes/upgrade_placeholder.html" with title="Fascicolo Famigliare" feature="panoramica integrata documenti/chat/eventi" %}
+{% endif %}
+{% endblock %}

@@ -19,10 +19,14 @@
             {{ form.role|as_crispy_field }}
         {% endif %}
 
+        {# ✅ AGGIUNGI QUESTO CAMPO #}
+        {{ form.target_family|as_crispy_field }}
+
         {{ form.channel|as_crispy_field }}
         {{ form.email|as_crispy_field }}
         {{ form.phone|as_crispy_field }}
         {{ form.display_name|as_crispy_field }}
+        {{ form.message|as_crispy_field }}
 
         <button type="submit" class="btn btn-success btn-style">
             📩 Invia invito
@@ -42,7 +46,7 @@ document.addEventListener("DOMContentLoaded", function() {
             emailField.required = true;
             emailField.disabled = false;
             phoneField.required = false;
-            phoneField.disabled = true;
+            phoneField.disabled = false;
             phoneField.value = "";
         } else {
             emailField.required = false;

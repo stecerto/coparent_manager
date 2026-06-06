@@ -1,0 +1,59 @@
+<div class="tab-pane fade" id="pricing-mediatori" role="tabpanel">
+    <div class="row g-4 justify-content-center">
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Mediator Base</h5>
+                    <h2 class="display-6 fw-bold">€24,99<span class="fs-6 text-muted">/mese</span></h2>
+                    <p class="text-muted small">Dopo i 14 giorni di prova</p>
+                    <p class="text-muted">Fino a 5 nuclei</p>
+                    <ul class="list-unstyled text-start mb-4">
+                        <li>✅ Spazio neutro condiviso</li>
+                        <li>✅ Chat moderata</li>
+                        <li>✅ Note di mediazione</li>
+                        <li>❌ Report avanzati</li>
+                    </ul>
+                    <a href="{% url 'accounts:register' %}?role={{ role }}&plan=base" class="btn btn-outline-success w-100">
+                        🎁 Prova 14 giorni gratis
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 shadow border-success">
+                <div class="card-header bg-success text-white text-center fw-bold">⭐ MEDIATORE PRO</div>
+                <div class="card-body text-center">
+                    <h5 class="card-title">Mediator Pro</h5>
+                    <h2 class="display-6 fw-bold">€49,99<span class="fs-6 text-muted">/mese</span></h2>
+                    <p class="text-muted small">Dopo i 14 giorni di prova</p>
+                    <p class="text-muted">Fino a 15 nuclei</p>
+                    <ul class="list-unstyled text-start mb-4">
+                        <li>✅ Tutto di Base</li>
+                        <li>✅ Verbali strutturati</li>
+                        <li>✅ Timeline concordata</li>
+                        <li>✅ Export per CTU/CTP</li>
+                    </ul>
+                    <a href="{% url 'accounts:register' %}?role={{ role }}&plan=pro" class="btn btn-success w-100">
+                        🎁 Prova 14 giorni gratis
+                    </a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card h-100 shadow-sm border">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Centro Mediazione</h5>
+                    <h2 class="display-6 fw-bold">Custom</h2>
+                    <p class="text-muted">Per enti e associazioni</p>
+                    <ul class="list-unstyled text-start mb-4">
+                        <li>✅ Multi-mediatore</li>
+                        <li>✅ Dashboard amministrativa</li>
+                        <li>✅ Whitelabel opzionale</li>
+                        <li>✅ Formazione inclusa</li>
+                    </ul>
+                    <a href="mailto:info@coparentmanager.it" class="btn btn-outline-dark w-100">Contattaci</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

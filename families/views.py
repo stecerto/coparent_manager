@@ -1,48 +1,63 @@
-import logging
-
-from crispy_forms.layout import HTML
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.decorators import login_required
-from django.contrib.auth.decorators import user_passes_test
-from django.contrib.auth.models import User
-from django.db import transaction
-from django.db.models import Sum
-from django.http import JsonResponse, HttpResponse
-from django.shortcuts import get_object_or_404
-from django.shortcuts import render, redirect
-from django.template.loader import render_to_string
-
-from accounts.forms import UserForm, UserProfileForm
-from accounts.models import UserProfile
-from calendar_app.services.calendar_service import get_family_events
-from core.choices import RoleChoices
-from families.decorators import role_required
-from documents.models import AuditLog, Document
-from expenses.models import Expense
-from expenses.services.expences_service import create_expense
-from families.forms import InvitationForm, ChildSupportAgreementForm
-from families.models import FamilyMember, Invitation, ChildSupportAgreement, Family
-from families.services.balance_service import calculate_family_balance
-from families.services.invitation_service import accept_invitation, \
-    build_whatsapp_link
-from families.utils import calculate_setup_progress, get_user_role_in_family
-from families.utils import get_family_of_user, is_lawyer
-from families.utils import is_parent
-from accounts.models import User
-
 # families/views.py
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, get_object_or_404, redirect
-from django.db.models import Sum, Count, Q, F
-from django.http import HttpResponse
-from django.utils import timezone
 import csv
-from datetime import datetime, timedelta
+import logging
+from datetime import timedelta
 
-from families.models import FamilyMember, Family
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import redirect
+from django.shortcuts import get_object_or_404
+from django.contrib.auth.decorators import login_required
+from families.models import FamilyMember
+from django.contrib.auth import get_user_model
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from families.models import Invitation
+from families.services.invitation_service import accept_invitation
+from families.services.email_service import (
+    send_invitation_email,
+    build_invitation_context
+)
+import logging
+from django.contrib import messages
+from django.contrib.auth import get_user_model
+from django.contrib.auth.decorators import login_required
+from django.db import transaction
+from django.db.models import Sum, Count
+from django.http import HttpResponse, JsonResponse, HttpResponseForbidden
+from django.shortcuts import render, redirect, get_object_or_404
+from django.template.loader import render_to_string
+from django.utils import timezone
+from django.template.loader import render_to_string
+from weasyprint import HTML
+
+# App locali
+from accounts.forms import UserForm, UserProfileForm
+from accounts.models import User, UserProfile
+from calendar_app.services.calendar_service import get_family_events
+from chat.models import FamilyMessage
 from core.choices import RoleChoices
+from documents.models import AuditLog, Document
 from expenses.models import Expense, ExpenseCategory
+from families.decorators import role_required
+from families.forms import InvitationForm, ChildSupportAgreementForm
+from families.models import Family, Invitation, ChildSupportAgreement, FamilyMember
+from families.services.balance_service import calculate_family_balance
+from families.services.email_service import send_invitation_email, build_invitation_context
+from families.services.invitation_service import (
+    build_whatsapp_link,
+    accept_invitation
+)
+from families.utils import (
+    calculate_setup_progress,
+    get_active_family,
+    can_lawyer_add_family,
+    generate_family_name,
+    get_target_role,
+    get_lawyer_limits,
+    get_family_of_user
+)
+
+logger = logging.getLogger(__name__)
 
 
 @login_required
@@ -214,8 +229,7 @@ def lawyer_expenses_dashboard_view(request, family_id=None):
 
 
 def export_expenses_pdf(expenses_qs, family, stats):
-    from django.template.loader import render_to_string
-    from weasyprint import HTML
+
 
     html = render_to_string('families/lawyer/expenses_pdf.html', {
         'expenses': expenses_qs,
@@ -258,31 +272,65 @@ def export_expenses_csv(expenses_qs, family):
     return response
 
 
-@user_passes_test(is_lawyer)
-def lawyer_dashboard(request):
-    pass
 
+logger = logging.getLogger(__name__)
+@login_required
+def family_dashboard(request):  # ← Assicurati che prenda 'request'
+    logger.info(
+        f"🔍 family_dashboard: GET={request.GET.get('family_id')}, SESSION={request.session.get('active_family_id')}")
+    user = request.user
+    # ✅ PASSA request a get_family_of_user
+    family = get_family_of_user(user, request=request)  # ← AGGIUNGI request=request
 
-@user_passes_test(is_parent)
-def family_dashboard(request):
-    pass
+    if not family:
+        return redirect("families:setup")
+
+    active_membership = FamilyMember.objects.filter(
+        family=family, user=user
+    ).select_related('user').first()
+
+    if active_membership:
+        role_raw = getattr(active_membership.role, 'value', active_membership.role)
+        role_label = str(role_raw).replace('_', ' ').title()
+    else:
+        role_label = ""
+
+    context = {
+        "family": family,
+        # ✅ AGGIUNGI QUESTI DUE PER IL BADGE DINAMICO
+        "active_family": family,
+        "active_family_membership": active_membership,
+        # ✅ Mantieni anche le variabili semplificate per il template
+        "active_family_name": family.name,
+        "active_role_label": role_label,
+        "active_is_parent_a": active_membership.role == "parent_a" if active_membership else False,
+        "active_is_lawyer_a": active_membership.role == "lawyer_a" if active_membership else False,
+    }
+    return render(request, "families/family_dashboard.html", context)
+
 
 @login_required
 def setup_view(request):
     user = request.user
     profile, _ = UserProfile.objects.get_or_create(user=user)
-    family = get_family_of_user(user)
-    if not family:
-        messages.warning(request, "Nessuna famiglia associata.")
-        return redirect("home")
+
+    # ✅ CORRETTO: usa is_professional (True per lawyer, mediator, consultant)
+    is_professional = profile.role in [RoleChoices.LAWYER, RoleChoices.MEDIATOR, RoleChoices.CONSULTANT]
+
+    # ✅ AVVOCATI: non richiedono famiglia
+    family = None if is_professional else get_family_of_user(user, request=request)
+
+
 
     # 📝 Form Utente & Profilo
     form_user = UserForm(request.POST or None, instance=user)
-    form_profile = UserProfileForm(request.POST or None, instance=profile, role=user.profile.role if hasattr(user, 'userprofile') else None)
 
-    # 👶 Formset Figli (modelformset_factory è più sicuro di formset_factory)
-    # ✅ PRE-CALCOLA I FIGLI ATTIVI (così il template è semplice)
-    #active_children = family.children.filter(is_active=True).order_by("birth_date", "name")
+    # ✅ CORRETTO: passa profile.role (non user.profile.role)
+    form_profile = UserProfileForm(
+        request.POST or None,
+        instance=profile,
+        role=profile.role  # ← CORRETTO: passa 'lawyer', 'mediator', ecc.
+    )
 
     if request.method == "POST":
         if form_user.is_valid() and form_profile.is_valid():
@@ -291,15 +339,34 @@ def setup_view(request):
             profile.setup_complete = True
             profile.save()
             messages.success(request, "✅ Dati personali salvati!")
-            return redirect("families:summary")
+
+            # ✅ CREA FAMIGLIA PER GENITORI (se non esiste)
+            if not is_professional and not family:
+                family_name = generate_family_name(user)
+                family = Family.objects.create(
+                    name=family_name,
+                    created_by=user,
+                    creator_role="parent_a"
+                )
+                FamilyMember.objects.create(
+                    family=family,
+                    user=user,
+                    role="parent_a",
+                    is_primary=True
+                )
+                messages.success(request, f"✅ Famiglia '{family_name}' creata!")
+            else:
+                messages.success(request, "✅ Dati personali salvati!")
+            # ✅ Redirect in base al ruolo
+            if is_professional:
+                return redirect("families:professional_dashboard")
+            else:
+                return redirect("families:summary")
         else:
             messages.error(request, "⚠️ Correggi gli errori evidenziati")
 
     # ✅ Calcola progresso setup
-    progress_pct, completed, missing,important_fields, labels = calculate_setup_progress(user)
-    total_fields = len([f for f in ['address', 'phone', 'birth_place'] if True])  # Base
-    if getattr(profile, 'role', None) == 'lawyer':
-        total_fields += 1  # + firm_name
+    progress_pct, completed, missing, important_fields, labels = calculate_setup_progress(user)
 
     progress_message = {
         100: "🎉 Profilo completo! Pronto per usare CoParentManager.",
@@ -307,23 +374,30 @@ def setup_view(request):
         50: "👍 Buon lavoro! Continua così.",
     }.get(progress_pct // 25 * 25, "🚀 Inizia compilando i primi campi.")
 
+    # ✅ active_children solo se family esiste
+    active_children = family.children.filter(is_active=True).order_by("birth_date", "name") if family else []
+
     context = {
         "form_user": form_user,
         "form_profile": form_profile,
         "family": family,
-        "active_children": family.children.filter(is_active=True).order_by("birth_date", "name"),  # ✅ PASSA QUESTO AL TEMPLATE
+        "is_lawyer": is_professional,  # ✅ CORRETTO: usa is_professional
+        "is_professional": is_professional,  # ✅ Aggiungiamo anche questa per chiarezza
+        "active_children": active_children,
         "is_edit_mode": True,
-        "membership": FamilyMember.objects.filter(family=family, user=request.user).first(),
+        "membership": FamilyMember.objects.filter(family=family, user=request.user).first() if family else None,
 
         "setup_progress_pct": progress_pct,
         "setup_completed_count": completed,
-        "setup_missing_count": missing,  # ✅ PASSA QUESTO
-        "setup_total_fields": len(important_fields),  # o calcolalo qui
+        "setup_missing_count": missing,
+        "setup_total_fields": len(important_fields),
         "setup_completed_labels": labels,
         "setup_progress_message": progress_message,
     }
 
-    return render(request, "families/setup.html", context)
+    # ✅ CORRETTO: usa is_professional per decidere il template
+    template = "families/lawyer_setup.html" if is_professional else "families/setup.html"
+    return render(request, template, context)
 
 
 
@@ -380,7 +454,7 @@ def family_summary(request):
         if user_role in ['parent_a', 'parent_b']:
             return redirect("families:family_dashboard")
         elif user_role in ['lawyer_a', 'lawyer_b']:
-            return redirect("families:lawyer_dashboard")
+            return redirect("families:professional_dashboard")
         else:
             return redirect("families:summary")  # Fallback
 
@@ -461,121 +535,168 @@ def confirm_invitation_view(request, token):
 
 
 # _______________________________________________________________________________________
-from families.services.email_service import (
-    send_invitation_email,
-    build_invitation_context
-)
+
 
 
 @login_required
 @transaction.atomic
 def invite_member_view(request):
+    # ✅ Recupera famiglia attiva (per genitori) o None (per professionisti)
+    family = get_family_of_user(request.user, request=request)
 
-    family = get_family_of_user(request.user)
-    if not family:
-        messages.error(request, "⚠️ Nessuna famiglia associata")
-        return redirect("families:setup")
+    membership = FamilyMember.objects.filter(family=family, user=request.user).first() if family else None
+    inviter_role = membership.role if membership else request.user.profile.role
 
-    #profile = request.user.userprofile
+    # ✅ FIX CRITICO: Se l'invitante è un professionista, IGNORA completamente la famiglia dalla sessione
+    # I professionisti devono selezionare la famiglia dal dropdown (per mediator/consultant)
+    # o non selezionarla affatto (per parent - creerà nuova famiglia)
+    if request.user.profile.role in ['lawyer', 'mediator', 'consultant']:
+        form_family = None  # ✅ Nessuna famiglia dalla sessione per i professionisti
+        logger.info(f"👔 Professionista {request.user.email} - famiglia dalla sessione IGNORATA")
+    else:
+        form_family = family  # ✅ Per i genitori, usa la famiglia dalla sessione
+        logger.info(
+            f"👨‍👩‍👧 Genitore {request.user.email} - famiglia dalla sessione: {family.name if family else 'None'}")
 
-    # ✅ DEBUG: Stampa cosa sta succedendo
-    membership = FamilyMember.objects.filter(family=family, user=request.user).first()
-    user_role = membership.role if membership else None
-    #print(f"🔍 DEBUG INVITO:")
-    #print(f"  - User: {request.user.email}")
-    #print(f"  - Family: {family.name if family else None}")
-    #print(f"  - Membership: {membership.role if membership else 'NONE'}")
-    #print(f"  - Occupied roles: {set(family.members.values_list('role', flat=True)) if family else set()}")
+    # ✅ 1. CONTROLLO LIMITI DELL'INVITANTE (se è un professionista)
+    if request.method == "POST":
+        invited_role_base = request.POST.get("role")  # 'parent', 'mediator', 'consultant'
 
-    # ✅ Passa family e user_role al form
+        # Controlla i limiti SOLO se chi invita è un professionista
+        if request.user.profile.role in ['lawyer', 'mediator', 'consultant']:
+            limits = get_lawyer_limits(request.user)
+
+            if limits:
+                # Se sta invitando un genitore, consuma uno slot "famiglie"
+                if invited_role_base == 'parent' and limits['families']['current'] >= limits['families']['limit']:
+                    messages.error(request,
+                                   f"⚠️ Hai raggiunto il limite di {limits['families']['limit']} famiglie per il tuo piano.")
+                    return redirect("families:professional_dashboard")
+
+                # Se sta invitando un mediatore, consuma uno slot "mediatori"
+                elif invited_role_base == 'mediator' and limits['mediators']['current'] >= limits['mediators']['limit']:
+                    messages.error(request,
+                                   f"⚠️ Hai raggiunto il limite di {limits['mediators']['limit']} mediatori per il tuo piano.")
+                    return redirect("families:professional_dashboard")
+
+                # Se sta invitando un consulente, consuma uno slot "consulenti"
+                elif invited_role_base == 'consultant' and limits['consultants']['current'] >= limits['consultants'][
+                    'limit']:
+                    messages.error(request,
+                                   f"⚠️ Hai raggiunto il limite di {limits['consultants']['limit']} consulenti per il tuo piano.")
+                    return redirect("families:professional_dashboard")
+
+    # ✅ 2. Istanza il form con inviter
     form = InvitationForm(
         request.POST or None,
-        user_role=user_role,
-        family=family  # 🔑 Fondamentale per filtrare i ruoli
+        user_role=inviter_role,
+        family=form_family,  # ✅ Usa form_family (None per professionisti)
+        inviter=request.user
     )
 
+    # ✅ 3. PROCESSA IL FORM VALIDO
     if request.method == "POST" and form.is_valid():
         display_name = form.cleaned_data.get("display_name")
+        invited_role_base = form.cleaned_data.get("role")  # Es: 'parent', 'mediator', 'consultant'
 
+        # ✅ Il form ha già gestito target_family:
+        # - None se role == 'parent'
+        # - Famiglia valida se role == 'mediator' o 'consultant'
+        target_family = form.cleaned_data.get("target_family")
+
+        # 🧠 LOGICA RUOLO
+        if request.user.profile.role in ['parent', 'parent_a', 'parent_b']:
+            # ✅ L'invitante è un genitore: usa la funzione get_target_role
+            target_role = get_target_role(invited_role_base, inviter_role)
+        else:
+            # ✅ L'invitante è un professionista: usa la logica nuova
+            if invited_role_base == 'parent':
+                target_role = 'parent_a'  # Sempre parent_a per nuovi genitori
+            else:
+                # Per mediator/consultant, target_family è garantito essere valido dal form
+                inviter_membership = FamilyMember.objects.filter(user=request.user, family=target_family).first()
+                if inviter_membership and '_b' in inviter_membership.role:
+                    target_role = f"{invited_role_base}_b"
+                else:
+                    target_role = f"{invited_role_base}_a"
+
+        # 💾 SALVATAGGIO
         with transaction.atomic():
-            # ✅ Il form ha già calcolato il ruolo corretto → usalo direttamente
-            invitation = form.save(
-                commit=False,
-                family=family,
-                sender=request.user
-            )
-            target = invitation.email or invitation.phone
+            invitation = form.save(commit=False)
+            invitation.family = target_family  # ✅ Sarà None per parent, o ID valido per altri
+            invitation.invited_by = request.user
+            invitation.role = target_role
             invitation.display_name = display_name
             invitation.save()
 
-        # 🔥 OUTSIDE TRANSACTION
+        target_contact = invitation.email or invitation.phone
+
+        # 🔥 INVIO EMAIL E REDIRECT
         if invitation.channel == "email":
             email_context = build_invitation_context(invitation, request.user, request.user.profile)
             send_invitation_email(request, invitation, context_extra=email_context)
 
-            role_label = dict(RoleChoices.choices).get(invitation.role, invitation.role)
-            messages.success(request, f"✅ Invito inviato a {target} come {role_label}")
-            return redirect("families:family_dashboard")
+            role_label = dict(RoleChoices.choices).get(target_role, target_role)
+            messages.success(request, f"✅ Invito inviato a {target_contact} come {role_label}")
+            return redirect("families:professional_dashboard")
 
         if invitation.channel == "whatsapp":
             wa_link = build_whatsapp_link(request, invitation)
-            messages.success(request, f"✅ Invito inviato a {target}!")
+            messages.success(request, f"✅ Link WhatsApp generato per {target_contact}!")
             return redirect(wa_link)
 
+    # ✅ 4. RENDERIZZA IL FORM (GET o POST non valido)
     return render(request, "families/invite_member.html", {"form": form})
 
 
 # =========================
 # ACCETTA INVITO
 # =========================
-import logging
-from django.contrib import messages
-from families.services.invitation_service import accept_invitation
-logger = logging.getLogger(__name__)
-# families/views.py - accept_invite_view
+
+
 def accept_invite_view(request, token):
+    # 1. Normalizza il token
 
 
+    # 2. Cerca l'invito
     invitation = Invitation.objects.filter(
         token=token,
         status="pending"
-    ).select_related('family','invited_by').first()
+    ).select_related('family', 'invited_by').first()
 
+    context = {"invitation": invitation}
+
+    # 3. Se non esiste
     if not invitation:
-        return render(request, "accounts/activation_invalid.html", {"reason": "invalid"})
+        context["reason"] = "invalid"
+        return render(request, "accounts/activation_invalid.html", context)
 
+    # 4. Se è scaduto
     if invitation.is_expired:
         invitation.mark_expired()
-        return render(request, "accounts/activation_invalid.html", {"reason": "expired"})
+        context["reason"] = "expired"
+        return render(request, "accounts/activation_invalid.html", context)
 
-    # ✅ CONTROLLA SE L'EMAIL È GIÀ REGISTRATA
-    from django.contrib.auth import get_user_model
-    User = get_user_model()
-    existing_user = User.objects.filter(email=invitation.email).first()
-
-    if existing_user:
-        # ✅ Email già registrata → mostra pagina intermedia
-        return render(request, "families/invite_existing_account.html", {
-            "invitation": invitation,
-            "existing_user": existing_user
-        })
-
-    # ✅ SE L'UTENTE È GIÀ LOGGATO → ACCETTA SUBITO
+    # ✅ 5. SE L'UTENTE È LOGGATO → ACCETTA SUBITO (priorità massima!)
     if request.user.is_authenticated:
         try:
             accept_invitation(invitation, request.user)
-            messages.success(request, f"✅ Sei stato aggiunto a '{invitation.family.name}'")
-            # Redirect in base al ruolo
-            if request.user.profile.role in RoleChoices.lawyer_roles():
-                return redirect('families:lawyer_dashboard')
+            messages.success(request,
+                             f"✅ Sei stato aggiunto a '{invitation.family.name}' come {invitation.get_role_display()}")
+
+            # Redirect in base al ruolo generico
+            if request.user.profile.role in ['lawyer', 'mediator', 'consultant']:
+                return redirect('families:professional_dashboard')
             return redirect('families:family_dashboard')
         except Exception as e:
             messages.error(request, f"⚠️ Errore nell'accettazione: {e}")
             return redirect('home')
 
-    # ✅ SE NON È LOGGATO → SALVA TOKEN E REDIRIGI AL LOGIN
-    request.session["pending_invite_token"] = str(token)
-    return redirect('accounts:login')
+    # ✅ 6. SE NON È LOGGATO → salva token e redirect al login
+    request.session['pending_invite_token'] = str(invitation.token)
+
+    # Mostra la pagina di invito con il pulsante "Registrati"
+    return render(request, "families/invitation_landing.html", context)
 
 def register_member_after_signup(request, user):
     invitation_id = request.session.get("invitation_id")
@@ -599,7 +720,7 @@ def register_member_after_signup(request, user):
 def resend_invitation_view(request, invitation_id):
     invitation = Invitation.objects.filter(
         id=invitation_id,
-        family=get_family_of_user(request.user)
+        family=get_family_of_user(request.user, request=request)
     ).first()
 
     if not invitation or invitation.status != "pending":
@@ -638,7 +759,7 @@ def cancel_invitation_view(request, invitation_id):
 def dashboard_view(request):
     user = request.user
     profile, _ = UserProfile.objects.get_or_create(user=user)
-    family = get_family_of_user(request.user)
+    family = get_family_of_user(user, request=request)
     if not family:
         return redirect("families:setup")
     expenses = family.expenses.all().order_by("-expense_date")[:5]
@@ -649,6 +770,13 @@ def dashboard_view(request):
 
     context = {
         "family": family,
+        # ✅ Esplícito per la topbar (sovrascrive il context processor se necessario)
+        "active_family": family,
+        "active_family_name": family.name,
+        "active_family_membership": FamilyMember.objects.filter(
+            family=family, user=user
+        ).select_related('user').first(),
+        # ... resto del tuo context ...
         "children": children,
         "expenses": expenses,
         "expenses_count": family.expenses.count(),
@@ -666,7 +794,7 @@ def dashboard_view(request):
 
 @login_required
 def create_support_agreement_view(request):
-    family = get_family_of_user(request.user)
+    family = get_family_of_user(request.user, request=request)
     if not family: return redirect("families:setup")
 
     if request.method == "POST":
@@ -687,7 +815,7 @@ def create_support_agreement_view(request):
 
 @login_required
 def edit_support_agreement_view(request, agreement_id):
-    family = get_family_of_user(request.user)
+    family = get_family_of_user(request.user, request=request)
     agreement = get_object_or_404(ChildSupportAgreement, pk=agreement_id, family=family)
 
     if request.method == "POST":
@@ -705,7 +833,7 @@ def edit_support_agreement_view(request, agreement_id):
 
 @login_required
 def delete_support_agreement_view(request, agreement_id):
-    family = get_family_of_user(request.user)
+    family = get_family_of_user(request.user, request=request)
     agreement = get_object_or_404(ChildSupportAgreement, pk=agreement_id, family=family)
 
     if request.method == "POST":
@@ -742,7 +870,7 @@ def approve_expense_view(request, expense_id):
 
 @login_required
 def expenses_by_child(request):
-    family = get_family_of_user(request.user)
+    family = get_family_of_user(request.user, request=request)
     if not family:
         return JsonResponse({"error": "Nessuna famiglia"}, status=400)
 
@@ -854,7 +982,7 @@ def summary_view(request):
 '''
 @login_required
 def family_timeline_view(request):
-    family = get_family_of_user(request.user)
+    family = get_family_of_user(request.user, request=request)
 
     logs = AuditLog.objects.filter(
         family=family
@@ -927,4 +1055,131 @@ def lawyer_dashboard_view(request):
             'total_children': active_children,
         }
     }
-    return render(request, "families/lawyer/lawyer_dashboard.html", context) # 'families/lawyer/lawyer_dashboard.html', context)
+    return render(request, "families/professional_dashboard.html", context) # 'families/lawyer/lawyer_dashboard.html', context)
+
+
+@login_required
+def professional_dashboard(request):
+    """Dashboard per Avvocati, Mediatori e Consulenti con gestione multi-famiglia"""
+    user = request.user
+    # ✅ Usa la nuova funzione. Se la sessione è vuota, torna a get_family_of_user()
+    active_family = get_active_family(request)
+    active_membership = None
+    if active_family:
+        active_membership = FamilyMember.objects.filter(
+            family=active_family, user=request.user
+        ).select_related('user').first()
+
+    active_family_membership = None
+    if active_family:
+        active_family_membership = FamilyMember.objects.filter(
+            family=active_family, user=request.user
+        ).select_related('user').first()
+
+    # ✅ Ruoli professionali abilitati alla multi-gestione
+    PRO_ROLES = [
+        RoleChoices.LAWYER_A, RoleChoices.LAWYER_B,
+        RoleChoices.MEDIATOR, RoleChoices.CONSULTANT
+    ]
+
+    memberships = FamilyMember.objects.filter(
+        user=user,
+        role__in=PRO_ROLES
+    ).select_related('family').order_by('family__name')
+
+    families_data = []
+
+    for mem in memberships:
+        family = mem.family
+
+        # FamilyMessage
+        # Approssimiamo i "non letti" con i messaggi privati degli ultimi 7 giorni.
+        pending_exp = Expense.objects.filter(family=family, status='pending').count()
+
+        recent_cutoff = timezone.now() - timedelta(days=7)
+        unread_msg = FamilyMessage.objects.filter(
+            family=family,
+            recipient=user,
+            created_at__gte=recent_cutoff  # ✅ Campo esistente, evita FieldError
+        ).count()
+
+        # 👶 Fetch figli (query ottimizzata)
+        children_qs = family.children.filter(is_active=True).only("name", "surname")
+        children_count = children_qs.count()
+        children_names = ", ".join([f"{c.name} {c.surname}" for c in children_qs])
+
+        # Etichetta ruolo (fallback sicuro)
+        if hasattr(mem, 'get_role_display'):
+            role_label = mem.get_role_display()
+        else:
+            raw_role = getattr(mem.role, 'value', mem.role)
+            role_label = str(raw_role).replace('_', ' ').title()
+
+        families_data.append({
+            'family': family,
+            'role_label': role_label,
+            'pending_expenses': pending_exp,
+            'unread_messages': unread_msg,
+            'children_count': children_count,
+            'children_names': children_names,
+        })
+
+
+    context = {
+        'families_data': families_data,
+        'active_family': active_family,
+        'active_family_membership': active_family_membership,
+        'selected_family_data': {
+            'family': active_family,
+            'membership': active_family_membership,
+            'client': None,
+        } if active_family else None,
+        'stats': {
+           'total_families': len(families_data),
+           'total_children': sum(item['family'].children.filter(is_active=True).count() for item in families_data),
+           'pending_expenses_total': sum(item['pending_expenses'] for item in families_data),
+       }
+    }
+
+    return render(request, 'families/professional_dashboard.html', context)
+
+
+# families/views.py
+
+
+@login_required
+def set_active_family(request, family_id):
+    family = get_object_or_404(Family, id=family_id)
+
+    if not FamilyMember.objects.filter(user=request.user, family=family).exists():
+        return HttpResponseForbidden("Non hai accesso a questa famiglia")
+
+    request.session['active_family_id'] = family_id
+    request.session.modified = True
+
+    if hasattr(request.session, 'save'):
+        request.session.save()
+
+    #redirect_url = f'families:family_dashboard?family_id={family_id}'
+    return redirect(f'/families/dashboard/?family_id={family_id}')
+    #return redirect(redirect_url)
+
+
+# families/views.py
+
+
+@login_required
+def lawyer_exit_family_context(request):
+    """Resetta il contesto famiglia per avvocati/mediatori/consulenti"""
+    # Pulisci la sessione
+    if 'active_family_id' in request.session:
+        del request.session['active_family_id']
+
+    # Redirect pulito alla dashboard avvocato (senza ?family_id)
+    return redirect('families:professional_dashboard')
+
+@login_required
+def exit_family_context(request):
+    """Pulisce il contesto famiglia e torna alla dashboard avvocato"""
+    request.session.pop('active_family_id', None)
+    return redirect('families:professional_dashboard')

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+{% load static %}
+
+<html lang="it">
+<head>
+    <meta charset="utf-8">
+    <title>Scheda {{ child.name }} {{ child.surname }}</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 37.5mm 15mm 30mm 15mm;
+            @top-center { content: element(header); }
+            @bottom-center { content: element(footer); }
+        }
+        .pdf-header { position: running(header); text-align: center; border-bottom: 2px solid #0d6efd; padding-bottom: 8px; margin-bottom: 12px; }
+        .pdf-logo { max-height: 60px; margin-bottom: 4px; }
+        .pdf-title { font-size: 15pt; font-weight: bold; color: #0d6efd; margin: 4px 0; }
+        .pdf-meta { font-size: 8pt; color: #555; }
+        .pdf-footer { position: running(footer); text-align: center; font-size: 7pt; color: #666; border-top: 1px solid #ccc; padding-top: 5px; margin-top: 8px; }
+
+        body { font-family: 'Segoe UI', Arial, sans-serif; font-size: 10pt; color: #333; line-height: 1.5; margin: 0; }
+        h2 { margin: 0 0 12px; font-size: 14pt; color: #222; border-left: 4px solid #0d6efd; padding-left: 8px; }
+        h3 { font-size: 11pt; color: #444; margin: 16px 0 8px; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+
+        /* ✅ Layout a blocchi sicuro per WeasyPrint */
+        .info-row { margin-bottom: 15px; }
+        .info-box {
+            width: 48%; display: inline-block; vertical-align: top;
+            background: #f8f9fa; padding: 10px; border-radius: 4px; border: 1px solid #e9ecef;
+            margin-right: 2%; box-sizing: border-box; margin-bottom: 10px;
+        }
+        .info-box:nth-child(even) { margin-right: 0; }
+        .info-label { font-size: 7.5pt; color: #666; display: block; margin-bottom: 2px; }
+        .info-value { font-size: 10pt; font-weight: bold; }
+
+        table { width: 100%; border-collapse: collapse; margin-bottom: 12px; page-break-inside: avoid; }
+        th, td { padding: 6px 8px; border: 1px solid #dee2e6; text-align: left; font-size: 9pt; }
+        th { background: #e9ecef; font-weight: 600; color: #495057; }
+        .text-right { text-align: right; }
+        .total-row td { background: #f1f3f5; font-weight: bold; }
+
+        .balance-box { background: #e9ecef; padding: 10px; border-radius: 4px; margin-top: 15px; font-size: 9pt; border: 1px solid #ced4da; }
+    </style>
+</head>
+<body>
+    <div class="pdf-header">
+        {% if logo_path %}
+            <img src="{{ logo_path }}" alt="Logo" class="pdf-logo">
+        {% else %}
+            <span style="color:#999; font-size:10pt;">[Logo non trovato]</span>
+        {% endif %}
+        <div class="pdf-title">Scheda Figlio & Report Finanziario</div>
+        <div class="pdf-meta">
+            Famiglia: <strong>{{ child.family.name }}</strong> |
+            Generato il: {{ generation_date|date:"d/m/Y H:i" }} |
+            Utente: {{ request.user.get_full_name|default:request.user.email }}
+        </div>
+    </div>
+
+    <h2>{{ child.name }} {{ child.surname }}</h2>
+
+    <div class="info-row">
+        <div class="info-box">
+            <span class="info-label">Data di Nascita</span>
+            <span class="info-value">{{ child.birth_date|date:"d/m/Y" }} ({{ child.age }} anni)</span>
+        </div>
+        <div class="info-box">
+            <span class="info-label">Mantenimento Mensile</span>
+            <span class="info-value">{% if current_support is not None %}{{ current_support|floatformat:2 }} €{% else %}Non definito{% endif %}</span>
+        </div>
+        <div class="info-box">
+            <span class="info-label">Ripartizione Spese (A / B)</span>
+            <span class="info-value">{{ split_a|floatformat:0 }}% / {{ split_b|floatformat:0 }}%</span>
+        </div>
+        <div class="info-box">
+            <span class="info-label">Totale Spese Approvate</span>
+            <span class="info-value">{{ approved_total|floatformat:2 }} €</span>
+        </div>
+    </div>
+
+    {% if expenses %}
+    <h3>Dettaglio Spese Approvate</h3>
+    <table>
+        <thead>
+            <tr>
+                <th style="width:15%">Data</th>
+                <th style="width:25%">Categoria</th>
+                <th style="width:15%" class="text-right">Importo</th>
+                <th style="width:20%" class="text-right">Quota A</th>
+                <th style="width:20%" class="text-right">Quota B</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in expenses %}
+            <tr>
+                <td>{{ item.exp.expense_date|date:"d/m/Y" }}</td>
+                <td>{{ item.exp.category_name_snapshot|default:"N/D" }}</td>
+                <td class="text-right">{{ item.exp.amount|floatformat:2 }} €</td>
+                <td class="text-right">{{ item.quota_a|floatformat:2 }} €</td>
+                <td class="text-right">{{ item.quota_b|floatformat:2 }} €</td>
+            </tr>
+            {% endfor %}
+            <tr class="total-row">
+                <td colspan="2">TOTALE</td>
+                <td class="text-right">{{ approved_total|floatformat:2 }} €</td>
+                <td class="text-right">{{ parent_a_total|floatformat:2 }} €</td>
+                <td class="text-right">{{ parent_b_total|floatformat:2 }} €</td>
+            </tr>
+        </tbody>
+    </table>
+    {% else %}
+    <p style="color:#666; font-style:italic; margin-top:20px;">Nessuna spesa approvata registrata.</p>
+    {% endif %}
+
+    <div class="balance-box">
+        <strong>Stato Ripartizione:</strong><br>
+        {% if balance > 0.01 %}
+            Se ha pagato il Genitore A → Il Genitore B deve rimborsare <strong>{{ balance|floatformat:2 }} €</strong>
+        {% elif balance < -0.01 %}
+            Se ha pagato il Genitore B → Il Genitore A deve rimborsare <strong>{{ balance|cut:"-"|floatformat:2 }} €</strong>
+        {% else %}
+            Quote perfettamente bilanciate. Nessun rimborso dovuto.
+        {% endif %}
+    </div>
+
+    <div class="pdf-footer">
+        CoParent Manager © {% now "Y" %} | Documento riservato | Pagina <span class="page"></span> di <span class="topage"></span>
+    </div>
+</body>
+</html>

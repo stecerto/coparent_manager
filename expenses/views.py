@@ -1,19 +1,23 @@
 # expenses/views.py
+# expenses/views.py
+from datetime import datetime, timedelta
 from decimal import Decimal
 
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, F, ExpressionWrapper, DecimalField
-from django.http import HttpResponseForbidden, FileResponse, JsonResponse
+from django.db.models import Sum, F, ExpressionWrapper, DecimalField, Count
+from django.db.models.functions import TruncMonth
+from django.http import HttpResponseForbidden, FileResponse, JsonResponse, HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.decorators.http import require_POST
 from django.db import transaction
 from core.choices import RoleChoices
+from core.plans import PLAN_LEVELS
 from documents.models import Document
 from families.utils import get_family_of_user
 from families.models import FamilyMember
 from expenses.forms import ExpenseForm
 from .models import Expense, ExpenseCategory
-from .pdf_utils import generate_expense_report  # ✅ Assicurati che il nome del file sia corretto
+from expenses.pdf_utils import generate_expense_report_pdf
 from expenses.services.expences_service import create_expense, update_expense, approve_expense
 from .utils import get_expense_shares
 
@@ -21,7 +25,11 @@ PARENT_ROLES = [RoleChoices.PARENT_A, RoleChoices.PARENT_B]
 
 @login_required
 def expenses_dashboard(request):
-    family = get_family_of_user(request.user)
+    # ✅ FIX: passa request=request
+    family = get_family_of_user(request.user, request=request)
+    if not family:
+        messages.error(request, "⚠️ Nessuna famiglia associata")
+        return redirect('home')
     expenses = Expense.objects.filter(family=family, is_active=True).select_related(
         "child", "created_by", "expense_type"
     ).order_by("-expense_date")
@@ -41,6 +49,11 @@ def expenses_dashboard(request):
         total=Sum("amount")
     ).order_by("expense_type__display_name")
 
+    # ✅ CONTESTO PIANO (obbligatorio per sbloccare il calendario)
+    profile = getattr(request.user, 'profile', None)
+    plan = getattr(profile, 'plan', 'starter') if profile else 'starter'
+    is_pro_or_higher = PLAN_LEVELS.get(plan, 1) >= 2
+
     return render(request, "expenses/expenses_dashboard.html", {
         "expenses": expenses[:5],
         "total_expenses": total_expenses,
@@ -48,15 +61,20 @@ def expenses_dashboard(request):
         "parent_b_total": parent_b_total,
         "category_summary": category_summary,
         "page_title": page_title,
+        "is_pro_or_higher": is_pro_or_higher,  # ✅ PASSA SEMPRE QUESTO
+        "family": family,
     })
 
 
 @login_required
 def expenses_list(request):
-    family = get_family_of_user(request.user)
+    family = get_family_of_user(request.user, request=request)
+    membership = FamilyMember.objects.filter(family=family, user=request.user).first()
+    can_manage = membership and membership.role in ["parent_a", "parent_b"] if membership else False
+
     expenses = Expense.objects.filter(family=family, is_active=True).select_related(
         "child", "created_by", "expense_type"
-    ).order_by("-expense_date")  # ✅ Rimosso .order_by() duplicato
+    ).order_by("-expense_date")
 
     expenses, form, data, page_title = filter_expenses_with_metadata(request, expenses, family)
     total_expenses = expenses.aggregate(total=Sum("amount"))["total"] or 0
@@ -78,6 +96,7 @@ def expenses_list(request):
         "form": form,
         "total_expenses": total_expenses,
         "page_title": page_title,
+        "can_manage_expenses": can_manage,
     })
 
 from django.contrib import messages
@@ -86,7 +105,8 @@ from django.contrib import messages
 @login_required
 @transaction.atomic
 def add_expense(request):
-    family = get_family_of_user(request.user)
+    # ✅ FIX: passa request=request
+    family = get_family_of_user(request.user, request=request)
     if not family:
         messages.error(request, "⚠️ Nessuna famiglia associata")
         return redirect("expenses:expenses_list")
@@ -99,9 +119,6 @@ def add_expense(request):
     if request.method == "POST":
         form = ExpenseForm(request.POST, request.FILES, user=request.user)
         if form.is_valid():
-            #child = form.cleaned_data["child"]
-
-            # ✅ Il service crea, salva e applica lo snapshot %
             cleaned = form.cleaned_data
 
             expense = create_expense(
@@ -115,10 +132,8 @@ def add_expense(request):
                 membership=membership
             )
 
-            # ✅ Il service imposta l'approvazione FK correttamente
             approve_expense(expense, request.user, membership.role)
 
-            # 📎 Allegati
             for f in request.FILES.getlist('payment_proof'):
                 Document.objects.create(
                     family=family, owner=request.user, uploaded_by=request.user,
@@ -137,7 +152,8 @@ def add_expense(request):
 
 @login_required
 def expense_update(request, pk):
-    family = get_family_of_user(request.user)
+    # ✅ FIX: passa request=request
+    family = get_family_of_user(request.user, request=request)
     original_expense = get_object_or_404(Expense, pk=pk, family=family, is_active=True)
 
     if original_expense.created_by != request.user:
@@ -152,14 +168,9 @@ def expense_update(request, pk):
         form = ExpenseForm(request.POST, request.FILES, instance=original_expense, user=request.user)
         if form.is_valid():
             child = form.cleaned_data["child"]
-
-            # ✅ Il service: 1) archivia v corrente 2) crea v+1 salvata 3) applica snapshot %
             new_expense = update_expense(original_expense, request.user, form.cleaned_data, child, membership)
-
-            # ✅ Auto-approva chi sta modificando
             approve_expense(new_expense, request.user, membership.role)
 
-            # 📎 Allegati per la nuova versione
             for f in request.FILES.getlist('payment_proof'):
                 Document.objects.create(
                     family=family, owner=request.user, uploaded_by=request.user,
@@ -178,16 +189,16 @@ def expense_update(request, pk):
 
 @login_required
 def expense_history(request, pk):
-    # ✅ Sicurezza: filtra per famiglia dell'utente (evita ID enumeration)
-    expense = get_object_or_404(Expense, pk=pk, family=get_family_of_user(request.user))
+    # ✅ FIX: passa request=request
+    family = get_family_of_user(request.user, request=request)
+    expense = get_object_or_404(Expense, pk=pk, family=family)
 
-    # Ricostruisci catena: versione corrente → previous → previous...
     versions = []
     curr = expense
     while curr:
         versions.append(curr)
         curr = curr.previous_version
-    versions.reverse()  # Dalla più vecchia alla più recente
+    versions.reverse()
 
     return render(request, "expenses/expense_history.html", {
         "expense": expense,
@@ -198,7 +209,6 @@ def expense_history(request, pk):
 @login_required
 @transaction.atomic
 def update_expense_status(request):
-    """AJAX: Aggiorna accepted/rejected dai pulsanti 🔵🔴"""
     import json
     try:
         data = json.loads(request.body)
@@ -208,46 +218,76 @@ def update_expense_status(request):
         if new_status not in ["accepted", "rejected"]:
             return JsonResponse({"success": False, "error": "Stato non valido"}, status=400)
 
-        expense = get_object_or_404(Expense, pk=expense_id, family=get_family_of_user(request.user))
+        # ✅ FIX: passa request=request
+        family = get_family_of_user(request.user, request=request)
+        expense = get_object_or_404(Expense, pk=expense_id, family=family)
 
-        # 🚫 Sicurezza: solo il NON creatore può confermare
         if expense.created_by == request.user:
-            return JsonResponse({"success": False, "error": "Solo l'altro genitore può approvare o rifiutare"},
-                                status=403)
+            return JsonResponse({"success": False, "error": "Solo l'altro genitore può approvare o rifiutare"}, status=403)
 
+        membership = family.members.filter(user=request.user).select_related('user').first()
+        if not membership:
+            return JsonResponse({"success": False, "error": "Membro famiglia non trovato"}, status=403)
+
+        user_role = str(membership.role.value if hasattr(membership.role, 'value') else membership.role).lower()
+        if user_role not in ['parent_a', 'parent_b']:
+            return JsonResponse({"success": False, "error": "Solo i genitori possono gestire le approvazioni"},
+                                status=403)
         if new_status == "accepted":
-            approve_expense(expense, request.user, "parent_b")
+            approve_expense(expense, request.user, user_role)
             expense.status = "accepted"
         elif new_status == "rejected":
-            approve_expense(expense, request.user, "parent_b")
+            approve_expense(expense, request.user, user_role)
             expense.status = "rejected"
 
         expense.save(update_fields=["status"])
+
+        from notifications.services import create_notification
+        create_notification(
+            user=expense.created_by,
+            notification_type=f"expense_{new_status}",
+            title=f"Spesa {'approvata' if new_status == 'accepted' else 'rifiutata'}",
+            message=f"La tua spesa di €{expense.amount} è stata {new_status} da {request.user.first_name or request.user.email}.",
+            target_url=f"/expenses/list/",
+            target_model="Expense",
+            target_id=expense.id,
+            send_email=True
+        )
+
         return JsonResponse({"success": True, "new_status": new_status})
+
     except Exception as e:
-        return JsonResponse({"success": False, "error": str(e)}, status=500)
+        import logging
+        logging.getLogger(__name__).error(f"Errore update_expense_status: {e}", exc_info=True)
+        return JsonResponse({"success": False, "error": "Errore interno del server"}, status=500)
 
 
 @require_POST
 @login_required
 def upload_payment_proof(request):
-    """AJAX: Upload ricevuta → transizione a paid"""
     try:
         expense_id = request.POST.get("expense_id")
-        expense = get_object_or_404(Expense, pk=expense_id, family=get_family_of_user(request.user))
+        # ✅ FIX: passa request=request
+        family = get_family_of_user(request.user, request=request)
+        expense = get_object_or_404(Expense, pk=expense_id, family=family)
 
-        # Sicurezza: solo il NON creatore può caricare la prova
         if expense.created_by == request.user:
             return JsonResponse({"success": False, "error": "Solo l'altro genitore può caricare la prova di pagamento"}, status=403)
 
         if expense.status == "paid":
             return JsonResponse({"success": False, "error": "Pagamento già completato"}, status=400)
+        membership = family.members.filter(user=request.user).first()
+        if not membership:
+            return JsonResponse({"success": False, "error": "Membro non trovato"}, status=403)
 
+        user_role = str(membership.role.value if hasattr(membership.role, 'value') else membership.role).lower()
+        if user_role not in ['parent_a', 'parent_b']:
+            return JsonResponse({"success": False, "error": "Solo i genitori possono confermare il pagamento"},
+                                status=403)
         file = request.FILES.get("proof_file")
         if not file:
             return JsonResponse({"success": False, "error": "Nessun file ricevuto"}, status=400)
 
-        # ✅ Crea il documento collegato alla spesa
         Document.objects.create(
             family=expense.family,
             owner=request.user,
@@ -261,12 +301,11 @@ def upload_payment_proof(request):
             is_active=True
         )
 
-        # ✅ AGGIORNA DIRETTAMENTE L'OGGETTO ESISTENTE (NO form.save())
         if not expense.approved_by_parent_b:
             approve_expense(expense, request.user, "parent_b")
 
         expense.status = "paid"
-        expense.save(update_fields=["status"]) # ✅ Salvataggio esplicito
+        expense.save(update_fields=["status"])
 
         return JsonResponse({
             "success": True,
@@ -281,7 +320,6 @@ def upload_payment_proof(request):
 @require_POST
 @login_required
 def send_rejection_message(request):
-    """AJAX: Invia messaggio di giustificazione rifiuto in chat"""
     try:
         import json
         from expenses.models import Expense
@@ -295,9 +333,10 @@ def send_rejection_message(request):
         if not expense_id or not reason:
             return JsonResponse({"success": False, "error": "Dati mancanti"}, status=400)
 
-        expense = Expense.objects.get(pk=expense_id, family=get_family_of_user(request.user))
+        # ✅ FIX: passa request=request
+        family = get_family_of_user(request.user, request=request)
+        expense = Expense.objects.get(pk=expense_id, family=family)
 
-        # Costruisci messaggio strutturato
         content = (
             f"🔴 *Rifiuto spesa*\n\n"
             f"📅 Data: {expense.expense_date.strftime('%d/%m/%Y')}\n"
@@ -307,7 +346,6 @@ def send_rejection_message(request):
             f"❌ Motivazione: {reason}"
         )
 
-        # Invia in chat familiare
         message = send_message(
             family=expense.family,
             sender=request.user,
@@ -315,7 +353,6 @@ def send_rejection_message(request):
             reply_to=None
         )
 
-        # Notifica email opzionale al creatore
         if notify and expense.created_by != request.user:
             from django.core.mail import send_mail
             from django.conf import settings
@@ -341,7 +378,8 @@ def send_rejection_message(request):
 
 @login_required
 def expense_delete(request, pk):
-    family = get_family_of_user(request.user)
+    # ✅ FIX: passa request=request
+    family = get_family_of_user(request.user, request=request)
     expense = get_object_or_404(Expense, pk=pk, family=family)
     if expense.created_by != request.user:
         return HttpResponseForbidden("Non puoi eliminare questa spesa")
@@ -355,13 +393,42 @@ def expense_delete(request, pk):
 
 @login_required
 def download_expense_pdf(request):
-    pdf_buffer = generate_expense_report(request.user)
-    return FileResponse(pdf_buffer, as_attachment=True, filename="report_spese.pdf")
+    # ✅ FIX: passa request=request
+    family = get_family_of_user(request.user, request=request)
+    if not family:
+        from django.contrib import messages
+        messages.error(request, "⚠️ Nessuna famiglia associata")
+        return redirect("expenses:expenses_list")
 
+    expenses = Expense.objects.filter(family=family, is_active=True).select_related(
+        "child", "expense_type"
+    ).order_by("-expense_date")
+
+    total_expenses = sum(exp.amount for exp in expenses) or Decimal("0.00")
+
+    parent_a_total = Decimal("0.00")
+    parent_b_total = Decimal("0.00")
+    for exp in expenses:
+        pct_raw = getattr(exp.child, 'contribution_pct_parent_a', None)
+        pct_a = Decimal(str(pct_raw)) if pct_raw is not None else Decimal('50.00')
+        share_a = exp.amount * (pct_a / Decimal('100'))
+        share_b = exp.amount * ((Decimal('100') - pct_a) / Decimal('100'))
+        parent_a_total += share_a
+        parent_b_total += share_b
+
+    pdf_bytes = generate_expense_report_pdf(
+        request, family, expenses[:100],
+        total_expenses, parent_a_total, parent_b_total
+    )
+
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    response["Content-Disposition"] = f'attachment; filename="report_spese_{family.id}_{datetime.now().strftime("%Y%m%d")}.pdf"'
+    return response
 
 @login_required
 def expenses_calendar(request):
-    family = get_family_of_user(request.user)
+    # ✅ FIX: passa request=request
+    family = get_family_of_user(request.user, request=request)
     expenses = Expense.objects.filter(family=family, is_active=True)
     data = []
     for e in expenses:
@@ -381,20 +448,129 @@ def expenses_calendar(request):
 
 @login_required
 def expense_day_detail(request, date):
-    family = get_family_of_user(request.user)
-    expenses = Expense.objects.filter(family=family, expense_date=date, is_active=True).select_related("child",
-                                                                                                       "created_by")
+    # ✅ FIX: passa request=request
+    family = get_family_of_user(request.user, request=request)
+    expenses = Expense.objects.filter(family=family, expense_date=date, is_active=True).select_related("child", "created_by")
     return render(request, "expenses/day_detail.html", {"expenses": expenses, "date": date})
+
+
+# expenses/views.py
+from decimal import Decimal
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.db.models import Sum, Q
+from families.utils import get_family_of_user
+from core.plans import PLAN_LEVELS
+from children.models import ChildProfile
+from .models import Expense
 
 
 @login_required
 def expenses_riepilogo_spese(request):
-    #family = get_family_of_user(request.user)
-    return redirect("expenses:expenses_dashboard")
+    """Riepilogo spese con grafici Pro-only, mantenimento figli e cronologia"""
 
+    # 1️⃣ Recupera famiglia
+    family = get_family_of_user(request.user, request=request)
+    if not family:
+        messages.error(request, "⚠️ Nessuna famiglia associata")
+        return redirect('expenses:expenses_dashboard')
+
+    # 2️⃣ Controllo piano (Pro vs Starter)
+    profile = getattr(request.user, 'profile', None)
+    plan = getattr(profile, 'plan', 'starter') if profile else 'starter'
+    is_pro_or_higher = PLAN_LEVELS.get(plan, 1) >= 2
+
+    # 3️⃣ Query spese (sempre necessarie)
+    expenses_qs = Expense.objects.filter(
+        family=family,
+        is_active=True,
+        status="accepted"
+    ).select_related("expense_type", "created_by", "child").order_by("-expense_date")
+
+    # 4️⃣ Totali e lista per tabella
+    total_expenses = expenses_qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    expenses_list = list(expenses_qs[:50])  # Limita a 50 per performance
+
+    # 5️⃣ Dati PRO-ONLY (skip per starter)
+    category_summary = []
+    parent_a_total = Decimal("0.00")
+    parent_b_total = Decimal("0.00")
+
+    if is_pro_or_higher:
+        # ✅ FILTRO CRUCIALE: solo spese "accepted" per grafici e calcoli
+        # Le spese pending/rejected restano visibili nella tabella, ma non influenzano le statistiche
+        accepted_expenses = expenses_qs.filter(status="accepted")
+
+        # 📊 Breakdown per categoria (solo accepted)
+        category_summary = accepted_expenses.values(
+            "expense_type__display_name",
+            "expense_type__color"
+        ).annotate(total=Sum("amount")).order_by("-total")
+
+        # ⚖️ Calcolo quote genitori (solo accepted)
+        for exp in accepted_expenses:
+            if exp.child:
+                split_a = exp.child.effective_split_pct_parent_a or Decimal("50.00")
+                quota_a = exp.amount * (split_a / Decimal("100"))
+                quota_b = exp.amount - quota_a
+            else:
+                quota_a = exp.amount / Decimal("2")
+                quota_b = exp.amount / Decimal("2")
+            parent_a_total += quota_a
+            parent_b_total += quota_b
+
+    # 6️⃣ ✅ MANTENIMENTO FIGLI (ALLINEATO AL TUO MODELLO)
+    maintenance_info = {}
+    children = ChildProfile.objects.filter(family=family, is_active=True)
+
+    for child in children:
+        # Spese condivise per questo figlio
+        child_expenses = expenses_qs.filter(child=child).aggregate(
+            total=Sum("amount")
+        )["total"] or Decimal("0.00")
+
+        child_name = f"{child.name} {child.surname}" if child.surname else child.name
+
+        # 🔒 USA LE TUE @PROPERTY (gestiscono automaticamente fallback e sentenze attive)
+        split_a = child.effective_split_pct_parent_a or Decimal("50.00")
+        split_b = Decimal("100.00") - split_a
+        payer = "Genitore A" if split_a >= split_b else "Genitore B"
+
+        # Property che controlla: 1. ChildSupport attivo → 2. Manuale → 3. None
+        monthly_support = child.effective_maintenance_amount or Decimal("0.00")
+
+        maintenance_info[child_name] = {
+            "age": child.age,
+            "payer": payer,
+            "amount": monthly_support,
+            "shared_expenses": child_expenses,
+            "split_a": split_a,
+            "split_b": split_b,
+        }
+
+    # 7️⃣ Media spese (per KPI)
+    average_expense = total_expenses / len(expenses_list) if expenses_list else Decimal("0.00")
+
+    # 8️⃣ Context finale
+    context = {
+        "family": family,
+        "expenses": expenses_list,  # ✅ Lista per tabella cronologia
+        "total_expenses": total_expenses,
+        "average_expense": average_expense,  # ✅ Per KPI "Media per Spesa"
+        "maintenance_info": maintenance_info,  # ✅ Per tabella mantenimento figli
+
+        # Dati Pro-only
+        "category_summary": category_summary,
+        "parent_a_total": parent_a_total,
+        "parent_b_total": parent_b_total,
+        "is_pro_or_higher": is_pro_or_higher,
+    }
+
+    return render(request, "expenses/expenses_riepilogo_spese.html", context)
 
 # ========================================================================
-# UTILS (Sposta in un file utils.py se preferisci)
+# UTILS
 # ========================================================================
 def filter_expenses_with_metadata(request, queryset, family):
     from .forms import ExpenseFilterForm
@@ -416,7 +592,7 @@ def filter_expenses_with_metadata(request, queryset, family):
 
         if data.get("expense_type"):
             queryset = queryset.filter(expense_type=data["expense_type"])
-            label = data["expense_type"].display_name  # ✅ CORRETTO
+            label = data["expense_type"].display_name
             if label: title_parts.insert(0, f"Spese filtrate per: {label.lower()}")
 
         if data.get("date_from"):
@@ -438,111 +614,63 @@ def filter_expenses_with_metadata(request, queryset, family):
     return queryset, form, data, page_title
 
 
-# Esempio in una view o service
 def calculate_parent_debt(expense_amount, child):
     pct_a = float(child.contribution_pct_parent_a) / 100
     pct_b = 1.0 - pct_a
-
     amount_a = expense_amount * pct_a
     amount_b = expense_amount * pct_b
     return amount_a, amount_b
 
 
-
-
 #________________________GESTIONE CATEGORIE E SPESE SOLO ADMIN________________________________________
-
-
 
 from django.contrib.admin.views.decorators import staff_member_required, user_passes_test
 from django.shortcuts import render
 from .models import ExpenseCategory
+
 def superadmin_only(user):
     return user.is_superuser
+
 def admin_required(view_func):
     return user_passes_test(lambda u: u.is_superuser)(view_func)
 
 @admin_required
 @staff_member_required
 def categories_list(request):
-
-    categories = ExpenseCategory.objects.select_related(
-        "group"
-    ).all()
-
-    return render(
-        request,
-        "expenses/categories/list.html",
-        {
-            "categories": categories
-        }
-    )
+    categories = ExpenseCategory.objects.select_related("group").all()
+    return render(request, "expenses/categories/list.html", {"categories": categories})
 
 from django.shortcuts import redirect
 from .forms import ExpenseCategoryForm
-#@admin_required
+
 @staff_member_required
 def category_create(request):
-
-    form = ExpenseCategoryForm(
-        request.POST or None
-    )
-
+    form = ExpenseCategoryForm(request.POST or None)
     if form.is_valid():
-
         category = form.save()
-
         return redirect("categories_list")
-
-    return render(
-        request,
-        "expenses/categories/form.html",
-        {
-            "form": form
-        }
-    )
+    return render(request, "expenses/categories/form.html", {"form": form})
 
 from django.shortcuts import get_object_or_404
-
 from django.utils import timezone
+from .models import ExpenseCategoryHistory
 
-from .models import (
-    ExpenseCategory,
-    ExpenseCategoryHistory
-)
-
-#@admin_required
 @staff_member_required
 def category_update(request, pk):
-
-    old_category = get_object_or_404(
-        ExpenseCategory,
-        pk=pk
-    )
-
-    form = ExpenseCategoryForm(
-        request.POST or None,
-        instance=old_category
-    )
+    old_category = get_object_or_404(ExpenseCategory, pk=pk)
+    form = ExpenseCategoryForm(request.POST or None, instance=old_category)
 
     if form.is_valid():
-
         old_category.valid_to = timezone.now()
         old_category.is_active = False
         old_category.save()
 
         new_category = form.save(commit=False)
-
         new_category.pk = None
-
         new_category.version = old_category.version + 1
-
         new_category.previous_version = old_category
-
         new_category.valid_from = timezone.now()
-
         new_category.is_active = True
-
         new_category.save()
 
         ExpenseCategoryHistory.objects.create(
@@ -554,30 +682,15 @@ def category_update(request, pk):
             new_color=new_category.color,
             changed_by=request.user
         )
-
         return redirect("categories_list")
 
-    return render(
-        request,
-        "expenses/categories/form.html",
-        {
-            "form": form,
-            "category": old_category
-        }
-    )
-#@admin_required
+    return render(request, "expenses/categories/form.html", {"form": form, "category": old_category})
+
 @staff_member_required
 def category_delete(request, pk):
-
-    category = get_object_or_404(
-        ExpenseCategory,
-        pk=pk
-    )
-
+    category = get_object_or_404(ExpenseCategory, pk=pk)
     category.is_active = False
-
     category.valid_to = timezone.now()
-
     category.save()
 
     ExpenseCategoryHistory.objects.create(
@@ -586,5 +699,105 @@ def category_delete(request, pk):
         old_name=category.display_name,
         changed_by=request.user
     )
-
     return redirect("categories_list")
+
+
+@login_required
+def expenses_analytics_view(request):
+    """Report avanzato spese: trend mensili, categorie, comparativo genitori (SOLO Pro+)"""
+    family = get_family_of_user(request.user, request=request)
+    if not family:
+        messages.error(request, "⚠️ Nessuna famiglia associata")
+        return redirect('expenses:expenses_dashboard')
+
+    # 🔒 Controllo piano: solo Pro/Enterprise
+    profile = getattr(request.user, 'profile', None)
+    plan = getattr(profile, 'plan', 'starter') if profile else 'starter'
+    if PLAN_LEVELS.get(plan, 1) < 2:  # < pro
+        messages.info(request,
+                      "📊 Funzione riservata al piano Pro. Effettua l'upgrade per sbloccare l'analisi avanzata.")
+        return redirect('pricing')
+
+    # 📅 Filtri data (ultimi 12 mesi di default)
+    months_back = int(request.GET.get("months", 12))
+    end_date = timezone.now().date()
+    start_date = end_date - timedelta(days=months_back * 30)
+
+    # 📦 Query base
+    expenses_qs = Expense.objects.filter(
+        family=family,
+        is_active=True,
+        status="accepted",  # Solo spese approvate
+        expense_date__gte=start_date,
+        expense_date__lte=end_date
+    ).select_related("child", "expense_type", "created_by")
+
+    # 📈 1. Trend mensile (line chart)
+    monthly_trend = expenses_qs.annotate(
+        month=TruncMonth("expense_date")
+    ).values("month").annotate(
+        total=Sum("amount"),
+        count=Count("id")
+    ).order_by("month")
+
+    # 🥧 2. Breakdown per categoria (doughnut chart)
+    category_breakdown = expenses_qs.values(
+        "expense_type__display_name",
+        "expense_type__color"
+    ).annotate(
+        total=Sum("amount"),
+        count=Count("id")
+    ).order_by("-total")
+
+    # ⚖️ 3. Comparativo genitori (bar chart)
+    parent_a_total = Decimal("0.00")
+    parent_b_total = Decimal("0.00")
+
+    for exp in expenses_qs:
+        if exp.child and exp.child.split_percentage_a is not None:
+            quota_a = exp.amount * (exp.child.split_percentage_a / Decimal("100"))
+            quota_b = exp.amount - quota_a
+            parent_a_total += quota_a
+            parent_b_total += quota_b
+
+    # 📊 4. Top 5 spese (tabella)
+    top_expenses = expenses_qs.order_by("-amount")[:5]
+
+    # 💰 5. KPI card
+    total_spent = expenses_qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
+    avg_expense = total_spent / expenses_qs.count() if expenses_qs.exists() else Decimal("0.00")
+
+    context = {
+        "family": family,
+        "months_back": months_back,
+        "start_date": start_date,
+        "end_date": end_date,
+        # Dati grafici (serializzabili in JSON per Chart.js)
+        "monthly_trend_json": [
+            {"month": item["month"].strftime("%Y-%m"), "total": float(item["total"]), "count": item["count"]}
+            for item in monthly_trend
+        ],
+        "category_breakdown_json": [
+            {"label": item["expense_type__display_name"] or "Senza categoria",
+             "value": float(item["total"]),
+             "color": item["expense_type__color"] or "#6c757d",
+             "count": item["count"]}
+            for item in category_breakdown
+        ],
+        "parent_comparison": {
+            "parent_a": float(parent_a_total),
+            "parent_b": float(parent_b_total),
+            "difference": float(abs(parent_a_total - parent_b_total)),
+            "higher": "A" if parent_a_total > parent_b_total else "B" if parent_b_total > parent_a_total else "Pareggio"
+        },
+        "top_expenses": top_expenses,
+        "kpi": {
+            "total": float(total_spent),
+            "average": float(avg_expense),
+            "count": expenses_qs.count(),
+            "trend": "up" if monthly_trend.last() and monthly_trend.first() and monthly_trend.last()["total"] >
+                             monthly_trend.first()["total"] else "down"
+        }
+    }
+
+    return render(request, "expenses/expenses_analytics.html", context)

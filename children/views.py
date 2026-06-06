@@ -7,6 +7,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.http import FileResponse
 from django.shortcuts import render, redirect, get_object_or_404
+from django.utils import timezone
 
 from children.forms import ChildForm
 from children.models import ChildProfile
@@ -17,6 +18,7 @@ from children.services.child_service import (
 )
 # children/views.py
 from children.utils import calculate_expense_shares, get_child_split_pct
+from expenses.models import Expense
 from families.utils import get_family_of_user
 from .forms import ChildSupportForm
 from .notifications.services_notification import notify_other_parent
@@ -28,7 +30,7 @@ from .services.child_service import update_child_support
 
 @login_required
 def children_list(request):
-    family = get_family_of_user(request.user)
+    family = get_family_of_user(request.user, request=request)
     if not family:
         return render(request, "children/children_list.html", {"children": []})
 
@@ -37,6 +39,7 @@ def children_list(request):
     children = list(family.children.filter(is_active=True).prefetch_related('supports', 'expenses'))
 
     for child in children:
+        expenses_qs = Expense.objects.filter(child=child, is_active=True, status="accepted")
         # 💰 Mantenimento
         child.current_support = child.effective_maintenance_amount
 
@@ -63,12 +66,16 @@ def children_list(request):
             is_approved = bool(exp.approved_by_parent_a) and bool(exp.approved_by_parent_b)
             if is_approved:
                 approved_total += amount
-                quota_a, quota_b = calculate_expense_shares(child, amount)
+                # ✅ FIX SICURO: evita crash se la utility torna None
+                shares = calculate_expense_shares(child, amount)
+                if shares is None:
+                    quota_a, quota_b = 0.0, 0.0
+                else:
+                    quota_a, quota_b = shares
                 parent_a_total += quota_a
                 parent_b_total += quota_b
             else:
                 active_total += amount
-
 
         # ✅ Assegna al child per il template
         child.approved_total = round(approved_total, 2)
@@ -117,63 +124,89 @@ def child_detail(request, child_id):
         "support_data": json.dumps(support_data)
     })
 from django.db import transaction
+# children/views.py
+from decimal import Decimal
+from django.utils import timezone
+from datetime import date
+from django.db import transaction
+
 @login_required
 def child_create_view(request):
-    family = get_family_of_user(request.user)
-
+    family = get_family_of_user(request.user, request=request)
     if not family:
         messages.error(request, "⚠️ Nessuna famiglia associata.")
         return redirect("families:setup")
 
     if request.method == "POST":
-        with transaction.atomic():
-            form = ChildForm(request.POST)
-            if form.is_valid():
+        form = ChildForm(request.POST)
+        if form.is_valid():
+            with transaction.atomic():
                 child = create_child(family, request.user, form.cleaned_data)
 
+                # ✅ FIX: Gestione sicura di amt (evita TypeError o crash su None)
                 amt = form.cleaned_data.get("manual_maintenance_amount")
-                if amt is not None and amt > Decimal("0"):
-                    update_child_support(child, amt, date.today())
+                if amt is not None:
+                    try:
+                        amt_decimal = Decimal(str(amt))
+                        if amt_decimal > Decimal("0"):
+                            update_child_support(child, amt_decimal, date.today())
+                    except Exception as e:
+                        import logging
+                        logging.getLogger(__name__).warning(f"⚠️ Salto mantenimento per errore conversione: {e}")
 
-                messages.success(request, f"✅ {child.name.capitalize()} aggiunto con successo")
-                return redirect("children:children_list")
-            else:
-                messages.error(request, "⚠️ Correggi gli errori evidenziati")
+            messages.success(request, f"✅ {child.name} aggiunto correttamente.")
+            return redirect("children:children_list")
     else:
         form = ChildForm()
 
-    return render(request, "children/child_form.html", {"form": form})
+    return render(request, "children/child_form.html", {"form": form, "family": family})
 
 
+# children/views.py
 @login_required
 def child_update_view(request, pk):
-    child = get_object_or_404(ChildProfile, pk=pk, is_active=True)
-    #print("🔍 Caricamento child:", child.pk, "| Pct A DB:", child.contribution_pct_parent_a)
+    child_id = pk
+    family = get_family_of_user(request.user, request=request)
+    child = get_object_or_404(ChildProfile, id=child_id, family=family, is_active=True)
+
+    # ✅ Salva valore PRE-modifica per storico
+    old_pct = child.contribution_pct_parent_a
 
     if request.method == "POST":
         form = ChildForm(request.POST, instance=child)
-       # print("📥 POST ricevuto:", request.POST.get("contribution_pct_parent_a"))
-
         if form.is_valid():
-            # ✅ Usa la tua funzione service (che ora include tutti i campi)
+            # ✅ update_child DEVE restituire l'istanza aggiornata
             updated = update_child(child, request.user, form.cleaned_data)
-            #print(f"💾 VERSIONE SALVATA: {updated_child.name} | v{updated_child.version} | Pct: {updated_child.contribution_pct_parent_a}")
-            # 🌉 Aggiorna anche il mantenimento se cambiato
+            if updated is None:
+                child.refresh_from_db()
+                updated = child
+
+            # 📜 REGISTRA MODIFICA RIPARTIZIONE (se cambiata)
+            new_pct = form.cleaned_data.get("contribution_pct_parent_a")
+            if old_pct != new_pct:
+                from .models import ChildSplitHistory
+                ChildSplitHistory.objects.create(
+                    child=updated, old_pct=old_pct, new_pct=new_pct,
+                    changed_by=request.user, changed_at=timezone.now()
+                )
+                messages.info(request, f"📊 Ripartizione aggiornata: {old_pct}% → {new_pct}%")
+
+            # 💰 Aggiorna mantenimento se modificato
             amt = form.cleaned_data.get("manual_maintenance_amount")
             if amt is not None and amt > Decimal("0"):
-                update_child_support(child, amt, date.today())
-            messages.success(request, f"✅ Dati di {updated.name} aggiornato (v{updated.version})")
+                update_child_support(updated, amt, date.today())
+
+            messages.success(request, f"✅ Dati di {updated.name} aggiornati (v{updated.version})")
             return redirect("children:children_list")
         else:
             messages.error(request, "⚠️ Correggi gli errori evidenziati")
     else:
-        # ✅ Precompila il campo con l'importo attivo attuale
         form = ChildForm(instance=child)
         active_amt = child.effective_maintenance_amount
         if active_amt:
             form.initial["manual_maintenance_amount"] = active_amt
 
-    return render(request, "children/child_form.html", {"form": form})
+    return render(request, "children/child_form.html", {"form": form, "child": child})
 
 
 @login_required
@@ -223,3 +256,50 @@ def export_child_pdf(request, child_id):
     file_path = generate_child_report(child, supports)
 
     return FileResponse(open(file_path, "rb"), as_attachment=True, filename=f"report_{child.name}.pdf")
+
+# children/views.py
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import get_object_or_404
+from django.http import HttpResponse
+from families.utils import get_family_of_user
+from .models import ChildProfile
+from children.utils import generate_child_report_pdf
+
+# children/views.py
+@login_required
+def child_pdf_view(request, child_id):
+    family = get_family_of_user(request.user, request=request)
+    child = get_object_or_404(ChildProfile, id=child_id, family=family, is_active=True)
+
+    # ✅ Calcola esplicitamente il mantenimento attivo
+    current_support = child.effective_maintenance_amount
+
+    expenses_qs = child.expenses.filter(is_active=True, status='accepted').select_related('expense_type').order_by('-expense_date')
+
+    pct_a = float(child.contribution_pct_parent_a or 50.0)
+    pct_b = 100.0 - pct_a
+
+    approved_total = 0.0
+    parent_a_total = 0.0
+    parent_b_total = 0.0
+    expenses_data = []
+
+    for exp in expenses_qs:
+        amt = float(exp.amount or 0)
+        qa = amt * (pct_a / 100)
+        qb = amt * (pct_b / 100)
+        approved_total += amt
+        parent_a_total += qa
+        parent_b_total += qb
+        expenses_data.append({'exp': exp, 'quota_a': round(qa, 2), 'quota_b': round(qb, 2)})
+
+    balance = round(parent_a_total - parent_b_total, 2)
+
+    pdf_bytes = generate_child_report_pdf(
+        child, current_support, expenses_data, approved_total,
+        parent_a_total, parent_b_total, pct_a, pct_b, balance, request
+    )
+
+    response = HttpResponse(pdf_bytes, content_type='application/pdf')
+    response['Content-Disposition'] = f'attachment; filename="scheda_{child.name}_{child.surname}.pdf"'
+    return response

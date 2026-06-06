@@ -20,7 +20,7 @@ def validate_income_documents(user):
 @login_required
 def upload_income_documents(request):
 
-    family = get_family_of_user(request.user)
+    family = get_family_of_user(request.user, request=request)
 
     if request.method == "POST":
         files = request.FILES.getlist("files")

@@ -4,32 +4,155 @@
 
 {% block title %}Bilance Family Registrazione{% endblock title %}
 
-{%block content %}
+{% block content %}
 <div class="container-fluid mt-4">
     <div class="row justify-content-center">
         <div class="col-md-6">
             <h2>Registrazione</h2>
-                <div class="card p-4 shadow custom-card">
-                    {% if invitation %}
-                        <div class="alert alert-info">
-                            <strong>Ruolo assegnato:</strong>
-                            {{ invitation.get_role_display }}
-                        </div>
+            <div class="card p-4 shadow custom-card">
+
+                {% if invitation %}
+                    <div class="alert alert-info">
+                        <strong>Ruolo assegnato:</strong> {{ invitation.get_role_display }}
+                    </div>
+                {% endif %}
+
+                <form method="POST">
+                    {% csrf_token %}
+                    {{ form|crispy }}
+
+                    <!-- ✅ Campo piano: SPOSTATO DENTRO IL FORM -->
+                    {% if not invitation %}
+                    <div class="mb-3">
+                        <label for="{{ form.plan_choice.id_for_label }}" class="form-label fw-bold">
+                            📦 Piano di abbonamento
+                        </label>
+                        {{ form.plan_choice }}
+                        <small class="text-muted">
+                            Puoi cambiare o annullare in qualsiasi momento dalle Impostazioni.
+                            <a href="{% url 'pricing' %}" target="_blank" class="ms-1">Confronta i piani →</a>
+                        </small>
+                    </div>
                     {% endif %}
-                    <form method="POST">
-                        {% csrf_token %}
-                        {{ form|crispy }}
-                        <button class="btn btn-success btn-style" type="submit">Registrati</button>
-                    </form>
-                        <a href="/accounts/login/">Hai già un account? Login</a>
-                        <hr style="border: 1px solid #ccc; width: 50%; margin: 20px auto;">
+
+                    <!-- ✅ Privacy consent block -->
+                    <div class="mb-3 p-3 border rounded bg-light">
+                        <div class="form-check mb-2">
+                            <!-- 🔹 INFORMATIVA BREVE (Onboarding) -->
+                            <div class="alert alert-info border-start border-4 border-info mb-3 py-2" role="alert">
+                                <h6 class="alert-heading mb-1" style="font-size:0.95rem;">🔒 Informativa Breve sulla Privacy</h6>
+                                <p class="small mb-1">CoParent Manager tratta i tuoi dati con tutele rafforzate:</p>
+                                <ul class="small mb-1 ps-3">
+                                    <li>Crittografia end-to-end per documenti e note sensibili</li>
+                                    <li>Server esclusivamente in UE (GDPR compliant)</li>
+                                    <li>Accesso granulare: l'altro genitore vede solo ciò che condividi esplicitamente</li>
+                                    <li>Zero profilazione, zero pubblicità, zero vendita dati</li>
+                                </ul>
+                                <p class="small mb-0">Per i dettagli completi: <a href="{% url 'privacy_policy' %}" target="_blank" class="fw-bold">Privacy Policy Estesa</a></p>
+                            </div>
+                            <input class="form-check-input" type="checkbox" id="privacyConsent" name="privacy_accept" required disabled>
+                            <label class="form-check-label small fw-bold" for="privacyConsent">
+                                Accettazione Privacy Policy & Termini
+                            </label>
+                        </div>
+                        <small class="text-muted d-block mb-2">Per abilitare la registrazione, leggi l'informativa e accetta esplicitamente.</small>
+                        <button type="button" class="btn btn-outline-primary btn-sm" data-bs-toggle="modal" data-bs-target="#privacyOnboardingModal">
+                            📖 Leggi e Accetta
+                        </button>
+                    </div>
+
+                    <!-- ✅ Submit button -->
+                    <button type="submit" id="registerBtn" class="btn btn-success w-100" disabled>
+                        Registrati
+                    </button>
+                </form> <!-- ✅ FORM CHIUSO QUI, DOPO TUTTI I CAMPI -->
+
+                <div class="mt-3 text-center">
+                    <a href="/accounts/login/" class="text-decoration-none">Hai già un account? Login</a>
                 </div>
+                <hr style="border: 1px solid #ccc; width: 50%; margin: 20px auto;">
+
+                <!-- ✅ MODALE ONBOARDING PRIVACY: SPOSTATO DENTRO block content  -->
+                <div class="modal fade" id="privacyOnboardingModal" tabindex="-1" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header bg-primary text-white">
+                                <h5 class="modal-title">🔒 Informativa Privacy & Registrazione</h5>
+                                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                            </div>
+                            <div class="modal-body">
+                                <!-- STEP 1: Leggi -->
+                                <div id="step1">
+                                    <h6 class="fw-bold mb-3">Come proteggiamo i tuoi dati</h6>
+                                    <ul class="small mb-3">
+                                        <li>✅ Crittografia end-to-end per documenti, spese e note sensibili</li>
+                                        <li>✅ Server esclusivamente in UE, zero profilazione, zero vendita dati</li>
+                                        <li>✅ Controlli granulari: l'altro genitore vede solo ciò che condividi tu</li>
+                                    </ul>
+                                    <a href="{% url 'privacy_policy' %}" target="_blank" class="btn btn-outline-info btn-sm mb-3">
+                                        📜 Leggi Privacy Policy Completa
+                                    </a>
+                                    <br>
+                                    <button class="btn btn-primary" onclick="goToStep(2)">Ho letto → Avanti</button>
+                                </div>
+
+                                <!-- STEP 2: Accetta -->
+                                <div id="step2" style="display:none;">
+                                    <div class="alert alert-warning small mb-3">
+                                        ⚠️ Per procedere, devi accettare esplicitamente il trattamento dei dati ai sensi del GDPR.
+                                    </div>
+                                    <div class="form-check mb-3">
+                                        <input class="form-check-input" type="checkbox" id="modalPrivacyCheck">
+                                        <label class="form-check-label" for="modalPrivacyCheck">
+                                            Dichiaro di aver letto l'informativa e acconsento al trattamento dei miei dati personali.
+                                        </label>
+                                    </div>
+                                    <button class="btn btn-success" id="acceptBtn" disabled onclick="acceptAndClose()">
+                                        ✅ Accetta e Abilita Registrazione
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <!-- FINE MODALE -->
+
+            </div>
         </div>
     </div>
+
+    <div class="text-center mt-4">
+        <small class="text-muted">
+            Non sai quale piano scegliere?
+            <a href="{% url 'pricing' %}" class="text-decoration-none fw-bold">Confronta i piani e le funzionalità →</a>
+        </small>
+    </div>
 </div>
-
 {% endblock content %}
-{% block scripts %}
-<script src="{% static 'js/coparentmanager.js' %}"></script>
-{% endblock %}
 
+{% block extra_js %}
+<script src="{% static 'js/coparentmanager.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    window.goToStep = (step) => {
+        document.getElementById('step1').style.display = step === 1 ? 'block' : 'none';
+        document.getElementById('step2').style.display = step === 2 ? 'block' : 'none';
+    };
+
+    document.getElementById('modalPrivacyCheck').addEventListener('change', function() {
+        document.getElementById('acceptBtn').disabled = !this.checked;
+    });
+
+    window.acceptAndClose = () => {
+        const formCheck = document.getElementById('privacyConsent');
+        formCheck.checked = true;
+        formCheck.disabled = false;
+        document.getElementById('registerBtn').disabled = false;
+
+        const modalEl = document.getElementById('privacyOnboardingModal');
+        const modal = bootstrap.Modal.getInstance(modalEl);
+        if (modal) modal.hide();
+    };
+});
+</script>
+{% endblock extra_js %}

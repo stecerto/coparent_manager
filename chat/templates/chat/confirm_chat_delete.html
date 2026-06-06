@@ -1,25 +1,30 @@
 {% extends "base.html" %}
-
 {% block title %}Elimina Messaggio{% endblock %}
 
 {% block content %}
 <div class="container mt-4">
     <h2>Conferma eliminazione</h2>
-    <p>Sei sicuro di voler eliminare
-        <strong>
-            {{ message.sender }}
-            {{ msg.created_at|date:"d/m/Y H:i" }}
-            contenuto {{ msg.content }}
-        </strong>?
+
+    <!-- ✅ FIX: Usa sempre 'message' (non 'msg') -->
+    <p>Sei sicuro di voler eliminare il messaggio di
+        <strong>{{ message.sender.username }}</strong>
+        del <strong>{{ message.created_at|date:"d/m/Y H:i" }}</strong>?
     </p>
 
-    <form method="POST">
+    <div class="alert alert-light border">
+        <p class="mb-0 fst-italic">{{ message.content }}</p>
+    </div>
+
+    <!-- ✅ FORM POST con CSRF -->
+    <form method="POST" action="{% url 'chat:delete_message' message.id %}">
         {% csrf_token %}
-        <button type="submit" class="btn btn-danger">Elimina</button>
+        <button type="submit" class="btn btn-danger">Elimina definitivamente</button>
         <a href="{% url 'chat:chat_home' %}" class="btn btn-secondary">Annulla</a>
     </form>
 </div>
+
 <script>
+// Salva posizione scroll per tornare al punto giusto dopo l'eliminazione
 document.querySelector("form").addEventListener("submit", function () {
     sessionStorage.setItem("scrollToChat", window.scrollY);
 });

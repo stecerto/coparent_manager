@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}📜 Cronologia Chat - {{ page_title }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <!-- 🎯 Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h3 class="mb-1 fw-bold">{{ page_title }}</h3>
+            <p class="text-muted mb-0">Famiglia: <strong>{{ family.name }}</strong></p>
+        </div>
+        <a href="{% url 'chat:chat_home' %}" class="btn btn-outline-primary">⬅️ Torna alla Chat</a>
+    </div>
+
+    <!-- 📜 Lista Messaggi (UN SOLO LOOP, formattato) -->
+    <div class="card shadow custom-card">
+        <div class="card-body p-3" style="max-height: 70vh; overflow-y: auto;">
+
+            {% for msg in messages %}
+                <div class="chat-message {% if msg.sender == request.user %}mine{% else %}other{% endif %} {% if not msg.is_active %}message-deleted{% endif %}">
+
+                    <!-- Avatar -->
+                    <div class="sender-avatar {% if msg.sender == request.user %}mine-avatar{% else %}other-avatar{% endif %}">
+                        {{ msg.sender.first_name|default:msg.sender.username|slice:":1"|upper }}
+                    </div>
+
+                    <!-- Bubble -->
+                    <div class="message-bubble">
+                        {% if chat_type != "private" and msg.sender != request.user %}
+                            <div class="fw-bold small mb-1" style="font-size: 0.8rem;">
+                                {{ msg.sender.first_name|default:msg.sender.username }}
+                            </div>
+                        {% endif %}
+
+                        <p class="mb-2" style="white-space: pre-wrap; line-height: 1.4;">
+                            {{ msg.content|linebreaksbr }}
+                        </p>
+
+                        {% if msg.attachments.all %}
+                            <div class="small {% if msg.sender == request.user %}text-white{% else %}text-muted{% endif %} mb-1">
+                                📎 {% for att in msg.attachments.all %}{{ att.file.name|slice:"30:" }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                            </div>
+                        {% endif %}
+
+                        <div class="message-meta">
+                            <span>{{ msg.created_at|date:"d/m/Y H:i" }}</span>
+                            {% if msg.version > 1 %}<span title="Modificato">✏️</span>{% endif %}
+                        </div>
+
+                        {% if not msg.is_active and msg.deleted_at %}
+                            <div class="small text-danger fw-bold mt-2 border-top pt-2">
+                                🗑️ Eliminato il {{ msg.deleted_at|date:"d/m/Y H:i" }} da {{ msg.deleted_by.first_name|default:msg.deleted_by.username }}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% empty %}
+                <p class="text-center text-muted py-5">Nessun messaggio in questa chat.</p>
+            {% endfor %}
+
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .chat-message { display: flex; gap: 12px; margin-bottom: 16px; align-items: flex-start; }
+    .chat-message.mine { flex-direction: row-reverse; }
+    .sender-avatar {
+        width: 36px; height: 36px; border-radius: 12%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 0.85rem; font-weight: 600; flex-shrink: 0;
+    }
+    .mine-avatar { background: #0d6efd; color: #fff; }
+    .other-avatar { background: #6c757d; color: #fff; }
+    .message-bubble {
+        max-width: 75%; padding: 10px 14px; border-radius: 16px;
+        background: #f1f3f5; position: relative; word-wrap: break-word;
+    }
+    .mine .message-bubble { background: #0d6efd; color: #fff; }
+    .message-meta {
+        font-size: 0.7rem; opacity: 0.8; margin-top: 4px;
+        display: flex; gap: 6px; align-items: center;
+    }
+    .mine .message-meta { justify-content: flex-end; }
+    .message-deleted {
+        background: #f8f9fa !important; border: 2px solid #dc3545 !important;
+        border-radius: 16px;
+        opacity: 0.9;
+    }
+    .message-deleted .message-bubble { background: #fff !important; color: #666 !important; }
+</style>
+{% endblock %}

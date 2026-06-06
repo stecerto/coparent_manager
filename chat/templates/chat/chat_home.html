@@ -46,8 +46,20 @@
                                     <div class="message-meta"><span>{{ msg.created_at|date:"H:i" }}</span>{% if msg.version > 1 %}<span title="Modificato">✏️</span>{% endif %}</div>
                                 </div>
                                 <div class="message-actions d-flex gap-1">
-                                    <button class="btn btn-sm btn-link text-muted p-0" onclick="replyToMessage('{{ msg.id }}', '{{ msg.content|escapejs }}', 'family')">↩️</button>
-                                    <a href="{% url 'chat:delete_message' msg.id %}" class="btn btn-sm btn-link text-danger p-0" onclick="return confirm('Eliminare?')">🗑️</a>
+                                    <button class="btn btn-sm btn-link text-muted p-0"
+                                            type="button"
+                                            onclick="replyToMessage('{{ msg.id }}', '{{ msg.content|escapejs }}', 'private')">
+                                        ↩️
+                                    </button>
+
+                                    <!-- ✅ FORM POST per delete -->
+                                    <form method="post"
+                                          action="{% url 'chat:delete_message' msg.id %}"
+                                          class="d-inline"
+                                          onsubmit="return confirm('Eliminare definitivamente questo messaggio?')">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-link text-danger p-0">🗑️</button>
+                                    </form>
                                 </div>
                             </div>
                         {% else %}
@@ -67,6 +79,30 @@
                         {% endif %}
                     {% empty %}<p class="text-center text-muted py-4">Nessun messaggio pubblico.</p>{% endfor %}
                 </div>
+
+<!-- ✅ PULSANTE HISTORY (FAMIGLIA) -->
+{% if has_deleted_family %}
+<div class="px-3 py-2 border-top bg-light d-flex justify-content-end gap-2">
+    <a href="{% url 'chat:chat_history' %}?type=family" class="btn btn-sm btn-outline-dark">
+        📜 Cronologia
+    </a>
+    {% if plan_features.can_export_pdf %}
+    <a href="{% url 'chat:chat_export_pdf' %}?type=family" class="btn btn-sm btn-outline-secondary">
+        📄 PDF
+    </a>
+    {% else %}
+    <button type="button"
+            class="btn btn-sm btn-outline-secondary"
+            disabled
+            title="Disponibile nel piano Pro"
+            data-bs-toggle="modal"
+            data-bs-target="#upgradeModal">
+        📄 Esporta PDF 🔒
+    </button>
+    {% endif %}
+</div>
+{% endif %}
+
 
                 <!-- ✍️ FORM FAMIGLIA (TUTTE LE FEATURE ORIGINALI) -->
                 <div class="p-3 border-top">
@@ -107,9 +143,11 @@
                             <label class="form-label small text-muted">📎 Allegati (opzionale)</label>
                             <input type="file" name="attachments" multiple class="form-control form-control-sm">
                         </div>
-                        <div class="form-check mb-3">
-                            <input class="form-check-input" type="checkbox" name="create_event" id="createEventCheck-family" onchange="toggleEventFields('family')">
-                            <label class="form-check-label small" for="createEventCheck-family">📅 Crea evento nel calendario</label>
+                        <div class="form-check mb-3 {% if not plan_features.can_create_events %}opacity-50{% endif %}">
+                            <input class="form-check-input" type="checkbox" name="create_event" id="createEventCheck-family" {% if not plan_features.can_create_events %}disabled{% endif %}
+                                   onchange="toggleEventFields('family')">
+                            <label class="form-check-label small" for="createEventCheck-family">📅 Crea evento nel calendario {% if not plan_features.can_create_events %}<small class="text-danger">(Pro)</small>{% endif %}
+                            </label>
                         </div>
                         <div id="eventFields-family" class="d-none border rounded p-3 mb-3 bg-light">
                             <input type="text" name="event_title" placeholder="Titolo evento" class="form-control form-control-sm mb-2">
@@ -140,6 +178,9 @@
                         </div>
                     </form>
                 </div>
+
+
+
 
                 {% if shared_docs %}
                 <div class="p-3 border-top">
@@ -174,8 +215,20 @@
                                     <div class="message-meta"><span>{{ msg.created_at|date:"H:i" }}</span>{% if msg.version > 1 %}<span title="Modificato">✏️</span>{% endif %}</div>
                                 </div>
                                 <div class="message-actions d-flex gap-1">
-                                    <button class="btn btn-sm btn-link text-muted p-0" onclick="replyToMessage('{{ msg.id }}', '{{ msg.content|escapejs }}', 'private')">↩️</button>
-                                    <a href="{% url 'chat:delete_message' msg.id %}" class="btn btn-sm btn-link text-danger p-0" onclick="return confirm('Eliminare?')">🗑️</a>
+                                    <button class="btn btn-sm btn-link text-muted p-0"
+                                            type="button"
+                                            onclick="replyToMessage('{{ msg.id }}', '{{ msg.content|escapejs }}', 'private')">
+                                        ↩️
+                                    </button>
+
+                                    <!-- ✅ FORM POST per delete -->
+                                    <form method="post"
+                                          action="{% url 'chat:delete_message' msg.id %}"
+                                          class="d-inline"
+                                          onsubmit="return confirm('Eliminare definitivamente questo messaggio?')">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-link text-danger p-0">🗑️</button>
+                                    </form>
                                 </div>
                             </div>
                         {% else %}
@@ -195,6 +248,28 @@
 
                 <!-- ✍️ FORM PRIVATA (Reply + Allegati) -->
 
+<!-- ✅ PULSANTE HISTORY (PRIVATA) -->
+{% if has_deleted_private %}
+<div class="px-3 py-2 border-top bg-light d-flex justify-content-end gap-2">
+    <a href="{% url 'chat:chat_history' %}?type=private" class="btn btn-sm btn-outline-dark">
+        📜 Cronologia
+    </a>
+    {% if plan_features.can_export_pdf %}
+    <a href="{% url 'chat:chat_export_pdf' %}?type=private" class="btn btn-sm btn-outline-secondary">
+        📄 PDF
+    </a>
+    {% else %}
+    <button type="button"
+            class="btn btn-sm btn-outline-secondary"
+            disabled
+            title="Disponibile nel piano Pro"
+            data-bs-toggle="modal"
+            data-bs-target="#upgradeModal">
+        📄 Esporta PDF 🔒
+    </button>
+    {% endif %}
+</div>
+{% endif %}
             <div class="p-3 border-top bg-light">
                 <form method="POST" enctype="multipart/form-data" id="chatForm-private">
                     {% csrf_token %}
@@ -249,10 +324,6 @@
     </div>
 </div>
 
-<!-- 🔍 DEBUG (rimuovi in produzione) -->
-<div class="position-fixed top-0 end-0 p-2 bg-dark text-white small" style="z-index:9999;">
-  Fam: {{ family_messages|length }} | Priv: {{ private_messages|length }} | Controparte: {{ private_with_user.email|default:"Nessuna" }}
-</div>
 <div style="height:80px;"></div>
 {% endblock %}
 

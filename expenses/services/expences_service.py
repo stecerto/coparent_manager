@@ -101,31 +101,4 @@ def approve_expense(expense, user, role):
     if updated_fields:
         expense.save(update_fields=updated_fields)
 
-    if new_status == "pending" and expense.created_by != user:
-        # Notifica all'altro genitore che c'è una spesa in attesa
-        other_parent = family.members.exclude(user=user).filter(role__in=["parent_a", "parent_b"]).first()
-        if other_parent:
-            create_notification(
-                user=other_parent.user,
-                notification_type="expense_pending",
-                title=f"Nuova spesa da approvare",
-                message=f"{user.first_name} ha inserito una spesa di €{expense.amount} per {expense.child.name if expense.child else 'la famiglia'}.",
-                target_url=f"/expenses/list/?status=pending",
-                target_model="Expense",
-                target_id=expense.id,
-                send_email=True
-            )
-
-    elif new_status == "rejected":
-        # Notifica a chi ha inserito la spesa che è stata rifiutata
-        create_notification(
-            user=expense.created_by,
-            notification_type="expense_rejected",
-            title=f"Spesa rifiutata",
-            message=f"La tua spesa di €{expense.amount} è stata rifiutata. Vedi la chat per i dettagli.",
-            target_url=f"/chat/?family_id={family.id}",
-            target_model="Expense",
-            target_id=expense.id,
-            send_email=True
-        )
     return expense

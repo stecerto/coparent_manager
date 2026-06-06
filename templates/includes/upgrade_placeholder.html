@@ -1,0 +1,10 @@
+<!-- templates/includes/upgrade_placeholder.html -->
+<div class="container py-5 text-center">
+    <div class="card shadow-sm border-0 p-5 mx-auto" style="max-width:600px;">
+        <span class="fs-1">🔒</span>
+        <h3 class="fw-bold mt-3">{{ title|default:"Funzionalità Avanzata" }}</h3>
+        <p class="text-muted">Questa funzionalità è riservata ai piani <strong>Pro</strong> ed <strong>Enterprise</strong>.<br>
+        <small class="text-muted">Sblocca {{ feature|default:"tutte le funzionalità" }} per gestire la tua famiglia in modo professionale.</small></p>
+        <a href="{% url 'pricing' %}" class="btn btn-primary btn-lg mt-3">Confronta i piani →</a>
+    </div>
+</div>

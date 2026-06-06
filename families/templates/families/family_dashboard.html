@@ -6,6 +6,14 @@
 {% block title %}Pannello Controllo Famiglia{% endblock %}
 
 {% block content %}
+<!-- 🔍 DEBUG BLOCK - Rimuovi dopo il test
+<div class="alert alert-info mb-3 small">
+    <strong>DEBUG family_dashboard:</strong><br>
+    • family.name: <strong>{{ family.name|default:"NONE" }}</strong> (ID: {{ family.id|default:"NONE" }})<br>
+    • active_family_name: <strong>{{ active_family_name|default:"NONE" }}</strong><br>
+    • request.GET.family_id: <strong>{{ request.GET.family_id|default:"NONE" }}</strong><br>
+    • request.session.active_family_id: <strong>{{ request.session.active_family_id|default:"NONE" }}</strong>
+</div> -->
 
 <div class="card p-3 mb-2 shadow custom-card text-center">
     <h2 class="mb-0">🏠 Pannello Controllo Famiglia</h2>

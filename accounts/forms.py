@@ -1,3 +1,5 @@
+import profile
+
 from django.contrib.auth import get_user_model
 
 # accounts/forms.py
@@ -9,6 +11,8 @@ import re
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
+
+from core.choices import RoleChoices
 from .models import UserProfile
 
 User = get_user_model()
@@ -20,8 +24,25 @@ class RegisterForm(UserCreationForm):
     password1 = forms.CharField(widget=forms.PasswordInput(attrs={"class": "form-control", "placeholder": "Password"}))
     password2 = forms.CharField(widget=forms.PasswordInput(attrs={"class": "form-control", "placeholder": "Conferma Password"}))
 
+    # ✅ AGGIORNATO: Tutti i ruoli della pagina prezzi
     role = forms.ChoiceField(
-        choices=[("parent", "Genitore"), ("lawyer", "Avvocato")],
+        choices=[
+            (RoleChoices.PARENT, "👨‍👩‍👧 Genitore"),
+            (RoleChoices.LAWYER, "⚖️ Avvocato"),
+            (RoleChoices.MEDIATOR, "🤝 Mediatore"),
+            (RoleChoices.CONSULTANT, "📊 Consulente"),
+        ],
+        widget=forms.Select(attrs={"class": "form-select"})
+    )
+
+    # ✅ NUOVO: Campo piano (pre-compilato dalla URL, modificabile dall'utente)
+    plan = forms.ChoiceField(
+        choices=[
+            ("starter", "Starter "),
+            ("pro", "Pro (Piano consigliato)"),
+            ("enterprise", "Enterprise (Personalizzato)"),
+        ],
+        required=False,
         widget=forms.Select(attrs={"class": "form-select"})
     )
 
@@ -32,7 +53,8 @@ class RegisterForm(UserCreationForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         for field_name, field in self.fields.items():
-            if field_name not in ('password1', 'password2', 'role'):
+            # ✅ Aggiungi 'plan' alle eccezioni per non sovrascrivere la classe form-select
+            if field_name not in ('password1', 'password2', 'role', 'plan'):
                 field.widget.attrs.update({"class": "form-control"})
 
         if self.initial.get("email"):
@@ -66,6 +88,7 @@ class RegisterForm(UserCreationForm):
         user.username = self.generate_username(self.cleaned_data["email"])
         if commit:
             user.save()
+            # ✅ Il ruolo viene salvato qui. Il piano lo gestisce la view per flessibilità.
             UserProfile.objects.create(user=user, role=self.cleaned_data["role"])
         return user
 
@@ -98,45 +121,75 @@ class UserForm(forms.ModelForm):
 class UserProfileForm(forms.ModelForm):
     class Meta:
         model = UserProfile
-        fields = ['address', 'phone', 'birth_place', 'firm_name']
+        fields = ['firm_name', 'address', 'phone', 'birth_place', 'partita_iva']
         widgets = {
-            "address": forms.TextInput(attrs={
-                "placeholder": "Via, numero civico, città"
-            }),
-
-
-            'birth_place': forms.TextInput(attrs={'placeholder': 'Luogo di nascita'}),
-            'phone': forms.TextInput(attrs={"class": "form-control",'placeholder': '+39 123 456789'}),
+            'firm_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome del tuo studio legale'}),
+            'address': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Indirizzo completo'}),
+            'birth_place': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Luogo di nascita'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+39 123 456789'}),
+            'partita_iva': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'IT12345678901'}),
         }
 
     def __init__(self, *args, role=None, **kwargs):
-        # ✅ FIX 1: Estrai role PRIMA di super()
+        # 1. Estrai role PRIMA di chiamare super()
         role = kwargs.pop('role', None)
-        super().__init__(*args, **kwargs)
-        for name, field in self.fields.items():
 
+        # 2. DEBUG: stampiamo cosa riceve davvero il form
+
+
+        super().__init__(*args, **kwargs)
+        # ✅ BLINDATURA: se role non è passato, prendilo dall'istanza
+        if not role and self.instance and hasattr(self.instance, 'role'):
+            role = self.instance.role
+            # Normalizza il ruolo (rimuovi eventuali suffissi _a/_b per sicurezza)
+        role = str(role).strip().lower().replace('_a', '').replace('_b', '') if role else ''
+
+        #is_lawyer = (role == 'lawyer')
+
+        # 3. Controlla se è un avvocato (ruolo GENERICO)
+        is_lawyer = (str(role).strip().lower() == 'lawyer')
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"🔍 DEBUG FORM: role ricevuto = '{role}' (type: {type(role)})")
+        logger.error(f"🔍 DEBUG FORM: is_lawyer = {is_lawyer}")
+
+        if is_lawyer:
+            # AVVOCATI: nascondi birth_place
+            if 'birth_place' in self.fields:
+                del self.fields['birth_place']
+                logger.error("🔍 DEBUG FORM: birth_place ELIMINATO con successo")
+
+            # Rendi obbligatori i 3 campi professionali
+            self.fields['firm_name'].required = True
+            self.fields['partita_iva'].required = True
+            self.fields['phone'].required = True
+
+            # Label con asterisco
+            self.fields['firm_name'].label = "Ragione sociale / Nome studio *"
+            self.fields['partita_iva'].label = "Partita IVA *"
+            self.fields['phone'].label = "Numero di telefono *"
+
+            # Help text
+            self.fields['firm_name'].help_text = "Obbligatorio per fatturazione"
+            self.fields['partita_iva'].help_text = "Formato: IT + 11 cifre"
+            self.fields['phone'].help_text = "Per contatti urgenti con assistiti"
+
+        else:
+            # GENITORI/MEDIATORI/CONSULENTI: nascondi firm_name e partita_iva
+            if 'firm_name' in self.fields:
+                del self.fields['firm_name']
+            if 'partita_iva' in self.fields:
+                del self.fields['partita_iva']
+
+            # birth_place obbligatorio per genitori
+            if 'birth_place' in self.fields:
+                self.fields['birth_place'].required = True
+                self.fields['birth_place'].label = "Luogo di nascita *"
+
+        # 4. Aggiungi classe CSS a tutti i campi
+        for name, field in self.fields.items():
             field.widget.attrs["class"] = "form-control"
 
-            value = self.initial.get(name)
-
+            value = self.initial.get(name) or (getattr(self.instance, name, None) if self.instance else None)
             if value:
                 field.widget.attrs["class"] += " profile-complete"
-
-
-        # ✅ FIX 2: Spostato fuori da Meta + sintassi corretta per pop()
-        if role != 'lawyer' and 'firm_name' in self.fields:
-             del self.fields['firm_name']
-#Validazione campo per avvocato phone obbligatorio
-    def clean(self):
-        cleaned_data = super().clean()
-        # Esempio: telefono richiesto SOLO per avvocati
-        role = getattr(self.instance, 'role', None) or self.data.get('role')
-        if role == 'lawyer' and not cleaned_data.get('phone'):
-            self.add_error('phone', "Il telefono è obbligatorio per gli avvocati")
-        return cleaned_data
-
-        # 🔒 Blocca telefono dopo la creazione
-      #  if self.instance.pk and 'phone' in self.fields:
-      #      self.fields['phone'].widget.attrs['readonly'] = True
-      #      self.fields['phone'].help_text = "Non modificabile dopo la registrazione"
-

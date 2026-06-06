@@ -1,102 +1,74 @@
 {% extends "base.html" %}
-{% block content %}
+{% block title %}📄 {{ document.title }}{% endblock %}
 
-<div class="container mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2>{{ document.title }}</h2>
+{% block content %}
+{% if is_pro_or_higher %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <h2 class="fw-bold mb-0">{{ document.title }}</h2>
         <span class="badge bg-info fs-6">{{ document.get_status_display }}</span>
     </div>
 
-    <div class="row">
-
-        <!-- COLONNA SINISTRA: ANTEPRIMA PDF -->
-        <div class="col-md-8">
-            
-            <!-- ✅ INSERISCI QUI IL NUOVO BLOCCO -->
-            <div class="card mb-3 shadow-sm">
+    <div class="row g-4">
+        <!-- Anteprima -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm h-100">
                 <div class="card-header d-flex justify-content-between align-items-center bg-light">
-                    <span>📄 Anteprima Documento</span>
-                    <!-- Link di sicurezza se l'iframe non dovesse caricare -->
-                    <a href="{% url 'documents:document_preview' document.id %}" 
-                       target="_blank" class="btn btn-sm btn-outline-primary">
-                        ↗️ Apri in nuova scheda
-                    </a>
+                    <span>👁️ Anteprima Documento</span>
+                    {% if document.file %}
+                        <a href="{{ document.file.url }}" target="_blank" class="btn btn-sm btn-outline-primary">↗️ Apri in nuova scheda</a>
+                    {% endif %}
                 </div>
                 <div class="card-body p-0">
-                    <iframe src="{% url 'documents:document_preview' document.id %}"
-                            width="100%" height="800px"
-                            style="border:none; background:#f8f9fa;"
-                            loading="lazy"
-                            title="Anteprima {{ document.title }}">
-                        <div class="p-5 text-center">
-                            <p>Il tuo browser non supporta l'anteprima.</p>
-                            <a href="{% url 'documents:document_preview' document.id %}" class="btn btn-secondary">
-                                Scarica il file
-                            </a>
-                        </div>
-                    </iframe>
+                    {% if document.file %}
+                        <iframe src="{{ document.file.url }}" width="100%" height="700px" style="border:none; background:#f8f9fa;" loading="lazy"></iframe>
+                    {% else %}
+                        <div class="p-5 text-center text-muted">⚠️ File non disponibile per l'anteprima</div>
+                    {% endif %}
                 </div>
             </div>
-            <!-- FINE BLOCCO ANTEPRIMA -->
-
         </div>
 
-        <!-- COLONNA DESTRA: SIDEBAR INFO E FIRME -->
-        <div class="col-md-4">
-
-            <!-- Stato e Azioni -->
-            <div class="card mb-3 shadow-sm">
-                <div class="card-header">⚙️ Stato Documento</div>
-                <div class="card-body">
-                    <h5 class="card-title">{{ document.get_status_display }}</h5>
-                    
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header fw-bold">⚙️ Azioni</div>
+                <div class="card-body d-grid gap-2">
                     {% if document.status != "signed" %}
-                        <a href="{% url 'documents:sign' document.id %}" class="btn btn-dark w-100 mb-2">
-                            ✍️ Firma documento
-                        </a>
+                        <a href="{% url 'documents:sign' document.id %}" class="btn btn-dark w-100">✍️ Firma documento</a>
                     {% else %}
-                        <div class="alert alert-success text-center">
-                            ✔ Documento firmato
-                        </div>
+                        <div class="alert alert-success text-center mb-0">✔ Documento firmato</div>
+                    {% endif %}
+                    {% if document.status != "approved" %}
+                        <a href="{% url 'documents:approve' document.id %}" class="btn btn-primary w-100">✅ Approva documento</a>
                     {% endif %}
                 </div>
             </div>
 
-            <!-- Lista Firme -->
-            <div class="card mb-3 shadow-sm">
-                <div class="card-header">🖊️ Firme Apposte</div>
-                <div class="card-body">
+            <div class="card shadow-sm mb-3">
+                <div class="card-header fw-bold">🖊️ Firme Apposte</div>
+                <div class="card-body p-0">
                     {% if signatures %}
                         <ul class="list-group list-group-flush">
                             {% for sig in signatures %}
-                                <li class="list-group-item d-flex justify-content-between align-items-start">
-                                    <div>
-                                        <strong>{{ sig.user.username }}</strong><br>
-                                        <small class="text-muted">{{ sig.get_role_display }}</small>
-                                    </div>
-                                    <small class="text-muted text-end">{{ sig.signed_at|date:"d/m/Y H:i" }}</small>
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <span>{{ sig.user.first_name|default:sig.user.username }} <small class="text-muted">({{ sig.get_role_display }})</small></span>
+                                    <small class="text-muted">{{ sig.signed_at|date:"d/m H:i" }}</small>
                                 </li>
                             {% endfor %}
                         </ul>
                     {% else %}
-                        <p class="text-muted text-center">Nessuna firma ancora presente</p>
+                        <div class="p-3 text-muted text-center">Nessuna firma ancora presente</div>
                     {% endif %}
                 </div>
             </div>
 
-        </div>
-    </div>
-
-    <!-- WORKFLOW LEGALE -->
-    <div class="card shadow-sm mt-3">
-        <div class="card-header">⚖️ Workflow Legale</div>
-        <div class="card-body d-flex justify-content-between align-items-center">
-            <p class="mb-0"><strong>Stato attuale:</strong> {{ document.get_status_display }}</p>
-            <a href="{% url 'documents:approve' document.id %}" class="btn btn-primary">
-                Approva documento
-            </a>
+            <a href="{% url 'documents:documents_versions' document.id %}" class="btn btn-outline-secondary w-100">📜 Vedi Storico Versioni</a>
+            <a href="{% url 'documents:documents_list' %}" class="btn btn-outline-dark w-100 mt-2">← Torna alla Lista</a>
         </div>
     </div>
 </div>
-
-{% endblock content %}
+{% else %}
+    {% include "includes/upgrade_placeholder.html" with title="Dettaglio Documento" feature="anteprima, firme e workflow legale" %}
+{% endif %}
+{% endblock %}

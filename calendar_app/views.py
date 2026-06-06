@@ -21,7 +21,7 @@ def _parse_local_dt(dt_str):
 
 @login_required
 def family_calendar_view(request):
-    family = get_family_of_user(request.user)
+    family = get_family_of_user(request.user, request=request)
     if not family:
         return render(request, "calendar_app/no_family.html")
 
@@ -63,7 +63,7 @@ def family_calendar_view(request):
 
 @login_required
 def events_json(request):
-    family = get_family_of_user(request.user)
+    family = get_family_of_user(request.user, request=request)
     if not family: return JsonResponse([], safe=False)
 
     queryset = CalendarEvent.objects.filter(family=family, is_active=True).select_related(
@@ -92,7 +92,7 @@ def events_json(request):
 @require_POST
 def update_event_ajax(request, event_id):
     try:
-        ev = get_object_or_404(CalendarEvent, pk=event_id, family=get_family_of_user(request.user))
+        ev = get_object_or_404(CalendarEvent, pk=event_id, family=get_family_of_user(request.user, request=request))
         start = _parse_local_dt(request.POST.get("start_time"))
         end = _parse_local_dt(request.POST.get("end_time"))
         if start: ev.start_time = start
@@ -107,7 +107,7 @@ def update_event_ajax(request, event_id):
 @login_required
 @require_POST
 def delete_event_view(request, event_id):
-    ev = get_object_or_404(CalendarEvent, pk=event_id, family=get_family_of_user(request.user))
+    ev = get_object_or_404(CalendarEvent, pk=event_id, family=get_family_of_user(request.user, request=request))
     ev.is_active = False
     ev.archived_at = timezone.now()
     ev.archived_by = request.user
@@ -117,7 +117,7 @@ def delete_event_view(request, event_id):
 
 @login_required
 def event_form_view(request, event_id=None):
-    family = get_family_of_user(request.user)
+    family = get_family_of_user(request.user, request=request)
     if not family: return render(request, "calendar_app/no_family.html")
 
     event = get_object_or_404(CalendarEvent, pk=event_id, family=family) if event_id else None

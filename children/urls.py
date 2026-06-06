@@ -11,5 +11,5 @@ urlpatterns = [
     path("add/", views.child_create_view, name="child_form"),
     path("<int:pk>/edit/", views.child_update_view, name="child_edit"),
     path("<int:pk>/delete/", views.child_delete_view, name="child_confirm_delete"),
-    path("child/<int:child_id>/pdf/", views.export_child_pdf, name="child_pdf"),
+    path("child/<int:child_id>/pdf/", views.child_pdf_view, name="child_pdf"),
 ]

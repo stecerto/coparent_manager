@@ -1,10 +1,11 @@
 from decimal import Decimal
 
 from django import forms
+from django.contrib.auth import get_user_model
 
 from core.choices import RoleChoices
 from expenses.models import Expense
-from .models import Invitation, ChildSupportAgreement
+from .models import Invitation, ChildSupportAgreement, FamilyMember
 
 from django import forms
 from .models import Invitation
@@ -56,7 +57,7 @@ class InvitationForm(forms.ModelForm):
 
     class Meta:
         model = Invitation
-        fields = ["role", "channel", "email", "phone", "display_name"]
+        fields = ["role", "channel", "email", "phone", "display_name", 'message']
         widgets = {
             "role": forms.Select(attrs={"class": "form-select"}),
         }
@@ -64,27 +65,59 @@ class InvitationForm(forms.ModelForm):
     # =========================
     # INIT
     # =========================
-    def __init__(self, *args, user_role=None, family=None, **kwargs):
+    def __init__(self, *args, user_role=None, family=None, inviter=None, **kwargs):
         super().__init__(*args, **kwargs)
 
         self.user_role = user_role
         self.family = family
+        self.inviter = inviter
+
+        # ✅ AGGIUNGI CAMPO FAMIGLIA TARGET (per professionisti)
+        from families.models import Family
+        self.fields['target_family'] = forms.ModelChoiceField(
+            queryset=Family.objects.none(),
+            required=False,
+            label="Seleziona la Famiglia",
+            widget=forms.Select(attrs={'class': 'form-select'})
+        )
 
         # Default: tutti i ruoli
         self.fields["role"].choices = RoleChoices.choices
 
-        if not family or not user_role:
-            return
+
+
+        # ✅ SE L'INVITANTE È UN PROFESSIONISTA, POPOLA IL DROPDOWN FAMIGLIE
+        if inviter and hasattr(inviter, 'family_memberships'):
+            # Professionisti possono invitare solo per le famiglie a cui sono assegnati
+            family_ids = inviter.family_memberships.values_list('family_id', flat=True)
+            self.fields['target_family'].queryset = Family.objects.filter(id__in=family_ids)
+
+            # Se è un professionista, rendi obbligatoria la scelta della famiglia
+            if user_role in ['lawyer','lawyer_a','lawyer_b','mediator', 'mediator_a', 'mediator_b',
+                           'consultant', 'consultant_a', 'consultant_b']:
+                self.fields['target_family'].required = False
+            else:
+                # Genitori: nascondi il campo (la famiglia è implicita)
+                self.fields['target_family'].widget = forms.HiddenInput()
+                self.fields['target_family'].initial = family.id
+        else:
+            # Fallback: nascondi il campo
+            self.fields['target_family'].widget = forms.HiddenInput()
+            self.fields['target_family'].initial = family.id if family else None
 
         # =========================
         # RUOLI GIÀ OCCUPATI
         # =========================
-        occupied = set(family.members.values_list("role", flat=True))
+        if family:
+            occupied = set(family.members.values_list("role", flat=True))
+        else:
+            occupied = set()  # ✅ Set vuoto: nessun ruolo occupato
 
         # =========================
         # RUOLI CONSENTITI PER INVITANTE
         # =========================
         if user_role in (RoleChoices.PARENT_A, "parent_a"):
+            # Genitore A invita: mostra ruoli specifici
             allowed = {
                 RoleChoices.PARENT_B,
                 RoleChoices.LAWYER_A,
@@ -93,6 +126,7 @@ class InvitationForm(forms.ModelForm):
             }
 
         elif user_role in (RoleChoices.PARENT_B, "parent_b"):
+            # Genitore B invita: mostra ruoli specifici
             allowed = {
                 RoleChoices.PARENT_A,
                 RoleChoices.LAWYER_B,
@@ -100,15 +134,18 @@ class InvitationForm(forms.ModelForm):
                 RoleChoices.CONSULTANT,
             }
 
-        elif "lawyer" in str(user_role):
+        elif "lawyer" in str(user_role) or "mediator" in str(user_role) or "consultant" in str(user_role):
+            # ✅ PROFESSIONISTI: mostrano SOLO ruoli base (senza _a/_b)
+            # Il suffisso verrà calcolato automaticamente in base alla famiglia selezionata
+            # NON devono vedere "lawyer" perché sono già loro l'avvocato
             allowed = {
-                RoleChoices.LAWYER_A,
-                RoleChoices.LAWYER_B,
-                RoleChoices.MEDIATOR,
-                RoleChoices.CONSULTANT,
+                "parent",  # Genitore (base, senza suffisso)
+                "mediator",  # Mediatore (base)
+                "consultant",  # Consulente (base)
             }
 
         else:
+            # Fallback per altri ruoli
             allowed = {c[0] for c in RoleChoices.choices}
 
         # =========================
@@ -118,6 +155,19 @@ class InvitationForm(forms.ModelForm):
             c for c in RoleChoices.choices
             if c[0] in allowed and c[0] not in occupied
         ]
+
+        # ✅ Se l'invitante è un professionista, aggiungi i ruoli base se non ci sono
+        if "lawyer" in str(user_role) or "mediator" in str(user_role) or "consultant" in str(user_role):
+            # Aggiungi manualmente i ruoli base se mancano
+            base_roles = [
+                ("parent", "Genitore"),
+                ("mediator", "Mediatore"),
+                ("consultant", "Consulente"),
+            ]
+            available_roles = [
+                c for c in base_roles
+                if c[0] in allowed
+            ]
 
         self.fields["role"].choices = available_roles
 
@@ -146,6 +196,16 @@ class InvitationForm(forms.ModelForm):
         email = cleaned_data.get("email")
         phone = cleaned_data.get("phone")
         role = cleaned_data.get("role")
+        target_family = cleaned_data.get("target_family")
+        # ✅ NUOVA LOGICA: Gestione target_family in base al ruolo invitato
+        if role == 'parent':
+            # Se invita un genitore, la famiglia è sempre None (se ne crea una nuova)
+            cleaned_data['target_family'] = None
+        else:
+            # Se invita mediatore o consulente, la famiglia è OBBLIGATORIA
+            if not target_family:
+                self.add_error("target_family",
+                               "⚠️ Devi selezionare una famiglia esistente per invitare un professionista.")
 
         if not channel:
             self.add_error("channel", "Seleziona un metodo di invito")
@@ -169,6 +229,12 @@ class InvitationForm(forms.ModelForm):
                 status="pending"
             ).exists():
                 self.add_error("email", "Invito già esistente")
+
+        # ✅ Evita inviti duplicati per lo stesso utente in famiglie diverse
+        if self.instance.pk is None and email:
+            target_user = get_user_model().objects.filter(email=email).first()
+            if target_user and FamilyMember.objects.filter(user=target_user, family=self.family).exists():
+                self.add_error("email", "Questo utente è già membro di questa famiglia")
 
         return cleaned_data
 

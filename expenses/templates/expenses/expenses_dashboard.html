@@ -33,8 +33,13 @@
                 Riepilogo Spese
             </a>
             <a href="{% url 'expenses:download_expense_pdf' %}" class="btn btn-success btn-style mb-2">
-            📄 Scarica PDF
+            📄 Scarica Report PDF
             </a>
+            {% if is_pro_or_higher %}
+                <a href="{% url 'expenses:expenses_analytics' %}" class="btn btn-outline-primary btn-sm">
+                    📊 Analisi Avanzata
+                </a>
+            {% endif %}
 
         </div>
     </div>
@@ -43,61 +48,96 @@
         <div class="row justify-content-center">
 
         <!-- CATEGORY -->
-        <div class="col-12 col-md-6 col-lg-4 mb-3">
-            <div class="card p-3 shadow custom-card h-100">
-
-                <h5 class="text-center">Spese per categoria</h5>
-
-                    <!-- WRAPPER STABILE -->
-                    <div class="d-flex w-100 align-items-stretch">
-
-                        <!-- LEGENDA SINISTRA -->
-                        <div id="categoryLegend" class="d-flex flex-column gap-2 me-3">
-                            {% for c in category_summary %}
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="legend-dot" style="background:{{ c.expense_type__color|default:'#6f42c1' }}"></span>
-                                    <small>{{ c.expense_type__display_name }}</small>
-                                </div>
-                            {% endfor %}
-                        </div>
-
-                        <!-- GRAFICO DESTRA -->
-                        <div class="flex-grow-1 d-flex justify-content-center align-items-center"
-                             style="height:250px; width:100%;">
-                            <canvas id="categoryChart"></canvas>
-                        </div>
-
+        <!-- ✅ GRAFICI: Visibili SOLO per piano Pro+ -->
+        {% if is_pro_or_higher %}
+        <div class="row g-4 mb-4">
+            <!-- Grafico a Torta: Categorie -->
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white fw-bold">📊 Spese per Categoria</div>
+                    <div class="card-body">
+                        <canvas id="categoryChart"></canvas>
                     </div>
+                </div>
+            </div>
 
+            <!-- Grafico a Barre: Quote Genitori -->
+            <div class="col-md-6">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white fw-bold">⚖️ Ripartizione Quote</div>
+                    <div class="card-body">
+                        <canvas id="splitChart"></canvas>
+                    </div>
+                </div>
             </div>
         </div>
 
+    <!-- ✅ Script Chart.js: Eseguito SOLO se Pro+ -->
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    // ✅ Controllo sicurezza: se non è Pro+, esci subito
+    {% if not is_pro_or_higher %}return;{% endif %}
 
-    <!-- PARENT -->
-    <div class="col-12 col-md-6 col-lg-4 mb-3">
-        <div class="card p-3 shadow custom-card h-100">
+    // ... il tuo codice Chart.js esistente ...
 
-            <h5 class="text-center">Spese per genitore</h5>
+    // Esempio: Grafico Categorie
+    const ctxCat = document.getElementById('categoryChart');
+    if (ctxCat) {
+        new Chart(ctxCat, {
+            type: 'doughnut',
+            data: {
+                labels: [{% for c in category_summary %}"{{ c.expense_type__display_name }}",{% endfor %}],
+                datasets: [{
+                    data: [{% for c in category_summary %}{{ c.total|floatformat:2 }},{% endfor %}],
+                    backgroundColor: [{% for c in category_summary %}'{{ c.expense_type__color }}',{% endfor %}]
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
 
-            <div style="height:250px;">
-                <canvas id="parentChart"></canvas>
+    // Esempio: Grafico Quote
+    const ctxSplit = document.getElementById('splitChart');
+    if (ctxSplit) {
+        new Chart(ctxSplit, {
+            type: 'bar',
+            data: {
+                labels: ['Genitore A', 'Genitore B'],
+                datasets: [{
+                    label: 'Totale Quote (€)',
+                    data: [{{ parent_a_total|floatformat:2 }}, {{ parent_b_total|floatformat:2 }}],
+                    backgroundColor: ['#0d6efd', '#dc3545']
+                }]
+            },
+            options: { responsive: true, maintainAspectRatio: false }
+        });
+    }
+});
+</script>
+        {% else %}
+            <!-- ✅ MESSAGGIO UPGRADE per utenti Starter -->
+            <div class="alert alert-info border-0 shadow-sm mb-4">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="fs-4">📈</span>
+                    <div class="flex-grow-1">
+                        <h6 class="mb-1 fw-bold">Grafici e Analisi Avanzate</h6>
+                        <p class="mb-0 small text-muted">Passa al piano <strong>Pro</strong> per visualizzare report visivi, trend mensili e analisi comparative.</p>
+                    </div>
+                    <a href="{% url 'pricing' %}" class="btn btn-sm btn-primary text-nowrap">Scopri i piani →</a>
+                </div>
             </div>
+        {% endif %}
 
         </div>
     </div>
-
 </div>
-        </div>
-
         <!-- PDF -->
 
         <!-- <hr style="border: 1px solid #ccc; width: 50%; margin: 20px auto;"> -->
 
-    </div>
+
     <div class="card p-3 mb-2 shadow custom-card">
         <h4>📅 Calendario spese</h4>
-
-
 
         <div id="calendar" class="mb-4"
              style="max-width: 100%; margin-bottom:20px;">
@@ -122,39 +162,7 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="{% static 'js/pages/expenses_dashboard.js' %}"></script>
-<script>
-window.categoryChartData = {
-    labels: [
-        {% for c in category_summary %}
-            "{{ c.expense_type__display_name|escapejs }}",
-        {% endfor %}
-    ],
-    datasets: [{
-        data: [
-            {% for c in category_summary %}
-                Number("{{ c.total|default:'0' }}"),
-            {% endfor %}
-        ],
-        backgroundColor: [
-            {% for c in category_summary %}
-                "{{ c.expense_type__color|default:'#6f42c1' }}",
-            {% endfor %}
-        ]
-        }]
-    };
 
-
-
-    window.parentChartData = {
-        labels: ["Genitore A", "Genitore B"],
-        datasets: [{
-            data: [
-                Number("{{ parent_a_total|default:'0' }}"),
-                Number("{{ parent_b_total|default:'0' }}")
-            ]
-        }]
-    };
-</script>
 <script>
     document.addEventListener("click", function (e) {
         const modal = document.getElementById("dayModal");

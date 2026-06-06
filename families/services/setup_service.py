@@ -1,17 +1,17 @@
 
 
 from django import forms
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.forms import modelformset_factory
-from django.shortcuts import redirect, render
+from django.shortcuts import render, redirect
 from django.utils import timezone
 
+from accounts.forms import FirstLoginForm, UserProfileForm
+from accounts.models import UserProfile
 from children.models import ChildProfile
 from families.models import FamilyMember, Family
 from families.utils import get_family_of_user
-from accounts.models import UserProfile
-from accounts.forms import FirstLoginForm, UserProfileForm
-from families.services.email_service import send_invitation_email
 
 
 @login_required
@@ -19,7 +19,12 @@ def handle_setup(request, mode="setup"):
     user = request.user
     profile, _ = UserProfile.objects.get_or_create(user=user)
 
-    # 🔍 Cerca famiglia esistente (da invito o già creata)
+    # ✅ AVVOCATI/MEDIATORI/CONSULENTI: Non devono fare setup famiglia
+    if profile.role in ["lawyer", "mediator", "consultant"]:
+        messages.info(request, "✅ Il tuo profilo professionale è attivo. Riceverai inviti dalle famiglie.")
+        return redirect("families:professional_dashboard")
+
+    # ✅ GENITORI: Procedi con il setup famiglia
     family = get_family_of_user(user)
 
     child_formset = build_child_formset(
@@ -29,48 +34,38 @@ def handle_setup(request, mode="setup"):
 
     if request.method == "POST":
         if child_formset.is_valid():
-
-            # ✅ LOGICA DI SICUREZZA: Non creare nuova famiglia se l'utente è già membro
+            # ✅ CREA FAMIGLIA SOLO PER GENITORI SENZA FAMIGLIA
             if not family:
-                # Fallback: cerca membership esistente ma non linkata correttamente
                 existing_membership = FamilyMember.objects.filter(user=user).first()
                 if existing_membership:
                     family = existing_membership.family
                 else:
-                    # 🆕 Crea famiglia SOLO per registrazioni DIRETTE (senza invito)
-                    creator_role = "lawyer_a" if profile.role.startswith("lawyer") else "parent_a"
+                    # 🆕 Crea famiglia SOLO per genitori
                     family = Family.objects.create(
                         name=f"Famiglia {user.last_name or 'Nuova'}",
                         created_by=user,
-                        creator_role=creator_role
+                        creator_role="parent_a"
                     )
                     FamilyMember.objects.create(
                         family=family,
                         user=user,
-                        role=creator_role,
+                        role="parent_a",
                         is_primary=True
                     )
 
-            # 🔄 Sincronizza ruolo profilo con quello effettivo del membership
-            member = FamilyMember.objects.filter(family=family, user=user).first()
-            if member and profile.role != member.role:
-                profile.role = member.role
-                profile.save()
-
             save_children(child_formset, family, user)
             complete_setup(profile)
+            messages.success(request, f"✅ Setup completato! Benvenuto nella tua famiglia.")
+            return redirect("families:family_dashboard")
 
-            return redirect("families:family_dashboard")  # o summary, in base al tuo routing
-
-    return {
-        "context": {
-            "form_user": FirstLoginForm(instance=user),
-            "form_profile": UserProfileForm(instance=profile),
-            "formset": child_formset,
-            "is_setup": True,
-            "family": family  # Utile per il template
-        }
-    }
+    # ✅ CORRETTO: Usa render() invece di restituire un dizionario
+    return render(request, "families/setup.html", {
+        "form_user": FirstLoginForm(instance=user),
+        "form_profile": UserProfileForm(instance=profile),
+        "formset": child_formset,
+        "is_setup": True,
+        "family": family
+    })
 
 
 

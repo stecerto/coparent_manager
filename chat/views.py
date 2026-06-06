@@ -4,9 +4,10 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseForbidden
 from django.contrib import messages
 from children.models import ChildProfile
+from core.decorators import plan_required
 from .models import FamilyMessage
 from .services.message_service import send_message, delete_message
 from families.models import FamilyMember
@@ -29,7 +30,7 @@ def family_chat_view(request, family_id=None, user_id=None):
         )
         family = membership.family
     else:
-        family = get_family_of_user(user)
+        family = get_family_of_user(user, request=request)
         if not family:
             return render(request, "chat/no_family.html")
         membership = FamilyMember.objects.filter(family=family, user=user).first()
@@ -209,13 +210,25 @@ def family_chat_view(request, family_id=None, user_id=None):
         "private_docs": private_docs,
         "reject_context": reject_context,
         "expenses": expenses,
+        "has_deleted_family": FamilyMessage.objects.filter(
+            family=family, recipient__isnull=True, is_active=False
+        ).exists(),
+        "has_deleted_private": FamilyMessage.objects.filter(
+            family=family,
+            sender__in=[user, private_with_user] if private_with_user else [user],
+            recipient__in=[user, private_with_user] if private_with_user else [None],
+            is_active=False
+        ).exists() if private_with_user else False,
     }
+
+
     return render(request, "chat/chat_home.html", context)
+
 
 
 @login_required
 def message_history_view(request, pk):
-    family = get_family_of_user(request.user)
+    family = get_family_of_user(request.user, request=request)
     message = get_object_or_404(FamilyMessage, pk=pk, family=family)
 
     history = []
@@ -230,14 +243,46 @@ def message_history_view(request, pk):
 
 @login_required
 def delete_message_view(request, pk):
-    family = get_family_of_user(request.user)
-    message = get_object_or_404(FamilyMessage, pk=pk, family=family, is_active=True)
+    """Elimina messaggio: GET mostra conferma, POST esegue delete"""
 
+    # 1️⃣ Recupera famiglia
+    family = get_family_of_user(request.user, request=request)
+    if not family:
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({"error": "Nessuna famiglia"}, status=400)
+        return redirect('chat:chat_home')
+
+    # 2️⃣ ✅ FIX CRUCIALE: Rimuovi is_active=True per trovare anche messaggi già cancellati
+    # Se non esiste proprio (PK errato o famiglia sbagliata), allora sì che va in 404
+    message = get_object_or_404(FamilyMessage, pk=pk, family=family)
+
+    # 3️⃣ Permessi: solo il mittente può cancellare
+    if message.sender != request.user:
+        return HttpResponseForbidden("Puoi cancellare solo i tuoi messaggi")
+
+    # 4️⃣ Se è già stato cancellato, redirect gentile invece di crash
+    if not message.is_active:
+        messages.info(request, "ℹ️ Messaggio già eliminato.")
+        return redirect('chat:chat_home')
+
+    # 5️⃣ POST = esegui delete
     if request.method == "POST":
-        delete_message(message, request.user)
+        # Chiama la tua funzione di soft delete (assicurati che esista)
+        if 'delete_message' in globals():
+            delete_message(message, request.user)
+        else:
+            # Fallback inline se la funzione non è definita altrove
+            message.is_active = False
+            message.save(update_fields=['is_active'])
+
         messages.success(request, "🗑️ Messaggio eliminato.")
+
+        # Supporta AJAX
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+            return JsonResponse({"success": True})
         return redirect("chat:chat_home")
 
+    # 6️⃣ GET = mostra pagina di conferma
     return render(request, "chat/confirm_chat_delete.html", {"message": message})
 
 
@@ -254,7 +299,7 @@ def send_rejection_message(request):
         if not expense_id or not reason:
             return JsonResponse({"success": False, "error": "Dati mancanti"}, status=400)
 
-        expense = Expense.objects.get(pk=expense_id, family=get_family_of_user(request.user))
+        expense = Expense.objects.get(pk=expense_id, family=get_family_of_user(request.user, request=request))
 
         content = (
             f"🔴 *Rifiuto spesa*\n\n"
@@ -289,3 +334,147 @@ def send_rejection_message(request):
         return JsonResponse({"success": False, "error": "Spesa non trovata"}, status=404)
     except Exception as e:
         return JsonResponse({"success": False, "error": str(e)}, status=500)
+
+
+# chat/views.py (in fondo al file, prima di eventuali import finali)
+from django.template.loader import render_to_string
+from weasyprint import HTML
+from django.http import HttpResponse
+
+
+@login_required
+def chat_history_view(request):
+    """Mostra TUTTI i messaggi (attivi + eliminati) per cronologia"""
+    family = get_family_of_user(request.user, request=request)
+    if not family:
+        return redirect("chat:chat_home")
+
+    chat_type = request.GET.get("type", "family")
+
+    if chat_type == "private":
+        # Chat privata: messaggi tra user e counterpart
+        private_with_user = None
+        membership = FamilyMember.objects.filter(family=family, user=request.user).first()
+        if membership:
+            role_val = membership.role.value if hasattr(membership.role, 'value') else membership.role
+            target_role = None
+            if role_val in (RoleChoices.LAWYER_A, 'lawyer_a'):
+                target_role = RoleChoices.PARENT_A
+            elif role_val in (RoleChoices.LAWYER_B, 'lawyer_b'):
+                target_role = RoleChoices.PARENT_B
+            elif role_val in (RoleChoices.PARENT_A, 'parent_a'):
+                target_role = RoleChoices.LAWYER_A
+            elif role_val in (RoleChoices.PARENT_B, 'parent_b'):
+                target_role = RoleChoices.LAWYER_B
+
+            if target_role:
+                counterpart = FamilyMember.objects.filter(family=family, role=target_role).select_related(
+                    'user').first()
+                if counterpart: private_with_user = counterpart.user
+
+        messages = FamilyMessage.objects.filter(
+            family=family,
+            sender__in=[request.user, private_with_user] if private_with_user else [request.user],
+            recipient__in=[request.user, private_with_user] if private_with_user else [None]
+        ).order_by("created_at").select_related("sender", "recipient", "reply_to", "deleted_by")
+        title = "Cronologia Chat Privata"
+    else:
+        # Chat famiglia: tutti i messaggi pubblici
+        messages = FamilyMessage.objects.filter(
+            family=family,
+            recipient__isnull=True  # Solo messaggi di famiglia
+        ).order_by("created_at").select_related("sender", "reply_to", "deleted_by")
+        title = "Cronologia Chat Famiglia"
+
+    return render(request, "chat/chat_history.html", {
+        "family": family,
+        "messages": messages,
+        "chat_type": chat_type,
+        "page_title": title,
+    })
+
+
+@login_required
+@plan_required("pro")  # ✅ Blocca automaticamente gli starter
+def chat_export_pdf(request):
+    """Esporta chat in PDF (solo messaggi attivi) + LOGO SEMPRE VISIBILE"""
+    import os, base64
+    from django.conf import settings
+
+    family = get_family_of_user(request.user, request=request)
+    if not family:
+        return redirect("chat:chat_home")
+
+    # ✅ CARICA LOGO BASE64 (fallback a percorso assoluto se fallisce)
+    logo_base64 = None
+    logo_path = None
+    possible_paths = [
+        os.path.join(settings.BASE_DIR, 'static', 'img', 'logo_coparent.png'),
+        os.path.join(settings.BASE_DIR, 'static', 'images', 'logo-coparent.svg'),
+        os.path.join(settings.BASE_DIR, 'static', 'images', 'logo_coparent.png'),
+    ]
+    for path in possible_paths:
+        if os.path.exists(path):
+            with open(path, "rb") as f:
+                logo_base64 = base64.b64encode(f.read()).decode('utf-8')
+            break
+    if not logo_base64:
+        # Fallback: usa percorso assoluto per WeasyPrint
+        for path in possible_paths:
+            if os.path.exists(path):
+                logo_path = request.build_absolute_uri(f"/static/{path.split('static/')[-1]}")
+                break
+
+    chat_type = request.GET.get("type", "family")
+
+    if chat_type == "private":
+        private_with_user = None
+        membership = FamilyMember.objects.filter(family=family, user=request.user).first()
+        if membership:
+            role_val = membership.role.value if hasattr(membership.role, 'value') else membership.role
+            target_role = None
+            if role_val in (RoleChoices.LAWYER_A, 'lawyer_a'):
+                target_role = RoleChoices.PARENT_A
+            elif role_val in (RoleChoices.LAWYER_B, 'lawyer_b'):
+                target_role = RoleChoices.PARENT_B
+            elif role_val in (RoleChoices.PARENT_A, 'parent_a'):
+                target_role = RoleChoices.LAWYER_A
+            elif role_val in (RoleChoices.PARENT_B, 'parent_b'):
+                target_role = RoleChoices.LAWYER_B
+
+            if target_role:
+                counterpart = FamilyMember.objects.filter(family=family, role=target_role).select_related(
+                    'user').first()
+                if counterpart: private_with_user = counterpart.user
+
+        qs = FamilyMessage.objects.filter(
+            family=family,
+            is_active=True,
+            sender__in=[request.user, private_with_user] if private_with_user else [request.user],
+            recipient__in=[request.user, private_with_user] if private_with_user else [None]
+        ).order_by("created_at").select_related("sender", "recipient")
+        title = f"Chat Privata - {family.name}"
+    else:
+        qs = FamilyMessage.objects.filter(
+            family=family,
+            is_active=True,
+            recipient__isnull=True
+        ).order_by("created_at").select_related("sender")
+        title = f"Chat Famiglia - {family.name}"
+
+    context = {
+        "messages": qs,
+        "family": family,
+        "title": title,
+        "generated_at": timezone.now(),
+        "user": request.user,
+        "logo_base64": logo_base64,  # ✅ PASSA IL LOGO
+        "logo_path": logo_path,
+    }
+    html_string = render_to_string("chat/chat_pdf.html", context, request=request)
+    pdf_bytes = HTML(string=html_string, base_url=request.build_absolute_uri("/")).write_pdf()
+
+    response = HttpResponse(pdf_bytes, content_type="application/pdf")
+    filename = title.replace(" ", "_").replace(":", "").replace("/", "-")
+    response["Content-Disposition"] = f'attachment; filename="{filename}_{family.id}.pdf"'
+    return response

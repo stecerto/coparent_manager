@@ -12,5 +12,5 @@ class CalendarAppConfig(AppConfig):
         # ✅ Import sicuro con fallback
         try:
             import calendar_app.signals  # noqa: F401
-        except Exception as e:
+        except ImportError as e:
             logger.warning(f"⚠️ Segnali calendar_app non caricati: {e}")
