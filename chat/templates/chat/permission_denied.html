@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Accesso Negato - CoParentManager{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <!-- ✅ MODALE FORZATO APERTO (show + display: block) -->
+    <div class="modal fade show" id="permissionModal" tabindex="-1" aria-labelledby="permissionModalLabel" style="display: block; background-color: rgba(0, 0, 0, 0.5);">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content border-0 shadow-lg">
+                
+                <!-- Header Rosso di Avviso -->
+                <div class="modal-header bg-danger text-white border-0">
+                    <h5 class="modal-title fw-bold" id="permissionModalLabel">
+                        <i class="bi bi-shield-x me-2"></i>Accesso Negato
+                    </h5>
+                </div>
+                
+                <!-- Corpo del Messaggio -->
+                <div class="modal-body text-center py-4">
+                    <div class="mb-3">
+                        <i class="bi bi-exclamation-triangle-fill text-danger" style="font-size: 3rem;"></i>
+                    </div>
+                    <h5 class="fw-bold mb-3">Ops! Qualcosa non va.</h5>
+                    <p class="text-muted fs-5 mb-0">
+                        {{ message|default:"Non sei autorizzato a effettuare questa azione." }}
+                    </p>
+                </div>
+                
+                <!-- Pulsante per Tornare Indietro -->
+                <div class="modal-footer border-0 justify-content-center pb-4">
+                    <a href="{{ safe_redirect|default:'/chat/' }}" class="btn btn-primary btn-lg px-5">
+                        <i class="bi bi-arrow-left me-2"></i>Torna alla Chat
+                    </a>
+                </div>
+                
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ Script opzionale per gestire la chiusura con il tasto ESC o clic fuori -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Se l'utente clicca sullo sfondo scuro, reindirizza alla chat
+        document.getElementById('permissionModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                window.location.href = "{{ safe_redirect|default:'/chat/' }}";
+            }
+        });
+    });
+</script>
+{% endblock %}

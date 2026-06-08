@@ -27,7 +27,7 @@ AUTH_USER_MODEL = "users.User"
 SECRET_KEY = config("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = False
+DEBUG = True
 
 CSRF_TRUSTED_ORIGINS = ["https://*.herokuapp.com"]
 
@@ -212,12 +212,27 @@ else:
                 'level': 'ERROR',
                 'class': 'django.utils.log.AdminEmailHandler',
             },
+
+        },
+        'root': {
+            'handlers': ['console'],
+            'level': 'INFO',
         },
         'loggers': {
             'django': {
                 'handlers': ['file', 'mail_admins'],
                 'level': 'ERROR',
-                'propagate': True,
+                'propagate': False,
+            },
+            'chat': {
+                'handlers': ['console'],
+                'level': 'DEBUG',
+                'propagate': False,
+            },
+            'notifications': {
+                'handlers': ['console'],
+                'level': 'DEBUG',
+                'propagate': False,
             },
         },
     }
@@ -268,13 +283,13 @@ SERVER_EMAIL = EMAIL_HOST_USER
 # In fondo al tuo settings.py
 
 if DEBUG:
-    # 🛠️ IN SVILUPPO: Disabilita le forzature HTTPS
+    # Ambiente di SVILUPPO: usa HTTP normale
     SECURE_SSL_REDIRECT = False
     SESSION_COOKIE_SECURE = False
     CSRF_COOKIE_SECURE = False
     SECURE_HSTS_SECONDS = 0
 else:
-    # 🚀 IN PRODUZIONE: Abilita la sicurezza HTTPS
+    # Ambiente di PRODUZIONE: forza HTTPS
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True

@@ -195,22 +195,31 @@ def get_user_role_in_family(user, family=None):
 from accounts.models import UserProfile
 
 
+# families/utils.py
 def calculate_setup_progress(user):
+    """
+    Calcola il progresso di completamento del profilo.
+    Logica diversa per genitori e professionisti.
+    """
+    from accounts.models import UserProfile
+
     profile = UserProfile.objects.filter(user=user).first()
+    if not profile:
+        return 0, 0, 0, [], []
 
     # ✅ Differenzia i campi in base al ruolo
     is_professional = profile.role in ['lawyer', 'mediator', 'consultant']
 
     if is_professional:
-        # AVVOCATI/MEDIATORI/CONSULENTI: campi professionali
+        # PROFESSIONISTI: 4 campi obbligatori
         important_fields = [
+            ("firm_name", "Ragione sociale / Nome studio"),
             ("address", "Indirizzo"),
             ("phone", "Telefono"),
-            ("firm_name", "Nome studio legale"),
             ("partita_iva", "Partita IVA"),
         ]
     else:
-        # GENITORI: campi personali
+        # GENITORI: 3 campi obbligatori
         important_fields = [
             ("address", "Indirizzo"),
             ("phone", "Telefono"),
@@ -222,19 +231,20 @@ def calculate_setup_progress(user):
     completed = 0
 
     for field_name, label in important_fields:
+        # ✅ Recupera il valore dal profilo
         value = getattr(profile, field_name, "")
 
-        # ✅ normalizza
+        # Normalizza
         value = str(value).strip() if value is not None else ""
 
-        if value != "":
+        if value and value != "":
             completed += 1
-            completed_labels.append(label)
+            completed_labels.append(f"✅ {label}")
         else:
-            missing_labels.append(label)
+            missing_labels.append(f"⚠️ {label} (mancante)")
 
     total = len(important_fields)
-    progress_pct = round((completed / total) * 100) if total else 0
+    progress_pct = round((completed / total) * 100) if total > 0 else 0
 
     return (
         progress_pct,
@@ -328,13 +338,17 @@ def get_target_role(base_role, inviter_role):
     inviter_role_str = str(inviter_role).lower()
     base_role_clean = base_role.replace('_a', '').replace('_b', '')
 
+    # ✅ MEDIATORI E CONSULENTI: MAI suffissi!
+    if base_role_clean in ['mediator', 'consultant']:
+        return base_role_clean  # Ritorna solo 'mediator' o 'consultant'
+
     # =========================
     # CASO 1: L'invitante è un GENITORE
     # =========================
     if inviter_role_str in ['parent_a', 'parent_b', 'parent']:
         if base_role_clean == 'parent':
             # ✅ Genitore invita l'ALTRO genitore: inverti il suffisso
-            if inviter_role_str == 'parent_a':
+            if inviter_role_str in ['parent_a', 'parent']:
                 return 'parent_b'
             elif inviter_role_str == 'parent_b':
                 return 'parent_a'
@@ -343,7 +357,7 @@ def get_target_role(base_role, inviter_role):
         else:
             # ✅ Genitore invita professionista: stesso suffisso del genitore
             suffix = '_b' if inviter_role_str == 'parent_b' else '_a'
-            if base_role_clean in ['lawyer', 'mediator', 'consultant']:
+            if base_role_clean == 'lawyer':
                 return f"{base_role_clean}{suffix}"
             return base_role
 

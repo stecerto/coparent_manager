@@ -14,4 +14,5 @@ urlpatterns = [
     # ✅ Azioni
     path('api/mark-read/<int:notification_id>/', views.mark_as_read, name='mark_as_read'),
     path('api/mark-read-all/', views.mark_as_read_all, name='mark_as_read_all'),
+    path('api/delete-all/', views.delete_all_notifications, name='delete_all'),
 ]

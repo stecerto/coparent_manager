@@ -21,19 +21,17 @@
                     {% csrf_token %}
                     {{ form|crispy }}
 
-                    <!-- ✅ Campo piano: SPOSTATO DENTRO IL FORM -->
-                    {% if not invitation %}
+                    <!-- ✅ Campo piano: MOSTRATO SEMPRE (anche per invitati) -->
                     <div class="mb-3">
-                        <label for="{{ form.plan_choice.id_for_label }}" class="form-label fw-bold">
+                        <label for="{{ form.plan.id_for_label }}" class="form-label fw-bold">
                             📦 Piano di abbonamento
                         </label>
-                        {{ form.plan_choice }}
-                        <small class="text-muted">
+                        {{ form.plan }}
+                        <small class="text-muted d-block mt-1">
                             Puoi cambiare o annullare in qualsiasi momento dalle Impostazioni.
                             <a href="{% url 'pricing' %}" target="_blank" class="ms-1">Confronta i piani →</a>
                         </small>
                     </div>
-                    {% endif %}
 
                     <!-- ✅ Privacy consent block -->
                     <div class="mb-3 p-3 border rounded bg-light">

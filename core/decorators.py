@@ -9,7 +9,7 @@ def plan_required(min_plan="pro"):
     def decorator(view_func):
         @wraps(view_func)
         def _wrapped_view(request, *args, **kwargs):
-            profile = getattr(request.user, 'profile', None)
+            profile = getattr(request.user, 'profile', None) or getattr(request.user, 'userprofile', None)
             user_plan = getattr(profile, 'plan', 'starter') if profile else 'starter'
             user_level = PLAN_LEVELS.get(user_plan, 1)
             required_level = PLAN_LEVELS.get(min_plan, 2)

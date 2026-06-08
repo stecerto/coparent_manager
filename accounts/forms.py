@@ -134,40 +134,40 @@ class UserProfileForm(forms.ModelForm):
         # 1. Estrai role PRIMA di chiamare super()
         role = kwargs.pop('role', None)
 
-        # 2. DEBUG: stampiamo cosa riceve davvero il form
-
-
         super().__init__(*args, **kwargs)
+
         # ✅ BLINDATURA: se role non è passato, prendilo dall'istanza
         if not role and self.instance and hasattr(self.instance, 'role'):
             role = self.instance.role
-            # Normalizza il ruolo (rimuovi eventuali suffissi _a/_b per sicurezza)
+
+        # Normalizza il ruolo (rimuovi eventuali suffissi _a/_b)
         role = str(role).strip().lower().replace('_a', '').replace('_b', '') if role else ''
 
-        #is_lawyer = (role == 'lawyer')
-
-        # 3. Controlla se è un avvocato (ruolo GENERICO)
-        is_lawyer = (str(role).strip().lower() == 'lawyer')
         import logging
         logger = logging.getLogger(__name__)
-        logger.error(f"🔍 DEBUG FORM: role ricevuto = '{role}' (type: {type(role)})")
-        logger.error(f"🔍 DEBUG FORM: is_lawyer = {is_lawyer}")
+        logger.info(f"🔍 UserProfileForm: role = '{role}'")
 
-        if is_lawyer:
-            # AVVOCATI: nascondi birth_place
+        # ✅ CORRETTO: Controlla se è un PROFESSIONISTA (lawyer, mediator, consultant)
+        is_professional = role in ['lawyer', 'mediator', 'consultant']
+
+        if is_professional:
+            # PROFESSIONISTI (lawyer, mediator, consultant):
+            # Mostra firm_name e partita_iva, nascondi birth_place
             if 'birth_place' in self.fields:
                 del self.fields['birth_place']
-                logger.error("🔍 DEBUG FORM: birth_place ELIMINATO con successo")
+                logger.info("🔍 birth_place RIMOSSO per professionista")
 
-            # Rendi obbligatori i 3 campi professionali
+            # Rendi obbligatori i 4 campi professionali
             self.fields['firm_name'].required = True
             self.fields['partita_iva'].required = True
             self.fields['phone'].required = True
+            self.fields['address'].required = True
 
             # Label con asterisco
             self.fields['firm_name'].label = "Ragione sociale / Nome studio *"
             self.fields['partita_iva'].label = "Partita IVA *"
             self.fields['phone'].label = "Numero di telefono *"
+            self.fields['address'].label = "Indirizzo *"
 
             # Help text
             self.fields['firm_name'].help_text = "Obbligatorio per fatturazione"
@@ -175,7 +175,7 @@ class UserProfileForm(forms.ModelForm):
             self.fields['phone'].help_text = "Per contatti urgenti con assistiti"
 
         else:
-            # GENITORI/MEDIATORI/CONSULENTI: nascondi firm_name e partita_iva
+            # GENITORI: nascondi firm_name e partita_iva, mostra birth_place
             if 'firm_name' in self.fields:
                 del self.fields['firm_name']
             if 'partita_iva' in self.fields:
@@ -185,6 +185,10 @@ class UserProfileForm(forms.ModelForm):
             if 'birth_place' in self.fields:
                 self.fields['birth_place'].required = True
                 self.fields['birth_place'].label = "Luogo di nascita *"
+
+            # phone e address obbligatori
+            self.fields['phone'].required = True
+            self.fields['address'].required = True
 
         # 4. Aggiungi classe CSS a tutti i campi
         for name, field in self.fields.items():

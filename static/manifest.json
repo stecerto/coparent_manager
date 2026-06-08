@@ -1,0 +1,75 @@
+{
+  "name": "Coparent Manager",
+  "short_name": "Coparent",
+  "description": "Gestione familiare intelligente",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+
+  "display": "standalone",
+  "display_override": ["window-controls-overlay"],
+
+  "background_color": "#ffffff",
+  "theme_color": "#157CA3",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/static/img/logo-coparent.svg",
+      "sizes": "192x192",
+      "type": "image/svg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/static/images/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/static/images/screenshot-desktop.png",
+      "sizes": "1280x720",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Dashboard CoParent Manager"
+    },
+    {
+      "src": "/static/images/screenshot-mobile.png",
+      "sizes": "750x1334",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Chat CoParent Manager"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Nuovo Messaggio",
+      "short_name": "Messaggio",
+      "description": "Apri la chat famiglia",
+      "url": "/chat/",
+      "icons": [
+        {
+          "src": "/static/images/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Calendario",
+      "short_name": "Calendario",
+      "description": "Vedi il calendario",
+      "url": "/calendar/",
+      "icons": [
+        {
+          "src": "/static/images/icon-192x192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "categories": ["productivity", "lifestyle"],
+  "lang": "it-IT",
+  "dir": "ltr"
+
+}

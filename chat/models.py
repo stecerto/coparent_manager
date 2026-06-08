@@ -16,8 +16,29 @@ class FamilyMessage(models.Model):
         PrivateMessage è stato rimosso per evitare duplicazione di logica
         (versioning, soft-delete, crittografia, export, history).
         """
+    # ✅ NUOVO: Tipo di conversazione per gestire gruppi specifici
+    THREAD_TYPES = [
+        ('family', '👨‍👩‍👧‍👦 Gruppo Famiglia (Tutti)'),
+        ('legal_a', '⚖️ Legale A (Avv.A + Gen.A)'),
+        ('legal_b', '⚖️ Legale B (Avv.B + Gen.B)'),
+        ('mediation', '🤝 Mediazione (Mediatore + Gen.A + Gen.B)'),
+        ('consulting', '💼 Consulenza (Consulente + Gen.A + Gen.B)'),
+        # ✅ NUOVI: Chat private 1-to-1
+        ('mediation_private', '🔒 Mediazione Privata (Mediatore + Genitore)'),
+        ('consultant_private', '🔒 Consulenza Privata (Consulente + Genitore)'),
+        ('lawyer_private', '🔒 Avvocato Privato (Avvocato + Genitore)'),
+        ('mediator_private', '🔒 Mediatore Privato (Mediatore + Genitore)'),
+
+    ]
+
     family = models.ForeignKey("families.Family", on_delete=models.CASCADE, related_name="messages")
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="sent_messages")
+    thread_type = models.CharField(
+        max_length=20,
+        choices=THREAD_TYPES,
+        default='family',
+        db_index=True
+    )
     recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="received_messages")
     # NUOVO → risposta
     reply_to = models.ForeignKey(
@@ -67,6 +88,17 @@ class FamilyMessage(models.Model):
         blank=True,
         related_name="linked_messages"
     )
+
+    linked_expense = models.ForeignKey(
+        "expenses.Expense",  # Assicurati che il nome sia corretto
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="linked_messages"
+    )
+
+
+
 
     def __str__(self):
         return f"{self.sender.username} ({self.created_at}): {self.content[:30]}"

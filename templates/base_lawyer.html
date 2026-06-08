@@ -327,6 +327,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const safe = Math.min(count, 99);
         badge.textContent = safe > 0 ? safe : '';
         badge.style.display = safe > 0 ? 'inline-block' : 'none';
+
+        // ✅ AGGIORNA BADGE APP (stile WhatsApp)
+        if ('setAppBadge' in navigator) {
+            if (safe > 0) {
+                navigator.setAppBadge(safe);
+            } else {
+                navigator.clearAppBadge();
+            }
+        }
     }
 
     async function loadNotifications() {
@@ -380,6 +389,14 @@ document.addEventListener('DOMContentLoaded', () => {
             const v = Math.min(count, 99);
             badge.textContent = v > 0 ? v : '';
             badge.style.display = v > 0 ? 'inline-block' : 'none';
+            // ✅ AGGIORNA BADGE APP
+            if ('setAppBadge' in navigator) {
+                if (v > 0) {
+                    navigator.setAppBadge(v);
+                } else {
+                    navigator.clearAppBadge();
+                }
+            }
         }
         window.__notifPoller = setInterval(() => {
             if (document.visibilityState === 'visible') { fetchCount().then(render); }

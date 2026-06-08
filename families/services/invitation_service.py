@@ -109,6 +109,11 @@ def accept_invitation(invitation, user):
     Accetta un invito e sincronizza FamilyMember + UserProfile.
     ✅ Se l'invito non ha una famiglia (invito da avvocato a nuovo genitore), la crea automaticamente.
     """
+    role = invitation.role
+    role_base = role.replace('_a', '').replace('_b', '')
+    if role_base in ['mediator', 'consultant']:
+        role = role_base  # Usa solo 'mediator' o 'consultant'
+
     # 🛡️ 0. Controllo email
     if invitation.email and user.email.lower() != invitation.email.lower():
         from django.core.exceptions import PermissionDenied

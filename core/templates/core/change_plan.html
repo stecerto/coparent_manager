@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Gestisci Abbonamento - CoParentManager{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="text-center mb-5">
+        <h2 class="fw-bold">⚙️ Gestisci il tuo Abbonamento</h2>
+        <p class="text-muted">Piano attuale: <span class="badge bg-primary fs-5">{{ current_plan|title }}</span></p>
+    </div>
+
+    <form method="POST">
+        {% csrf_token %}
+        
+        <div class="row g-4 mb-4">
+            {% for plan in plans %}
+            <div class="col-md-4">
+                <div class="card h-100 {% if plan.is_current %}border-primary shadow-lg{% endif %} {% if plan.recommended and not plan.is_current %}border-success{% endif %}">
+                    {% if plan.recommended and not plan.is_current %}
+                        <div class="card-header bg-success text-white text-center py-2">
+                            <small class="fw-bold">⭐ CONSIGLIATO</small>
+                        </div>
+                    {% endif %}
+                    
+                    <div class="card-body d-flex flex-column">
+                        <h4 class="card-title fw-bold mb-3">{{ plan.name }}</h4>
+                        <ul class="list-unstyled text-start mb-4 flex-grow-1">
+                            {% for feat_key, is_active in plan.features.items %}
+                                {% if is_active %}
+                                    <li class="mb-2 text-success">✅ {{ feat_key|replace:"_"," "|title }}</li>
+                                {% endif %}
+                            {% endfor %}
+                        </ul>
+                        
+                        {% if plan.is_current %}
+                            <button type="button" class="btn btn-secondary w-100" disabled>✅ Piano Attuale</button>
+                        {% else %}
+                            <button type="submit" name="plan" value="{{ plan.id }}" class="btn btn-primary w-100">
+                                {% if current_plan == 'cancelled' %}Riattiva{% else %}Passa a {{ plan.name }}{% endif %}
+                            </button>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Zona Cancellazione -->
+        <div class="card border-danger mt-4">
+            <div class="card-body">
+                <h5 class="card-title text-danger">⚠️ Zona Pericolosa</h5>
+                <p class="small text-muted mb-3">Cancellando l'abbonamento, perderai l'accesso alle funzioni Pro/Enterprise al termine del periodo fatturato.</p>
+                <button type="submit" name="action" value="cancel" 
+                        class="btn btn-outline-danger btn-sm"
+                        onclick="return confirm('Sei sicuro di voler cancellare il tuo abbonamento?')">
+                    ❌ Cancella Abbonamento
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

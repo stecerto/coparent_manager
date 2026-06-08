@@ -256,6 +256,8 @@ mark.bg-warning {
     transition: background-color 0.2s;
 }
 
+
+
 /* 💬 Chat container con spazio per sidebar */
 @media (min-width: 992px) {
     .chat-container {
@@ -278,4 +280,79 @@ mark.bg-warning {
     #chatTabContent { display: grid !important; grid-template-columns: 1fr 1fr; gap: 1rem; }
     .tab-pane { display: block !important; opacity: 1 !important; }
     .chat-container { max-height: 65vh !important; }
+}
+
+/* Contenitore con scroll pulito */
+.sidebar-chat-container {
+    padding-bottom: 10px;
+}
+
+/* Stile base di ogni "scheda" chat */
+.sidebar-chat-item {
+    border-radius: 12px !important;
+    border: 1px solid #e9ecef !important;
+    background-color: #ffffff !important;
+    transition: all 0.2s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+    align-items: flex-start !important; /* ✅ FONDAMENTALE: allinea icona e testo in alto */
+    padding: 12px 14px !important;
+}
+
+/* Effetto hover */
+.sidebar-chat-item:hover {
+    background-color: #f8f9fa !important;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+/* Chat attiva (selezionata) */
+.sidebar-chat-item.active-chat {
+    background-color: #0d6efd !important;
+    border-color: #0d6efd !important;
+    color: white !important;
+    box-shadow: 0 4px 8px rgba(13, 110, 253, 0.3);
+}
+
+.sidebar-chat-item.active-chat h6 {
+    color: white !important;
+}
+
+/* ✅ Stile specifico per le chat private */
+.chat-private-item {
+    background-color: #f8f9fc !important;
+    border-left: 4px solid #0d6efd !important;
+}
+
+.chat-private-item:hover {
+    background-color: #eef2ff !important;
+}
+
+.chat-private-item.active-chat .chat-lock-icon {
+    background: rgba(255, 255, 255, 0.25);
+    box-shadow: none;
+}
+
+/* Lucchetto stilizzato */
+.chat-lock-icon {
+    background: linear-gradient(135deg, #0d6efd, #0a58ca);
+    color: white;
+    border-radius: 6px;
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: 12px;
+    margin-top: 2px; /* ✅ Allineamento visivo con la prima riga di testo */
+    font-size: 14px;
+    box-shadow: 0 2px 4px rgba(13, 110, 253, 0.3);
+    flex-shrink: 0; /* Impedisce all'icona di schiacciarsi */
+}
+
+/* ✅ Gestione testo su più righe */
+.sidebar-chat-item h6 {
+    line-height: 1.35 !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important; /* Forza il testo a capo */
 }

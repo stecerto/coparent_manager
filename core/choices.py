@@ -13,15 +13,14 @@ class RoleChoices(models.TextChoices):
     PARENT_B = 'parent_b', 'Genitore B'
     LAWYER_A = 'lawyer_a', 'Avvocato A (del Genitore A)'
     LAWYER_B = 'lawyer_b', 'Avvocato B (del Genitore B)'
-    MEDIATOR_A = 'mediator_a', 'Mediatore A'
-    MEDIATOR_B = 'mediator_b', 'Mediatore B'
-    CONSULTANT_A = 'consultant_a', 'Consulente A'
-    CONSULTANT_B = 'consultant_b', 'Consulente B'
+
+
+
 
     @classmethod
     def is_professional(cls, role):
         return role in [cls.LAWYER, cls.MEDIATOR, cls.CONSULTANT,
-                        cls.LAWYER_A, cls.LAWYER_B, cls.MEDIATOR_A, cls.MEDIATOR_B, cls.CONSULTANT_A, cls.CONSULTANT_B]
+                        cls.LAWYER_A, cls.LAWYER_B, cls.MEDIATOR, cls.CONSULTANT]
     @classmethod
     def parent_roles(cls):
         """Solo i genitori"""

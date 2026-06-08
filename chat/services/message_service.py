@@ -21,7 +21,8 @@ def send_message(
         files=None,
         create_calendar_event=False,
         event_data=None,
-        reply_to=None
+        reply_to=None,
+        thread_type="family"
 ):
     """
     Invia un messaggio con eventuali allegati e crea evento calendario (se richiesto).
@@ -35,7 +36,8 @@ def send_message(
         sender=sender,
         recipient=recipient,
         content=content,
-        reply_to=reply_to
+        reply_to=reply_to,
+        thread_type=thread_type
     )
 
     # 2. Gestione Allegati (Logica originale mantenuta intatta)
@@ -121,6 +123,32 @@ def send_message(
         except Exception as e:
             import logging
             logging.getLogger(__name__).error(f"❌ Errore creazione evento calendario: {e}", exc_info=True)
+
+
+    logger.info(f"🔔 NOTIFICA - recipient: {recipient}, thread_type: {thread_type}")
+    # 🔔 NOTIFICA (se messaggio privato 1-to-1)
+    if recipient and thread_type in ['legal_a', 'legal_b', 'mediation_private', 'consultant_private', 'lawyer_private', 'mediator_private']:
+        try:
+            from notifications.services import create_notification
+            create_notification(
+                user=recipient,
+                notification_type="chat_private",
+                title=f"💬 Nuovo messaggio da {sender.first_name or sender.email}",
+                message=content[:150] + ("..." if len(content) > 150 else ""),
+                target_url=f"/chat/?family_id={family.id}&thread={thread_type}",
+                target_model="FamilyMessage",
+                target_id=message.id,
+                metadata={
+                    "sender_id": sender.id,
+                    "family_id": family.id,
+                    "thread_type": thread_type,
+                },
+                #send_email=True
+            )
+        except Exception as e:
+            import logging
+            logging.getLogger(__name__).error(f"❌ Errore notifica chat: {e}", exc_info=True)
+            # Non bloccare il flusso se la notifica fallisce
 
     return message
 

@@ -23,7 +23,7 @@ urlpatterns = [
     # DASHBOARD
     # =========================
     path("dashboard/", dashboard_view, name="family_dashboard"),
-    path("lawyer/dashboard/", lawyer_dashboard_view, name="lawyer_dashboard"),
+    #path("lawyer/dashboard/", lawyer_dashboard_view, name="lawyer_dashboard"),
     path("summary/", family_summary, name="summary"),
 
     # =========================

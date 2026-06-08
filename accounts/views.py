@@ -108,22 +108,26 @@ def register_view(request):
 
         # ✅ GESTIONE PIANO
         plan_from_form = form.cleaned_data.get("plan")
-        plan_to_save = plan_from_form or request.session.pop("registration_plan", "starter")
+        plan_from_session = request.session.get("registration_plan", "")
 
-        # Normalizza il piano
-        if form_role in ["parent"]:
-            profile.plan = plan_to_save if plan_to_save in ["starter", "pro", "enterprise"] else "starter"
+        # Priorità: form > sessione > default
+        if plan_from_form:
+            plan_to_save = plan_from_form
+        elif plan_from_session:
+            plan_to_save = plan_from_session
         else:
-            # Avvocati/mediatori/consulenti
-            profile.plan = plan_to_save if plan_to_save in ["base", "pro", "enterprise"] else "base"
+            # Default in base al ruolo
+            plan_to_save = "pro" if form_role in ["lawyer", "mediator", "consultant"] else "starter"
 
-        profile.plan_started_at = timezone.now()
+        # Salva il piano
+        profile.plan = plan_to_save
 
         # Dati privacy
         profile.privacy_accepted_at = timezone.now()
         profile.privacy_version_accepted = getattr(settings, 'PRIVACY_VERSION', '1.0')
 
         profile.save()
+        logger.info(f"💰 Piano scelto da {user.email}: {plan_to_save}")
 
         # Accetta invito (se presente)
         if invitation:
@@ -531,3 +535,5 @@ def resend_activation(request):
 def logout_view(request):
     logout(request)
     return redirect("/")
+
+

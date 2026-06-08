@@ -336,9 +336,7 @@ def setup_view(request):
         if form_user.is_valid() and form_profile.is_valid():
             form_user.save()
             profile = form_profile.save(commit=False)
-            profile.setup_complete = True
-            profile.save()
-            messages.success(request, "✅ Dati personali salvati!")
+
 
             # ✅ CREA FAMIGLIA PER GENITORI (se non esiste)
             if not is_professional and not family:
@@ -357,6 +355,12 @@ def setup_view(request):
                 messages.success(request, f"✅ Famiglia '{family_name}' creata!")
             else:
                 messages.success(request, "✅ Dati personali salvati!")
+            #salvo il profilo
+            profile.setup_complete = True
+            profile.save()
+            messages.success(request, "✅ Dati personali salvati!")
+
+
             # ✅ Redirect in base al ruolo
             if is_professional:
                 return redirect("families:professional_dashboard")
@@ -934,52 +938,7 @@ def expenses_by_child(request):
     }
 
     return JsonResponse(data)
-'''
-# =========================
-# SUMMARY VIEW
-# =========================
-@login_required
-def summary_view(request):
 
-    user = request.user
-
-    profile = UserProfile.objects.get(user=user)
-
-    # 1. prendo membership reale (fonte unica verità)
-    membership = (
-        FamilyMember.objects
-        .select_related("family")
-        .filter(user=user)
-        .order_by("-is_primary", "-joined_at")
-        .first()
-    )
-
-    if not membership:
-        return render(request, "families/summary.html", {
-            "profile": profile,
-            "family": None,
-            "children": [],
-            "error": "Nessuna famiglia associata"
-        })
-
-    family = membership.family
-
-    # 2. figli coerenti con family reale
-    children = family.children.filter(is_active=True)
-
-    context = {
-        "profile": profile,
-        "family": family,
-        "children": children,
-
-        # DEBUG utile
-        "membership": membership,
-        "user_role": membership.role,
-        "debug_family_id": family.id,
-    }
-
-    return render(request, "families/summary.html", context)
-'''
 @login_required
 def family_timeline_view(request):
     family = get_family_of_user(request.user, request=request)
@@ -1001,7 +960,7 @@ def family_timeline_view(request):
 @role_required(RoleChoices.LAWYER_A, RoleChoices.LAWYER_B)
 def lawyer_dashboard_view(request):
     user = request.user
-    profile = user.profile
+    profile = getattr(user, 'userprofile', None) or getattr(user, 'profile', None)
 
     # Verifica che sia un avvocato (sicurezza aggiuntiva)
     if profile.role not in RoleChoices.lawyer_roles():
@@ -1062,8 +1021,24 @@ def lawyer_dashboard_view(request):
 def professional_dashboard(request):
     """Dashboard per Avvocati, Mediatori e Consulenti con gestione multi-famiglia"""
     user = request.user
-    # ✅ Usa la nuova funzione. Se la sessione è vuota, torna a get_family_of_user()
+    # ✅ Verifica che sia un professionista
+    profile = getattr(user, 'userprofile', None) or getattr(user, 'profile', None)
+    if not profile:
+        return redirect('families:setup')
+
+    role_raw = profile.role
+    role_str = str(role_raw).strip().lower() if role_raw else ''
+    role_base = role_str.replace('_a', '').replace('_b', '')
+
+    if role_base not in ['lawyer', 'mediator', 'consultant']:
+        messages.error(request, "⚠️ Accesso riservato ai professionisti.")
+        return redirect('families:family_dashboard')
+
+    # ✅ NON usare get_family_of_user per professionisti!
+    # Usa invece get_active_family che gestisce la sessione
+    from families.utils import get_active_family
     active_family = get_active_family(request)
+
     active_membership = None
     if active_family:
         active_membership = FamilyMember.objects.filter(

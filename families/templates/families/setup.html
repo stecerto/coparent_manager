@@ -46,11 +46,13 @@
         <div>
             <h5 class="mb-1 fw-bold">📦 Il tuo piano attuale</h5>
             <p class="mb-0 text-muted">
-                Stai utilizzando il piano <strong>{{ user.profile.plan|title|default:"Starter" }}</strong>.
-                {% if user.profile.plan_expires_at %}Scade il {{ user.profile.plan_expires_at|date:"d/m/Y" }}.{% endif %}
+                {% with profile=user.userprofile|default:user.profile %}
+                    Stai utilizzando il piano <strong>{{ profile.plan|title|default:"Starter" }}</strong>.
+                    {% if profile.plan_expires_at %}Scade il {{ profile.plan_expires_at|date:"d/m/Y" }}.{% endif %}
+                {% endwith %}
             </p>
         </div>
-        <a href="{% url 'pricing' %}" class="btn btn-outline-primary btn-sm text-nowrap">
+        <a href="{% url 'core:change_plan' %}" class="btn btn-outline-primary btn-sm text-nowrap">
             ⬆️ Cambia o Upgrade Piano
         </a>
     </div>
