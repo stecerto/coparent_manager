@@ -1,84 +1,204 @@
 {% extends "base.html" %}
 {% load static %}
-{% load crispy_forms_tags %}
+
+{% block title %}📅 Calendario - CoParent Manager{% endblock %}
+
 {% block content %}
+<div class="container py-4">
 
-<div class="card p-3 mb-2 shadow custom-card text-center">
-        <h2 class="mb-0">🗓️ Calendario Famiglia</h2>
-        <!-- ✅ Sottotitolo con hint visivo -->
-        <small class="text-muted d-block mt-1">
-            <i class="bi bi-info-circle"></i>
-           ℹ️ Clicca su un giorno per <strong>creare</strong> un evento, o su un evento esistente per <strong>modificarlo</strong>.
-        </small>
-</div>
-
-    <div class="card-body">
-        <div class="card p-3 mb-2 shadow custom-card">
-            <div id="calendar" class="mb-4"></div>
-
-                <div class="modal fade" id="eventModal" tabindex="-1">
-                          <div class="modal-dialog">
-                            <div class="modal-content p-3">
-
-                              <h5>Modifica evento</h5>
-
-                              <input type="hidden" id="eventId">
-
-                              <input type="text" id="modalTitle" class="form-control mb-2">
-
-                              <textarea id="modalDescription" class="form-control mb-2"></textarea>
-
-                              <input type="datetime-local" id="modalStart" class="form-control mb-2">
-                              <input type="datetime-local" id="modalEnd" class="form-control mb-2">
-
-                              <label>Figli</label>
-                              <select id="modalChildren" multiple class="form-control mb-2">
-                                {% for child in family.children.all %}
-                                <option value="{{ child.id }}">{{ child.name }}</option>
-                                {% endfor %}
-                              </select>
-
-                              <div class="d-flex justify-content-between">
-                                <button class="btn btn-danger" id="deleteEvent">Elimina</button>
-                                <button class="btn btn-primary" id="saveEvent">Salva</button>
-                              </div>
-
-                            </div>
-                          </div>
-                </div>
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h2 class="fw-bold mb-1">📅 Calendario Famiglia</h2>
+            <p class="text-muted mb-0">Gestisci eventi, appuntamenti e attività familiari</p>
         </div>
-                    
+        <div class="d-flex gap-2">
+            <a href="{% url 'calendar:events_list' %}" class="btn btn-outline-secondary">
+                📋 Lista Eventi
+            </a>
+            <a href="{% url 'calendar:event_create' %}" class="btn btn-success">
+                ➕ Nuovo Evento
+            </a>
+        </div>
+    </div>
 
-         <div class="card p-3 mb-2 shadow custom-card">
-
-                    {% for event in events %}
-                    <div class="card mt-2">
-                        <div class="card-body">
-                            <strong>{{ event.title }}</strong>
-                            <p>{{ event.description }}</p>
-                            <small>{{ event.start_time }} → {{ event.end_time }}</small>
-                            <p>
-                                <strong>Figli:</strong>
-                                {% for child in event.children.all %}
-                                    {{ child.name }}{% if not forloop.last %}, {% endif %}
-                                {% empty %}
-                                    Nessuno
-                                {% endfor %}
-                            </p>
-
-
+    <!-- Card Riepilogo Rapido -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-0 border-start border-1 border-info">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted small mb-1">Come Funziona</p>
+                            <h6 class="fw-bold mb-0">📅 Clicca su un giorno</h6>
+                            <small class="text-muted">Per creare un nuovo evento</small>
                         </div>
+                        <span class="fs-1 text-info opacity-25">📅</span>
                     </div>
-                    {% empty %}
-                    <p>Nessun evento</p>
-                    {% endfor %}
-
-
                 </div>
             </div>
+        </div>
 
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-0 border-start border-1 border-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted small mb-1">Modifica</p>
+                            <h6 class="fw-bold mb-0">✏️ Clicca su un evento</h6>
+                            <small class="text-muted">Per modificarlo o eliminarlo</small>
+                        </div>
+                        <span class="fs-1 text-primary opacity-25">✏️</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-        {% endblock %}
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-0 border-start border-1 border-success">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted small mb-1">Azioni Rapide</p>
+                            <a href="{% url 'calendar:event_create' %}" class="btn btn-sm btn-success w-100">
+                                ➕ Crea Evento
+                            </a>
+                        </div>
+                        <span class="fs-1 text-success opacity-25">⚡</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendario Principale -->
+    <div class="card shadow-sm mb-4 border-start border-1 border-primary">
+        <div class="card-header bg-white fw-bold d-flex align-items-center gap-2">
+            <span class="fs-4">🗓️</span>
+            <span>Calendario Interattivo</span>
+            <div class="ms-auto d-flex gap-2">
+                <a href="{% url 'calendar:event_create' %}" class="btn btn-sm btn-success">
+                    ➕ Nuovo
+                </a>
+                <a href="{% url 'calendar:events_list' %}" class="btn btn-sm btn-outline-primary">
+                    📋 Lista Completa
+                </a>
+            </div>
+        </div>
+        <div class="card-body p-3">
+            <div id="calendar" style="min-height: 650px;"></div>
+        </div>
+    </div>
+
+    <!-- Info Box -->
+    <div class="card shadow-sm mb-4 border-start border-1 border-info">
+        <div class="card-header bg-white fw-bold d-flex align-items-center gap-2">
+            <span class="fs-4">ℹ️</span>
+            <span>Suggerimenti Utili</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-6">
+                    <div class="d-flex gap-2">
+                        <span class="text-primary fs-5">📅</span>
+                        <div>
+                            <strong class="d-block">Crea Eventi Velocemente</strong>
+                            <small class="text-muted">Clicca su qualsiasi giorno nel calendario per creare un nuovo evento in quella data</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="d-flex gap-2">
+                        <span class="text-success fs-5">🔄</span>
+                        <div>
+                            <strong class="d-block">Eventi Ricorrenti</strong>
+                            <small class="text-muted">Gli eventi di mantenimento vengono generati automaticamente dagli accordi</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="d-flex gap-2">
+                        <span class="text-warning fs-5">🔔</span>
+                        <div>
+                            <strong class="d-block">Promemoria Automatici</strong>
+                            <small class="text-muted">Riceverai notifiche per gli eventi imminenti nelle prossime 24 ore</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <div class="d-flex gap-2">
+                        <span class="text-info fs-5">👥</span>
+                        <div>
+                            <strong class="d-block">Condivisione Famiglia</strong>
+                            <small class="text-muted">Tutti i membri della famiglia possono vedere e gestire gli eventi condivisi</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Modal Modifica Evento -->
+<div class="modal fade" id="eventModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title d-flex align-items-center gap-2">
+                    <span class="fs-4">✏️</span>
+                    <span>Modifica Evento</span>
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="eventId">
+
+                <div class="mb-3">
+                    <label for="modalTitle" class="form-label fw-bold">📝 Titolo Evento</label>
+                    <input type="text" id="modalTitle" class="form-control" placeholder="Es: Visita medica, Riunione scuola...">
+                </div>
+
+                <div class="mb-3">
+                    <label for="modalDescription" class="form-label fw-bold">📄 Descrizione</label>
+                    <textarea id="modalDescription" class="form-control" rows="3" placeholder="Dettagli dell'evento..."></textarea>
+                </div>
+
+                <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                        <label for="modalStart" class="form-label fw-bold">🕐 Inizio</label>
+                        <input type="datetime-local" id="modalStart" class="form-control">
+                    </div>
+                    <div class="col-md-6">
+                        <label for="modalEnd" class="form-label fw-bold">🕐 Fine</label>
+                        <input type="datetime-local" id="modalEnd" class="form-control">
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="modalChildren" class="form-label fw-bold">👶 Figli Coinvolti</label>
+                    <select id="modalChildren" multiple class="form-select" size="3">
+                        {% for child in family.children.all %}
+                        <option value="{{ child.id }}">{{ child.name }} {{ child.surname }}</option>
+                        {% endfor %}
+                    </select>
+                    <div class="form-text">Tieni premuto Ctrl/Cmd per selezionare più figli</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline-danger me-auto" id="deleteEvent">
+                    <span class="me-1">🗑️</span> Elimina
+                </button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button class="btn btn-primary" id="saveEvent">
+                    <span class="me-1">💾</span> Salva Modifiche
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
 
 {% block extra_js %}
 <script src="{% static 'js/pages/calendar.js' %}"></script>

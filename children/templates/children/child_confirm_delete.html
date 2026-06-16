@@ -1,22 +1,93 @@
 {% extends "base.html" %}
+{% load static %}
 
-{% block title %}Elimina Figlio{% endblock %}
+{% block title %}Archivia Figlio - {{ child.name }} {{ child.surname }}{% endblock %}
 
 {% block content %}
-<div class="card p-3 mb-2 shadow custom-card text-center">
-    <h2>Conferma eliminazione</h2>
-</div>
-    <!-- Filtro figlio -->
-        <div class="card p-3 mb-2 shadow custom-card text-center">
+<div class="container py-4">
 
+    <!-- Header Pagina -->
+    <div class="d-flex align-items-center mb-4">
+        <a href="{% url 'children:child_detail' child.id %}" class="btn btn-outline-secondary btn-sm me-3 shadow-sm">
+            <i class="bi bi-arrow-left"></i> Indietro
+        </a>
+        <div>
+            <h1 class="h3 fw-bold mb-0 text-warning">
+                <i class="bi bi-archive-fill me-2"></i>Conferma Archiviazione
+            </h1>
+            <p class="text-muted mb-0 small">Stai per archiviare un profilo dal sistema</p>
+        </div>
+    </div>
 
-            <p>Sei sicuro di voler eliminare <strong>{{ child.name }} {{ child.surname }}</strong>?</p>
+    <!-- Card Principale -->
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0" style="border-radius: 12px;">
 
-            <form method="POST">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-danger">Elimina</button>
-                <a href="{% url 'children:children_list' %}" class="btn btn-secondary">Annulla</a>
-            </form>
+                <!-- Card Header (Design System: Bianco, Icona + Titolo, Border Start Warning) -->
+                <div class="card-header bg-white border-bottom border-start border-2 border-warning d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                    <i class="bi bi-person-dash fs-3 text-warning me-3"></i>
+                    <div>
+                        <h5 class="mb-0 fw-bold">Archivia profilo figlio</h5>
+                        <small class="text-muted">Azione reversibile: i dati storici saranno preservati</small>
+                    </div>
+                </div>
 
+                <div class="card-body p-4">
+
+                    <!-- Alert di Avviso Moderno (Warning invece di Danger) -->
+                    <div class="alert alert-warning border-0 shadow-sm d-flex align-items-start mb-4" role="alert">
+                        <i class="bi bi-info-circle-fill fs-2 me-3 mt-1"></i>
+                        <div>
+                            <h6 class="alert-heading fw-bold mb-1">Cosa succede quando archivi?</h6>
+                            <p class="mb-0 small">
+                                Il profilo di <strong>{{ child.name }} {{ child.surname }}</strong> non sarà più visibile nella lista principale e non potrà essere selezionato per nuove spese o eventi.
+                                <br><span class="fw-bold">Tutti i dati storici (spese passate, documenti, mantenimenti) verranno comunque conservati per tracciabilità legale.</span>
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Riepilogo Dati -->
+                    <div class="bg-light p-3 rounded-3 mb-4 border-start border-2 border-secondary">
+                        <h6 class="fw-bold mb-3 text-dark">
+                            <i class="bi bi-person-badge me-2"></i>Profilo da archiviare:
+                        </h6>
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.75rem;">Nome completo</small>
+                                <div class="d-flex align-items-center mt-1">
+                                    <i class="bi bi-person-fill text-secondary me-2"></i>
+                                    <span class="fw-bold fs-5">{{ child.name }} {{ child.surname }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.75rem;">Data di nascita</small>
+                                <div class="d-flex align-items-center mt-1">
+                                    <i class="bi bi-calendar-event text-secondary me-2"></i>
+                                    <span class="fw-semibold">{{ child.birth_date|date:"d/m/Y" }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Form di Conferma -->
+                    <form method="POST" class="mt-4">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-end gap-3">
+                            <a href="{% url 'children:child_detail' child.id %}" class="btn btn-outline-secondary btn-lg px-4">
+                                <i class="bi bi-x-circle me-2"></i>Annulla
+                            </a>
+
+                            <!-- Bottone Archivia (Warning, Primario per questa azione) -->
+                            <button type="submit" class="btn btn-warning btn-lg px-4 shadow-sm text-dark">
+                                <i class="bi bi-archive-fill me-2"></i>Conferma Archiviazione
+                            </button>
+                        </div>
+                    </form>
+
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 {% endblock %}

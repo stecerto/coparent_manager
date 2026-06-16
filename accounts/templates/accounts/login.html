@@ -2,34 +2,276 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block title %}Bilance Family{% endblock title %}
+{% block title %}Login - CoParent Manager{% endblock title %}
 
-{%block content %}
-<div class="container-fluid mt-4">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <h2>Login</h2>
-            <div class="card p-4 shadow custom-card">
-                <form method="POST">
-                    {% csrf_token %}
-                    {{ form|crispy }}
-                    <button class="btn btn-success btn-style" type="submit">Login</button>
-                </form>
-                <hr style="border: 1px solid #ccc; width: 50%; margin: 20px auto;">
-                <a href="/accounts/register/">Registrati</a>
+{% block extra_css %}
+<style>
+    /* 🎨 BACKGROUND GRADIENT */
+    .login-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem 0;
+    }
+
+    /* 🎴 CARD LOGIN */
+    .login-card {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        padding: 3rem;
+        max-width: 450px;
+        width: 100%;
+        animation: slideUp 0.5s ease;
+    }
+
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(30px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    /* 🎯 LOGO/ICONA */
+    .login-icon {
+        width: 80px;
+        height: 80px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+    }
+
+    .login-icon i {
+        font-size: 2.5rem;
+        color: white;
+    }
+
+    /* 📝 TITOLO */
+    .login-title {
+        text-align: center;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 0.5rem;
+        font-size: 1.8rem;
+    }
+
+    .login-subtitle {
+        text-align: center;
+        color: #718096;
+        margin-bottom: 2rem;
+        font-size: 0.95rem;
+    }
+
+    /* 🔤 INPUT FIELDS */
+    .form-floating > .form-control {
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1rem 1rem 1rem 3rem;
+        height: auto;
+        transition: all 0.3s ease;
+    }
+
+    .form-floating > .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
+    }
+
+    .form-floating > label {
+        padding-left: 3rem;
+        color: #718096;
+    }
+
+    .input-icon {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #a0aec0;
+        font-size: 1.2rem;
+        z-index: 5;
+    }
+
+    /* 🔘 PULSANTE LOGIN */
+    .btn-login {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        border-radius: 12px;
+        padding: 0.9rem;
+        font-weight: 600;
+        font-size: 1.05rem;
+        color: white;
+        width: 100%;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-login:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+
+    .btn-login:active {
+        transform: translateY(0);
+    }
+
+    /* 🔗 LINK */
+    .login-link {
+        color: #667eea;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .login-link:hover {
+        color: #764ba2;
+        text-decoration: underline;
+    }
+
+    /* 📦 SEPARATOR */
+    .login-separator {
+        display: flex;
+        align-items: center;
+        text-align: center;
+        color: #a0aec0;
+        margin: 1.5rem 0;
+    }
+
+    .login-separator::before,
+    .login-separator::after {
+        content: '';
+        flex: 1;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .login-separator span {
+        padding: 0 1rem;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    /* ⚠️ ALERT ERRORI */
+    .alert-login {
+        border-radius: 12px;
+        border: none;
+        padding: 1rem;
+        font-size: 0.9rem;
+    }
+
+    /* 📱 RESPONSIVE */
+    @media (max-width: 576px) {
+        .login-card {
+            padding: 2rem 1.5rem;
+        }
+
+        .login-title {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-card">
+        <!-- 🎯 LOGO -->
+        <div class="login-icon" style="background: #ffffff; padding: 15px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.15);">
+            <img src="{% static 'images/logo-coparent.svg' %}" alt="CoParent Manager Logo" style="max-width: 80px; height: auto; object-fit: contain;">
+        </div>
+
+        <!-- 📝 TITOLO -->
+        <h2 class="login-title">Bentornato!</h2>
+        <p class="login-subtitle">Accedi al tuo account CoParent Manager</p>
+
+        <!-- ⚠️ MESSAGGI DI ERRORE -->
+        {% if form.errors %}
+            <div class="alert alert-danger alert-login">
+                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                <strong>Credenziali non valide.</strong> Controlla email e password.
             </div>
+        {% endif %}
+
+        <!-- 🔐 FORM LOGIN -->
+        <form method="POST" novalidate>
+            {% csrf_token %}
+
+            <!-- Username/Email -->
+            <div class="form-floating mb-3 position-relative">
+                <i class="bi bi-envelope-fill input-icon"></i>
+                <input type="email"
+                       name="username"
+                       class="form-control {% if form.errors %}is-invalid{% endif %}"
+                       id="id_username"
+                       placeholder="nome@email.com"
+                       value="{{ form.username.value|default:'' }}"
+                       required>
+                <label for="id_username">Email</label>
+            </div>
+
+            <!-- Password -->
+            <div class="form-floating mb-3 position-relative">
+                <i class="bi bi-key-fill input-icon"></i>
+                <input type="password"
+                       name="password"
+                       class="form-control {% if form.errors %}is-invalid{% endif %}"
+                       id="id_password"
+                       placeholder="Password"
+                       required>
+                <label for="id_password">Password</label>
+            </div>
+
+            <!-- 🔑 PASSWORD DIMENTICATA -->
+            <div class="text-end mb-3">
+                <a href="{% url 'accounts:password_reset' %}" class="login-link small">
+                    <i class="bi bi-question-circle me-1"></i>
+                    Password dimenticata?
+                </a>
+            </div>
+
+            <!-- 🔘 PULSANTE LOGIN -->
+            <button class="btn btn-login" type="submit">
+                <i class="bi bi-box-arrow-in-right me-2"></i>
+                Accedi
+            </button>
+        </form>
+
+        <!-- 📦 SEPARATORE -->
+        <div class="login-separator">
+            <span>OPPURE</span>
+        </div>
+
+        <!-- 🆕 REGISTRAZIONE -->
+        <div class="text-center">
+            <p class="mb-2 text-muted small">Non hai ancora un account?</p>
+            <a href="/accounts/register/" class="btn btn-outline-primary w-100" style="border-radius: 12px; padding: 0.7rem;">
+                <i class="bi bi-person-plus-fill me-2"></i>
+                Registrati
+            </a>
+        </div>
+
+        <!-- 💡 LINK PRICING -->
+        <div class="text-center mt-4">
+            <small class="text-muted">
+                Non sai quale piano scegliere?
+                <a href="{% url 'pricing' %}" class="login-link d-block mt-1">
+                    Confronta i piani →
+                </a>
+            </small>
         </div>
     </div>
-    <div class="text-center mt-4">
-    <small class="text-muted">
-        Non sai quale piano scegliere?
-        <a href="{% url 'pricing' %}" class="text-decoration-none fw-bold">Confronta i piani e le funzionalità →</a>
-    </small>
 </div>
 {% endblock content %}
 
 {% block extra_js %}
 <script src="{% static 'js/pages/login.js' %}"></script>
 {% endblock %}
-
-

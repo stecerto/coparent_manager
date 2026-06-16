@@ -2,14 +2,14 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-
 <html lang="it">
 <head>
     <meta charset="UTF-8">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="CoParent Manager - Gestione familiare sicura e conforme GDPR">
-    <link rel="manifest" href="{% static 'manifest.json' %}" rel="manifest">
-    <meta name="theme-color" content=#157CA3">
+    <link rel="manifest" href="{% static 'manifest.json' %}">
+    <meta name="theme-color" content="#157CA3">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="CoParent">
@@ -22,8 +22,7 @@
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <!-- FullCalendar
-    <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css' rel='stylesheet' crossorigin='anonymous'/> -->
+    <!-- FullCalendar -->
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js' defer></script>
 
     <!-- Custom CSS -->
@@ -31,32 +30,57 @@
 
     <title>{% block title %}CoParent Manager{% endblock %}</title>
     {% block extra_css %}{% endblock %}
+
+    <!-- ✅ CSS PER DISABILITARE I LINK DELLA NAVBAR -->
+    <style>
+        .disabled-sub {
+        opacity: 0.5 !important;
+        pointer-events: none !important; /* Rende fisicamente non cliccabile */
+        cursor: not-allowed !important;
+        text-decoration: none !important;
+        filter: grayscale(80%); /* Effetto visivo di "bloccato" */
+    }
+    </style>
 </head>
 
 <body class="{% if user.profile.role in 'lawyer_a,lawyer_b' %}bg-light{% endif %}">
 
-<!-- 🖼️ BRAND BANNER (Logo grande, fuori dalla navbar) -->
+<!-- 🖼️ BRAND BANNER -->
 <header class="brand-banner py-4 bg-white border-bottom">
     <div class="container text-center">
-        {% with role=user.profile.role|default:"" %}
-            {% if role == "lawyer_a" or role == "lawyer_b" or role.value == "lawyer_a" or role.value == "lawyer_b" %}
-                <a href="{% url 'lawyer_home' %}">
-                    <img src="{% static 'images/logo-coparent.svg' %}"
-                         alt="CoParent Manager"
-                         class="brand-logo img-fluid"
-                         style="max-height: 120px; cursor: pointer;">
-                </a>
-            {% else %}
-                <a href="{% url 'home' %}">
-                    <img src="{% static 'images/logo-coparent.svg' %}"
-                         alt="CoParent Manager"
-                         class="brand-logo img-fluid"
-                         style="max-height: 120px; cursor: pointer;">
-                </a>
-            {% endif %}
-        {% endwith %}
+        {% if user.profile.is_professional %}
+            <a href="{% url 'lawyer_home' %}">
+                <img src="{% static 'images/logo-coparent.svg' %}"
+                     alt="CoParent Manager"
+                     class="brand-logo img-fluid"
+                     style="max-height: 120px; cursor: pointer;">
+            </a>
+        {% else %}
+            <a href="{% url 'home' %}">
+                <img src="{% static 'images/logo-coparent.svg' %}"
+                     alt="CoParent Manager"
+                     class="brand-logo img-fluid"
+                     style="max-height: 120px; cursor: pointer;">
+            </a>
+        {% endif %}
     </div>
 </header>
+
+<!-- ✅ 1. BANNER GLOBALE ABBONAMENTO (Sticky in alto) -->
+{% if user.is_authenticated and user.profile %}
+    {% if user.profile.is_suspended %}
+        <div class="alert alert-danger text-center mb-0 rounded-0 shadow-sm sticky-top" style="z-index: 1050; font-weight: 500;">
+            🚫 <strong>ACCOUNT SOSPESO:</strong> Il periodo di grazia di 25 giorni è terminato.
+            L'accesso è bloccato. <a href="{% url 'pricing' %}" class="alert-link text-white text-decoration-underline">Riattiva ora</a> per recuperare i tuoi dati.
+        </div>
+    {% elif user.profile.is_expired %}
+        <div class="alert alert-warning text-center mb-0 rounded-0 shadow-sm sticky-top" style="z-index: 1050; font-weight: 500;">
+            ⏰ <strong>ABBONAMENTO SCADUTO:</strong> Le funzioni sono limitate fino alla riattivazione.
+            I tuoi dati resteranno al sicuro nel sistema per un massimo di <strong>25 giorni</strong>.
+            <a href="{% url 'pricing' %}" class="alert-link text-dark text-decoration-underline">Rinnova ora</a>.
+        </div>
+    {% endif %}
+{% endif %}
 
 <!-- 🔹 NAVBAR DINAMICA PER RUOLO -->
 <nav class="navbar navbar-expand-lg {% if user.profile.role in 'lawyer_a,lawyer_b' %}bg-white{% else %}bg-light{% endif %} shadow-sm">
@@ -83,7 +107,6 @@
                                 <strong class="small">🔔 Notifiche</strong>
                                 <button id="markAllReadBtn" class="btn btn-link btn-sm p-0 text-decoration-none small">Segna tutte</button>
                                 <button id="deleteAllBtn" class="btn btn-link btn-sm p-0 text-decoration-none small text-danger">🗑️ Svuota</button>
-
                             </div>
                         </li>
                         <li id="notifWrapper" class="p-0">
@@ -111,35 +134,29 @@
                     {% endif %}
                 </li>
 
-                <!-- 🧭 Menu Genitori (LOGICA SEMPLIFICATA) -->
-                {% if user.is_authenticated and user.profile.role not in "lawyer_a,lawyer_b" %}
-
-                    <!-- DEBUG: rimuovi questo blocco dopo il fix -->
-                    {% if not is_setup_complete %}
-                        <li class="nav-item">
-                            <a class="nav-link text-warning small" href="{% url 'families:setup' %}">
-                                ⚠️ Completa setup per vedere il menu
-                            </a>
-                        </li>
-                    {% endif %}
-
-                    <!-- Mostra menu SOLO se setup completo O se siamo in una pagina allowed -->
+                <!-- 🧭 Menu Genitori -->
+                {% if user.is_authenticated and user.profile.role not in "lawyer_a,lawyer_b, consultant, mediator" %}
                     {% if is_setup_complete or request.resolver_match.url_name in "setup,summary,invite_member" %}
-
-                        <!-- Nascondi "Dashboard" se siamo già lì -->
-                        {% if request.resolver_match.url_name != "family_dashboard" %}
-                            <li class="nav-item">
-                                <a class="nav-link" href="{% url 'families:family_dashboard' %}">📊 Dashboard</a>
-                            </li>
-                        {% endif %}
-
-                        <li class="nav-item"><a class="nav-link" href="{% url 'children:children_list' %}">👶 Figli</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{% url 'expenses:expenses_dashboard' %}">💶 Spese</a></li>
-                        <li class="nav-item"><a class="nav-link" href="{% url 'chat:chat_home' %}">💬 Chat</a></li>
-
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'family_dashboard' %}active{% endif %} {% if user.profile.is_expired or user.profile.is_suspended %}disabled-sub{% endif %}"
+                               href="{% url 'families:family_dashboard' %}">📊 Pannello di Controllo</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if user.profile.is_expired or user.profile.is_suspended %}disabled-sub{% endif %}"
+                               href="{% url 'children:children_list' %}">👶 Figli</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if user.profile.is_expired or user.profile.is_suspended %}disabled-sub{% endif %}"
+                               href="{% url 'expenses:expenses_dashboard' %}">💶 Spese</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if user.profile.is_expired or user.profile.is_suspended %}disabled-sub{% endif %}"
+                               href="{% url 'chat:chat_home' %}">💬 Chat</a>
+                        </li>
 
                         <li class="nav-item dropdown me-2">
-                            <a class="nav-link dropdown-toggle position-relative" href="#" id="docDropdown" role="button" data-bs-toggle="dropdown">
+                            <a class="nav-link dropdown-toggle {% if user.profile.is_expired or user.profile.is_suspended %}disabled-sub{% endif %}"
+                               href="#" id="docDropdown" role="button" data-bs-toggle="dropdown">
                                 📁 Documenti
                             </a>
                             <ul class="dropdown-menu dropdown-menu-end p-0" style="min-width: 320px;">
@@ -154,27 +171,38 @@
                                 {% endif %}
                             </ul>
                         </li>
-
-
-
-
-
-
-                        <li class="nav-item"><a class="nav-link" href="{% url 'calendar:calendar_view' %}">📅 Calendario</a></li>
+                        <li class="nav-item dropdown me-2">
+                            <a class="nav-link dropdown-toggle" href="#" id="calDropdown" role="button" data-bs-toggle="dropdown">
+                                📅 Calendario
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="{% url 'calendar:calendar_view' %}">🗓️ Vista Calendario</a></li>
+                                <li><a class="dropdown-item" href="{% url 'calendar:events_list' %}">📋 Lista Eventi</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{% url 'calendar:event_create' %}">➕ Nuovo Evento</a></li>
+                            </ul>
+                        </li>
 
                     {% endif %}
                 {% endif %}
 
-                <!-- ⚖️ Menu Avvocato (solo per ruoli legali) -->
-                {% if user.profile.role in "lawyer_a,lawyer_b" %}
-                    <!-- Mostra "📊 Dashboard" SOLO se NON sono già sulla professional_dashboard -->
-                    {% if request.resolver_match.url_name != "professional_dashboard" %}
-                        <li class="nav-item">
-                            <a class="nav-link" href="{% url 'families:professional_dashboard' %}">
-                                📊 Dashboard Famiglie
+                                                <!-- ⚖️ Menu Professionisti (Avvocato, Mediatore, Consulente) -->
+                {% if user.profile.is_professional %}
+                    <li class="nav-item">
+                        {% if request.session.active_family_id %}
+                            {# ✅ DENTRO il contesto: Pannello di controllo della famiglia specifica #}
+                            <a class="nav-link {% if request.resolver_match.url_name == 'professional_dashboard' %}active{% endif %}"
+                               href="{% url 'families:family_dashboard' %}?family_id={{ request.session.active_family_id }}">
+                                📊 Pannello di Controllo
                             </a>
-                        </li>
-                    {% endif %}
+                        {% else %}
+                            {# ✅ FUORI dal contesto: Pannello di controllo generale (Home Studio) #}
+                            <a class="nav-link {% if request.resolver_match.url_name == 'professional_dashboard' or request.resolver_match.url_name == 'lawyer_home' %}active{% endif %}"
+                               href="{% url 'families:professional_dashboard' %}">
+                                📊 Pannello di Controllo
+                            </a>
+                        {% endif %}
+                    </li>
                 {% endif %}
 
                 <!-- 💳 Piano & Impostazioni -->
@@ -191,8 +219,10 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="{% url 'families:setup' %}">
-                            ⚙️ {% if user.profile.role in "lawyer_a,lawyer_b" %}Setup Studio{% else %}Impostazioni{% endif %}
+                        <a class="nav-link {% if user.profile.is_expired or user.profile.is_suspended %}disabled-sub{% endif %}"
+                           href="{% url 'families:setup' %}"
+                           {% if user.profile.is_expired or user.profile.is_suspended %}title="⚠️ Impostazioni bloccate: rinnova l'abbonamento"{% endif %}>
+                            ⚙️ {% if user.profile.role in "lawyer_a,lawyer_b, consultant, mediator" %}Setup Studio{% else %}Impostazioni{% endif %}
                         </a>
                     </li>
                     <li class="nav-item"><a class="nav-link text-danger" href="{% url 'accounts:logout' %}">Logout</a></li>
@@ -205,12 +235,12 @@
     </div>
 </nav>
 
-<!-- ✅ TOPBAR CONTESTUALE (Famiglia / Avvocato / Piano) -->
+<!-- ✅ TOPBAR CONTESTUALE -->
 {% if user.is_authenticated %}
 <div class="border-bottom bg-light py-2">
     <div class="container d-flex justify-content-between align-items-center flex-wrap gap-2">
 
-        <!-- 🔹 Breadcrumb (se presente) -->
+        <!-- 🔹 Breadcrumb -->
         {% if breadcrumbs %}
         <nav aria-label="breadcrumb" class="flex-grow-1">
             <ol class="breadcrumb mb-0 small">
@@ -227,45 +257,39 @@
         </nav>
         {% endif %}
 
-        <!-- 🏠 CONTESTO FAMIGLIA (Corretto per TUTTI: Genitori e Professionisti) -->
-
-{% if request.session.active_family_id %}
-    {# Cerca la membership che corrisponde all'ID in sessione #}
-    {% for membership in request.user.family_memberships.all %}
-        {% if membership.family.id == request.session.active_family_id %}
-            <div class="d-flex align-items-center gap-2 px-3 py-1 rounded-pill bg-white border shadow-sm">
-                <span class="fw-semibold small">👨‍👩‍👧 {{ membership.family.name }}</span>
-
-                <span class="badge bg-{% if request.user.profile.role in 'lawyer,mediator,consultant' %}primary{% else %}danger{% endif %}" style="font-size:0.7rem;">
-                    {{ membership.get_role_display }}
-                </span>
-
-                {% if request.user.profile.role in 'lawyer,mediator,consultant' %}
-                    <a href="{% url 'families:exit_lawyer_context' %}"
-                       class="btn btn-sm btn-outline-danger py-0 px-2"
-                       style="font-size:0.7rem;" title="Esci dal contesto famiglia">✕</a>
+        <!-- 🏠 CONTESTO FAMIGLIA -->
+        {% if request.session.active_family_id %}
+            {% for membership in request.user.family_memberships.all %}
+                {% if membership.family.id == request.session.active_family_id %}
+                    <div class="d-flex align-items-center gap-2 px-3 py-1 rounded-pill bg-white border shadow-sm">
+                        <span class="fw-semibold small">👨‍👩‍👧 {{ membership.family.name }}</span>
+                        <span class="badge bg-{% if request.user.profile.role in 'lawyer,mediator,consultant' %}primary{% else %}danger{% endif %}" style="font-size:0.7rem;">
+                            {{ membership.get_role_display }}
+                        </span>
+                        {% if request.user.profile.role in 'lawyer,mediator,consultant' %}
+                            <a href="{% url 'families:exit_lawyer_context' %}"
+                               class="btn btn-sm btn-outline-danger py-0 px-2"
+                               style="font-size:0.7rem;" title="Esci dal contesto famiglia">✕</a>
+                        {% endif %}
+                    </div>
                 {% endif %}
-            </div>
-        {% endif %}
-    {% endfor %}
-
-{% else %}
-    {# Se NON c'è active_family_id in sessione, mostriamo la famiglia SOLO se è un genitore #}
-    {% if request.user.profile.role == 'parent' %}
-        {% for membership in request.user.family_memberships.all %}
-            {% if forloop.first %}
-                <div class="d-flex align-items-center gap-2 px-3 py-1 rounded-pill bg-white border shadow-sm">
-                    <span class="fw-semibold small">👨‍👩‍👧 {{ membership.family.name }}</span>
-                    <span class="badge bg-danger" style="font-size:0.7rem;">
-                        {{ membership.get_role_display }}
-                    </span>
-                </div>
+            {% endfor %}
+        {% else %}
+            {% if request.user.profile.role == 'parent' %}
+                {% for membership in request.user.family_memberships.all %}
+                    {% if forloop.first %}
+                        <div class="d-flex align-items-center gap-2 px-3 py-1 rounded-pill bg-white border shadow-sm">
+                            <span class="fw-semibold small">👨‍👩‍👧 {{ membership.family.name }}</span>
+                            <span class="badge bg-danger" style="font-size:0.7rem;">
+                                {{ membership.get_role_display }}
+                            </span>
+                        </div>
+                    {% endif %}
+                {% endfor %}
             {% endif %}
-        {% endfor %}
-    {% endif %}
-{% endif %}
+        {% endif %}
 
-        <!-- ⚖️ Dropdown Famiglie (solo avvocati con famiglie assegnate) -->
+        <!-- ⚖️ Dropdown Famiglie -->
         {% if lawyer_nav_families %}
             <div class="dropdown">
                 <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
@@ -288,21 +312,20 @@
 </div>
 {% endif %}
 
-<!-- 🔹 MESSAGGI DI SISTEMA
-{% if messages %}
-<div class="container mt-3">
-    {% for message in messages %}
-        <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
-            {{ message }}
-            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-        </div>
-    {% endfor %}
-</div>
-{% endif %}-->
-
 <!-- 🔹 MAIN CONTENT -->
 <main class="py-4">
     <div class="container">
+
+      <!--   {# ✅ NUOVO: Blocco per visualizzare i messaggi di Django (success, error, warning, info) #}
+        {% if messages %}
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+            {% endfor %}
+        {% endif %} -->
+
         {% block content %}{% endblock %}
     </div>
 </main>
@@ -322,7 +345,7 @@
     </div>
 </footer>
 
-<!-- ✅ MODALE UPGRADE (Globale, per piani starter) -->
+<!-- ✅ MODALE UPGRADE -->
 {% if user.is_authenticated and not is_pro_or_higher %}
 <div class="modal fade" id="upgradeModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -357,7 +380,7 @@
 
 {% block extra_js %}{% endblock %}
 
-<!-- 🔔 Script Notifiche (solo se loggato) -->
+<!-- 🔔 Script Notifiche -->
 {% if user.is_authenticated %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -458,7 +481,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (err) { console.warn("Mark-all error:", err); }
     });
 
-        // ✅ NUOVO: Pulsante Svuota
     const deleteAllBtn = document.getElementById('deleteAllBtn');
 
     deleteAllBtn?.addEventListener('click', async (e) => {
@@ -480,11 +502,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (res.ok) {
                 const data = await res.json();
                 if (data.success) {
-                    // Aggiorna UI
                     updateBadge(0);
                     notifList.innerHTML = `<li class="dropdown-item text-center text-muted py-3 small">📭 Nessuna notifica</li>`;
 
-                    // Mostra toast di conferma
                     const toast = document.createElement('div');
                     toast.className = 'position-fixed bottom-0 end-0 p-3';
                     toast.style.zIndex = '9999';
@@ -505,7 +525,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    // Polling ottimizzato: 120s + visibilità tab
     (function() {
         if (window.__notifPoller) clearInterval(window.__notifPoller);
         async function fetchCount() {
@@ -531,7 +550,8 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 </script>
 {% endif %}
-<!-- ✅ Registrazione Service Worker per PWA e Notifiche Push -->
+
+<!-- ✅ Service Worker per PWA -->
 {% if user.is_authenticated %}
 <script>
 if ('serviceWorker' in navigator) {
@@ -539,13 +559,10 @@ if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('/static/js/sw.js')
             .then(registration => {
                 console.log('✅ Service Worker registrato:', registration.scope);
-
-                // Chiedi permesso notifiche (solo prima volta)
                 if (Notification.permission === 'default') {
                     Notification.requestPermission().then(permission => {
                         if (permission === 'granted') {
                             console.log('✅ Permesso notifiche concesso');
-                            // Qui potresti registrare il subscription per push
                         }
                     });
                 }
@@ -558,7 +575,7 @@ if ('serviceWorker' in navigator) {
 </script>
 {% endif %}
 
-<!-- ✅ Script per pulsanti piano (disabilitati per starter) -->
+<!-- ✅ Script per pulsanti piano -->
 {% if not is_pro_or_higher %}
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -574,8 +591,6 @@ document.addEventListener('DOMContentLoaded', () => {
 {% endif %}
 
 {% block extra_body_js %}{% endblock %}
-
-
 
 </body>
 </html>

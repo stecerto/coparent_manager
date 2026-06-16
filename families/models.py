@@ -1,15 +1,15 @@
 import uuid
+from datetime import timedelta
 
 from django.conf import settings
-from django.db import models
 from django.contrib.auth import get_user_model
-from django.utils import timezone
-from datetime import timedelta
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db import models
 from django.db.models import F
-from core.choices import RoleChoices
+from django.utils import timezone
+
+from core.choices import RoleChoices, AssignmentTypeChoices
 from core.fields import EncryptedCharField
 
 
@@ -18,7 +18,6 @@ class Family(models.Model):
         ("parent_a", "Genitore A"),
         ("lawyer_a", "Avvocato A"),
     ]
-
 
     name = EncryptedCharField(max_length=255)
     # 🔑 Identificativo univoco (per inviti, link, API)
@@ -56,7 +55,6 @@ class Family(models.Model):
         return self.name
 
 
-
 class FamilyMember(models.Model):
     role = models.CharField(
         max_length=20,
@@ -74,7 +72,6 @@ class FamilyMember(models.Model):
         on_delete=models.CASCADE,
         related_name="family_memberships"
     )
-
 
     is_primary = models.BooleanField(default=False)
     joined_at = models.DateTimeField(auto_now_add=True)
@@ -101,8 +98,6 @@ class FamilyMember(models.Model):
                 f"Ruolo {self.role} già assegnato"
             )
 
-
-
     def __str__(self):
         family_surname = self.family.surname if self.family else "N/D"
         return f"{family_surname} - {self.family.name if self.family else 'N/D'} - {self.user.email} - {self.role}"
@@ -116,7 +111,7 @@ class ChildSupportAgreement(models.Model):
     decree_date = models.DateField("Data sentenza", null=True, blank=True)
     decree_file = models.FileField("File sentenza", upload_to="legal/decrees/", null=True, blank=True)
 
-    #  Termini Pagamento
+    # Termini Pagamento
     monthly_amount = models.DecimalField("Importo mensile totale", max_digits=10, decimal_places=2)
     split_pct_parent_a = models.DecimalField(
         "% a carico Genitore A", max_digits=5, decimal_places=2,
@@ -148,7 +143,6 @@ class ChildSupportAgreement(models.Model):
         self.children.filter(override_split_pct__isnull=True).update(
             contribution_pct_parent_a=self.split_pct_parent_a
         )
-        #self.children.update(contribution_pct_parent_a=self.split_pct_parent_a)
 
         # 📅 Genera eventi calendario
         from .services.agreement_service import generate_support_calendar_events
@@ -158,22 +152,73 @@ class ChildSupportAgreement(models.Model):
         return f"Mantenimento {self.decree_number or 'senza num.'} - €{self.monthly_amount}"
 
 
+# ==============================================================================
+# ✅ NUOVO MODELLO AGGIUNTO QUI: ConsultantAssignment
+# ==============================================================================
+class ConsultantAssignment(models.Model):
+    """
+    Traccia formalmente l'incarico di un consulente (CTU, consulente di parte, ecc.)
+    all'interno di una famiglia, distinguendo la natura del mandato.
+    """
+    family = models.ForeignKey(
+        Family,
+        on_delete=models.CASCADE,
+        related_name="consultant_assignments"
+    )
+
+    consultant = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="consultant_assignments",
+        limit_choices_to={'profile__role': RoleChoices.CONSULTANT},  # Garantisce integrità dei dati
+        verbose_name="Consulente incaricato"
+    )
+
+    assignment_type = models.CharField(
+        max_length=20,
+        choices=AssignmentTypeChoices.choices,
+        default=AssignmentTypeChoices.INDIVIDUAL,
+        verbose_name="Tipo di incarico"
+    )
+
+    start_date = models.DateField("Data inizio incarico")
+    end_date = models.DateField("Data fine incarico", null=True, blank=True)
+
+    is_active = models.BooleanField(default=True, verbose_name="Incarico attivo")
+
+    notes = models.TextField(
+        "Note sull'incarico",
+        blank=True,
+        help_text="Es: Numero di ruolo CTU, oggetto specifico della consulenza, ecc."
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-start_date']
+        verbose_name = "Incarico Consulente"
+        verbose_name_plural = "Incarichi Consulenti"
+        constraints = [
+            # Evita incarichi sovrapposti per lo stesso tipo nella stessa famiglia
+            models.UniqueConstraint(
+                fields=['family', 'assignment_type'],
+                condition=models.Q(is_active=True),
+                name='unique_active_assignment_per_family_and_type'
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.consultant.email} - {self.get_assignment_type_display()} ({self.family.name})"
+
+
 # =========================
 # 🔹 INVITATIONS
 # =========================
-import uuid
-from django.conf import settings
-from django.db import models
-from django.utils import timezone
-from datetime import timedelta
-from core.choices import RoleChoices
-
-
 class Invitation(models.Model):
     role = models.CharField(
         max_length=20,
-        choices=RoleChoices.choices,  # ✅ Centralizzato
-        # ...
+        choices=RoleChoices.choices,
     )
 
     STATUS_CHOICES = [
@@ -202,8 +247,8 @@ class Invitation(models.Model):
         "families.Family",
         on_delete=models.CASCADE,
         related_name="invitations",
-        null = True,  # ✅ Consente NULL nel database
-        blank = True
+        null=True,
+        blank=True
     )
 
     invited_by = models.ForeignKey(
@@ -215,7 +260,6 @@ class Invitation(models.Model):
     )
 
     display_name = models.CharField(max_length=255, blank=True, null=True)
-
 
     token = models.UUIDField(
         default=uuid.uuid4,
@@ -280,8 +324,6 @@ class Invitation(models.Model):
             )
         ]
 
-
-
     def save(self, *args, **kwargs):
         if self._state.adding and not self.expire_at:
             self.expire_at = timezone.now() + timedelta(days=7)
@@ -305,7 +347,6 @@ class Invitation(models.Model):
         if self.status == "pending":
             self.status = "expired"
             self.save(update_fields=["status"])
-
 
     def increment_resend(self):
         self.resend_count = F("resend_count") + 1
@@ -334,18 +375,20 @@ class PaymentSubscription(models.Model):
 
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
 
-    # Date chiave
-    subscription_start = models.DateTimeField(default=timezone.now)
-    subscription_end = models.DateTimeField()  # Scadenza attuale
-    grace_period_end = models.DateTimeField(null=True, blank=True)  # Fine periodo di grazia
+    current_plan = models.CharField(max_length=20, default='starter')
 
-    # Storico pagamenti
+    pending_plan = models.CharField(max_length=20, blank=True, null=True)
+    pending_plan_start = models.DateTimeField(null=True, blank=True)
+
+    subscription_start = models.DateTimeField(default=timezone.now)
+    subscription_end = models.DateTimeField()
+    grace_period_end = models.DateTimeField(null=True, blank=True)
+
     last_payment_date = models.DateTimeField(null=True, blank=True)
     next_payment_date = models.DateTimeField(null=True, blank=True)
 
-    # Metodo pagamento (per integrazione futura con Stripe/PayPal)
     payment_method = models.CharField(max_length=50, blank=True)
-    payment_provider_id = models.CharField(max_length=100, blank=True)  # ID Stripe/PayPal
+    payment_provider_id = models.CharField(max_length=100, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -357,49 +400,59 @@ class PaymentSubscription(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.user.email} - {self.get_status_display()}"
+        return f"{self.user.email} - {self.current_plan} ({self.get_status_display()})"
 
     @property
     def is_expired(self):
-        """Verifica se l'abbonamento è scaduto."""
         return timezone.now() > self.subscription_end
 
     @property
     def is_in_grace_period(self):
-        """Verifica se è nel periodo di grazia (5 giorni dopo scadenza)."""
         if not self.grace_period_end:
             return False
         return self.subscription_end < timezone.now() <= self.grace_period_end
 
     def mark_as_suspended(self):
-        """Segna l'account come sospeso dopo il periodo di grazia."""
         self.status = 'suspended'
         self.save()
-
-        # Disattiva l'utente
         self.user.is_active = False
         self.user.save()
 
     def extend_subscription(self, months=1):
-        """Estende l'abbonamento di N mesi."""
         from dateutil.relativedelta import relativedelta
-
-        # Parti dalla data di scadenza attuale (non da oggi)
         new_end = self.subscription_end + relativedelta(months=months)
-
         self.subscription_end = new_end
         self.grace_period_end = new_end + timedelta(days=5)
         self.status = 'active'
         self.last_payment_date = timezone.now()
+        self.next_payment_date = new_end
         self.save()
 
-        # Riattiva l'utente se era sospeso
         if not self.user.is_active:
             self.user.is_active = True
             self.user.save()
 
+    def activate_pending_plan(self):
+        """Attiva il piano pending (chiamato alla scadenza o al pagamento)"""
+        if self.pending_plan:
+            self.current_plan = self.pending_plan
+            self.pending_plan = None
+            self.pending_plan_start = None
+
+            if hasattr(self.user, 'profile'):
+                self.user.profile.plan = self.current_plan
+                self.user.profile.save()
+
+            self.save()
+            return True
+        return False
+
     def save(self, *args, **kwargs):
-        """Imposta automaticamente grace_period_end alla creazione."""
         if not self.grace_period_end and self.subscription_end:
             self.grace_period_end = self.subscription_end + timedelta(days=5)
+
+        if hasattr(self.user, 'profile') and self.current_plan:
+            self.user.profile.plan = self.current_plan
+            self.user.profile.save()
+
         super().save(*args, **kwargs)

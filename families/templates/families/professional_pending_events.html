@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Eventi e Documenti in Sospeso{% endblock %}
+
+{% block content %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+
+            <div>
+                <h2 class="mb-1">📅 Eventi e Documenti in Sospeso</h2>
+                <p class="text-muted mb-0">
+                    Riepilogo di <strong>{{ total_items }}</strong> attività in corso su <strong>{{ total_families_with_activity }}</strong> famiglie.
+                </p>
+            </div>
+            <a href="{% url 'families:professional_dashboard' %}" class="btn btn-outline-secondary">
+                ← Torna alla Dashboard
+            </a>
+
+    </div>
+
+    {% if cross_summary %}
+        <div class="row">
+            {% for family_name, data in cross_summary.items %}
+                <div class="col-md-6 col-xl-4 mb-4">
+                    <div class="card shadow custom-card h-100 border-start border-4 border-primary">
+                        <div class="card-header bg-light fw-bold d-flex justify-content-between align-items-center">
+                            <span class="text-break" style="word-break: break-word; max-width: 70%;">👨‍👩‍👧 {{ family_name }}</span>
+                            <span class="badge bg-primary rounded-pill">{{ data.items|length }}</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <ul class="list-group list-group-flush">
+                                {% for item in data.items %}
+                                    <li class="list-group-item d-flex align-items-start py-3">
+                                        <span class="fs-4 me-3 {{ item.color_class }}" style="line-height: 1; flex-shrink: 0;">{{ item.icon }}</span>
+                                        <div class="flex-grow-1" style="min-width: 0;">
+                                            <div class="fw-semibold text-dark text-break" style="word-break: break-word;">{{ item.title }}</div>
+                                            <div class="small text-muted mt-1">{{ item.date_display }}</div>
+                                        </div>
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                        <div class="card-footer bg-white border-0 text-center pb-3">
+                            <a href="{% url 'families:family_dashboard' %}?family_id={{ data.id }}" class="btn btn-sm btn-outline-primary w-100">
+                                🔓 Entra nel contesto
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="text-center py-5 border rounded-3 bg-light">
+            <div class="display-1 text-muted mb-3">🎉</div>
+            <h4 class="text-muted">Nessuna attività in sospeso!</h4>
+            <p class="text-muted">Tutte le famiglie gestite sono aggiornate e senza scadenze imminenti.</p>
+            <a href="{% url 'families:professional_dashboard' %}" class="btn btn-primary mt-2">Torna alla Dashboard</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

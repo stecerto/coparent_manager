@@ -35,12 +35,12 @@ PLAN_LIMITS = {
         "consultants": 1,
     },
     "pro": {
-        "families": 25,
+        "families": 10,
         "mediators": 4,
         "consultants": 4,
     },
     "enterprise": {
-        "families": 50,
+        "families": 25,
         "mediators": 8,
         "consultants": 8,
     },

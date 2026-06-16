@@ -1,59 +1,7 @@
 <div class="tab-pane fade" id="pricing-avvocati" role="tabpanel">
     <div class="row g-4 justify-content-center">
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm border">
-                <div class="card-body text-center">
-                    <h5 class="card-title">Studio Base</h5>
-                    <h2 class="display-6 fw-bold">€19,99<span class="fs-6 text-muted">/mese</span></h2>
-                    <p class="text-muted small">Dopo i 14 giorni di prova</p>
-                    <p class="text-muted">Fino a 3 famiglie</p>
-                    <ul class="list-unstyled text-start mb-4">
-                        <li>✅ Dashboard multi-famiglia</li>
-                        <li>✅ Chat riservata assistito</li>
-                        <li>✅ Documenti e versioni</li>
-                        <li>❌ Export legale personalizzato</li>
-                    </ul>
-                    <a href="{% url 'accounts:register' %}?role={{ role }}&plan=base" class="btn btn-outline-primary w-100">
-                        🎁 Prova 14 giorni gratis
-                    </a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card h-100 shadow border-primary">
-                <div class="card-header bg-primary text-white text-center fw-bold">⭐ STUDIO PRO</div>
-                <div class="card-body text-center">
-                    <h5 class="card-title">Studio Pro</h5>
-                    <h2 class="display-6 fw-bold">€39,99<span class="fs-6 text-muted">/mese</span></h2>
-                    <p class="text-muted small">Dopo i 14 giorni di prova</p>
-                    <p class="text-muted">Fino a 10 famiglie</p>
-                    <ul class="list-unstyled text-start mb-4">
-                        <li>✅ Tutto di Base</li>
-                        <li>✅ Report per tribunale</li>
-                        <li>✅ Firme digitali integrate</li>
-                        <li>✅ Log attività e audit trail</li>
-                    </ul>
-                    <a href="{% url 'accounts:register' %}?role={{ role }}&plan=pro" class="btn btn-primary w-100">
-                        🎁 Prova 14 giorni gratis
-                    </a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm border">
-                <div class="card-body text-center">
-                    <h5 class="card-title">Studio Enterprise</h5>
-                    <h2 class="display-6 fw-bold">Custom</h2>
-                    <p class="text-muted">Per studi legali strutturati</p>
-                    <ul class="list-unstyled text-start mb-4">
-                        <li>✅ Famiglie illimitate</li>
-                        <li>✅ API dedicate</li>
-                        <li>✅ Onboarding dedicato</li>
-                        <li>✅ SLA garantito 99,9%</li>
-                    </ul>
-                    <a href="mailto:info@coparentmanager.it" class="btn btn-outline-dark w-100">Parla con noi</a>
-                </div>
-            </div>
-        </div>
+        {% for plan in plans %}
+            {% include "core/pricing/_pricing_card.html" with plan=plan role="lawyer" %}
+        {% endfor %}
     </div>
 </div>

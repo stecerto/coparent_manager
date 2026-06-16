@@ -14,8 +14,13 @@ from .models import Notification
 
 @login_required
 def api_unread_count(request):
-    count = Notification.objects.filter(user=request.user, is_read=False).count()
-    return JsonResponse({"count": count})
+    """Restituisce il numero di notifiche non lette"""
+    try:
+        count = Notification.objects.filter(user=request.user, is_read=False).count()
+        return JsonResponse({"count": count})
+    except Exception as e:
+        # ✅ FALLBACK: ritorna sempre una response valida
+        return JsonResponse({"count": 0, "error": str(e)}, status=500)
 
 @login_required
 def api_list(request):

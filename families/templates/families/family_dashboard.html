@@ -2,202 +2,394 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-
 {% block title %}Pannello Controllo Famiglia{% endblock %}
 
+{% block extra_css %}
+{{ block.super }}
+<style>
+    /* Dashboard moderna - stile SaaS */
+    .stat-card {
+        transition: all 0.2s ease;
+        border-left: 4px solid;
+    }
+    .stat-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 .5rem 1rem rgba(0,0,0,.1)!important;
+    }
+    .stat-card.border-info { border-left-color: #0dcaf0; }
+    .stat-card.border-success { border-left-color: #198754; }
+    .stat-card.border-warning { border-left-color: #ffc107; }
+    .stat-card.border-primary { border-left-color: #0d6efd; }
+
+    .section-card {
+        border: none;
+        box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,.075);
+    }
+    .section-card .card-header {
+        background: transparent;
+        border-bottom: 1px solid rgba(0,0,0,.08);
+        font-weight: 600;
+    }
+
+    .compact-list li {
+        padding: 0.6rem 0;
+        border-bottom: 1px solid rgba(0,0,0,.05);
+    }
+    .compact-list li:last-child { border-bottom: none; }
+
+    /* Tabella spese compatta */
+    .compact-table th, .compact-table td {
+        padding: 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    /* Chart container */
+    .chart-container {
+        position: relative;
+        height: 220px;
+        width: 100%;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
-<!-- 🔍 DEBUG BLOCK - Rimuovi dopo il test
-<div class="alert alert-info mb-3 small">
-    <strong>DEBUG family_dashboard:</strong><br>
-    • family.name: <strong>{{ family.name|default:"NONE" }}</strong> (ID: {{ family.id|default:"NONE" }})<br>
-    • active_family_name: <strong>{{ active_family_name|default:"NONE" }}</strong><br>
-    • request.GET.family_id: <strong>{{ request.GET.family_id|default:"NONE" }}</strong><br>
-    • request.session.active_family_id: <strong>{{ request.session.active_family_id|default:"NONE" }}</strong>
-</div> -->
+<div class="container-fluid py-3">
 
-<div class="card p-3 mb-2 shadow custom-card text-center">
-    <h2 class="mb-0">🏠 Pannello Controllo Famiglia</h2>
-</div>
-{% if not is_setup_complete %}
-<div class="alert alert-warning alert-dismissible fade show" role="alert">
-    <strong>⚠️ Profilo incompleto</strong>
-    Alcune funzionalità potrebbero non essere disponibili.
-    <a href="{% url 'families:setup' %}" class="alert-link">Completa ora →</a>
-    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-</div>
-{% endif %}
+    {# ============================================ #}
+    {# 🔝 HEADER FAMIGLIA + ALERT SETUP            #}
+    {# ============================================ #}
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="mb-1 fw-bold">🏠 {{ family.name|default:"Pannello Famiglia" }}</h2>
+            <p class="text-muted mb-0 small">
+                {% if active_role_label %}
+                    <span class="badge bg-secondary">{{ active_role_label }}</span>
+                {% endif %}
+                Panoramica completa della tua famiglia
+            </p>
+        </div>
 
-<!-- =======================
-     Figli
-======================= -->
-<div class="card p-3 mb-2 shadow custom-card">
-    <h4 class="mt-4">👶 Figli</h4>
+        {% if not is_setup_complete %}
+            <a href="{% url 'families:setup' %}" class="btn btn-warning btn-sm">
+                ⚠️ Completa il profilo →
+            </a>
+        {% endif %}
+    </div>
 
-    <!-- 🟢 Contenitore GRID: 1 colonna su mobile, 2 su tablet, 3 su desktop -->
-    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
-        {% for child in children %}
-        <div class="col">
-            <!-- h-100 garantisce altezza uniforme nella stessa riga -->
-            <div class="card p-3 shadow-sm h-100 custom-card">
-                <h5>{{ child.name }} {{ child.surname }}</h5>
-                <p>
-                    <strong>Data di nascita:</strong> {{ child.birth_date|date:"d/m/Y" }}<br>
-                    <strong>Età:</strong> {{ child.age }} anni
-                </p>
-                <!-- mt-auto spinge i pulsanti in fondo alla card -->
-                <div class="d-flex gap-2 mt-auto">
-                    <a href="{% url 'children:child_edit' child.id %}" class="btn btn-sm btn-warning">✏️ Modifica</a>
-                    <a href="{% url 'children:child_confirm_delete' child.id %}" class="btn btn-sm btn-danger">🗑️ Elimina</a>
+    {# ============================================ #}
+    {# 📊 STATS CARDS (4 colonne)                  #}
+    {# ============================================ #}
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-lg-3">
+            <a href="{% url 'children:children_list' %}" class="text-decoration-none">
+            <div class="card stat-card border-info h-100">
+                <div class="card-body py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-muted small text-uppercase">Figli</div>
+                            <div class="h3 mb-0 fw-bold">{{ children|length }}</div>
+                        </div>
+                        <div class="display-5 text-info opacity-5">👶</div>
+                    </div>
+                </div>
+            </div>
+            </a>
+        </div>
+        <div class="col-6 col-lg-3">
+            <a href="{% url 'expenses:expenses_list' %}" class="text-decoration-none">
+            <div class="card stat-card border-success h-100">
+                <div class="card-body py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-muted small text-uppercase">Spese</div>
+                            <div class="h3 mb-0 fw-bold">{{ expenses_count|default:"0" }}</div>
+                        </div>
+                        <div class="display-5 text-success opacity-5">💰</div>
+                    </div>
+                </div>
+            </div>
+            </a>
+        </div>
+        <div class="col-6 col-lg-3">
+            <a href="{% url 'documents:documents_list' %}" class="text-decoration-none">
+            <div class="card stat-card border-warning h-100">
+                <div class="card-body py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-muted small text-uppercase">Documenti</div>
+                            <div class="h3 mb-0 fw-bold">{{ documents_count|default:"0" }}</div>
+                        </div>
+                        <div class="display-5 text-warning opacity-5">📄</div>
+                    </div>
+                </div>
+            </div>
+            </a>
+        </div>
+        <div class="col-6 col-lg-3">
+            <a href="{% url 'calendar:calendar_view' %}" class="text-decoration-none"> <!-- Adatta al tuo URL -->
+            <div class="card stat-card border-primary h-100">
+                <div class="card-body py-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="text-muted small text-uppercase">Eventi</div>
+                            <div class="h3 mb-0 fw-bold">{{ events_count|default:"0" }}</div>
+                        </div>
+                        <div class="display-5 text-primary opacity-5">📅</div>
+                    </div>
+                </div>
+            </div>
+            </a>
+        </div>
+    </div>
+        <!-- 👫 CARD MANTENIMENTO CONIUGE (Dedicata) -->
+    <div class="row g-4 mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-0" style="border-radius: 12px;">
+                <div class="card-header bg-white border-bottom border-start border-1 border-info d-flex justify-content-between align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-people-fill fs-3 text-info me-3"></i>
+                        <h5 class="mb-0 fw-bold">Mantenimento al Coniuge</h5>
+                    </div>
+                    <a href="{% url 'families:spousal_support' %}" class="btn btn-sm btn-outline-info">
+                        <i class="bi bi-pencil-square me-1"></i> Gestisci
+                    </a>
+                </div>
+                <div class="card-body p-4">
+                    {% if current_spousal_support %}
+                        <div class="row align-items-center">
+                            <div class="col-md-8">
+                                <h2 class="fw-bold text-info mb-1">€ {{ current_spousal_support.amount|floatformat:2 }} <small class="fs-6 text-muted fw-normal">/ mese</small></h2>
+                                <p class="text-muted mb-0 small">
+                                    <i class="bi bi-calendar-check me-1"></i> Attivo dal {{ current_spousal_support.start_date|date:"d/m/Y" }}
+                                </p>
+                            </div>
+                            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                                <span class="badge bg-success fs-6 px-3 py-2">
+                                    <i class="bi bi-check-circle-fill me-1"></i> Configurato
+                                </span>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-3">
+                            <p class="text-muted mb-3">Nessun mantenimento al coniuge configurato per questa famiglia.</p>
+                            <a href="{% url 'families:spousal_support' %}" class="btn btn-info text-white">
+                                <i class="bi bi-plus-circle me-1"></i> Configura ora
+                            </a>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
-        {% empty %}
-        <div class="col-12">
-            <p class="text-muted">Nessun figlio inserito</p>
-        </div>
+    </div>
+
+    {# ============================================ #}
+    {# 🎯 WIDGET DINAMICI (solo Enterprise)        #}
+    {# ============================================ #}
+    {% if dashboard_widgets %}
+    <div class="row g-3 mb-4">
+        {% for widget in dashboard_widgets %}
+            <div class="col-md-6">
+                <div class="card shadow custom-card h-100 border-start border-4 border-primary">
+                {% include "dashboard/widgets/"|add:widget.widget_key|add:".html" %}
+                </div>
+            </div>
         {% endfor %}
     </div>
+    {% endif %}
 
-    <br>
-    <a href="{% url 'children:child_form' %}" class="btn btn-success btn-style mb-2">➕ Aggiungi Figlio</a>
-</div>
-
-
-<!-- =======================
-     Spese
-======================= -->
-<div class="card p-3 mb-2 shadow custom-card">
-    <h2 class="mt-4">📊 Spese</h2>
-
-        <!-- Filtro figlio -->
-        <div class="chat-box">
-            <select id="childFilter" class="form-select" style="max-width:300px; margin:auto;">
-                <option value="">Tutti i figli</option>
+    {# ============================================ #}
+    {# 👶 FIGLI (sempre visibile)                  #}
+    {# ============================================ #}
+    {% if children %}
+    <div class="card section-card mb-4">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <span>👶 Figli</span>
+            <a href="{% url 'children:child_form' %}" class="btn btn-sm btn-success">➕ Aggiungi</a>
+        </div>
+        <div class="card-body">
+            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
                 {% for child in children %}
-                    <option value="{{ child.id }}">
-                        {{ child.name }} {{ child.surname }}
-                    </option>
-                {% endfor %}
-            </select>
-            <br>
-            <!-- Grafico -->
-            <div class="chart-box">
-                <canvas id="categoryChart"></canvas>
-            </div>
-                <div id="chartLegend" class="mt-3"></div>
-
-            <button id="resetCategory" class="btn btn-sm btn-secondary mt-2">
-                Reset categorie
-            </button>
-        </div>
-        <div class="child-form">
-            <!-- ✅ LEGENDA STATO SPESE -->
-            <div class="d-flex flex-wrap justify-content-center gap-3 mb-3 p-2 bg-light border rounded shadow-sm">
-                <span class="fw-bold text-secondary small me-2">Legenda Stato:</span>
-                <span class="d-flex align-items-center gap-1" title="In attesa di approvazione">
-                    <span style="font-size: 1.3rem;">🟡</span> <small class="text-dark">In Sospeso</small>
-                </span>
-                <span class="d-flex align-items-center gap-1" title="Confermata dai genitori">
-                    <span style="font-size: 1.3rem;">🔵</span> <small class="text-dark">Accettata</small>
-                </span>
-                <span class="d-flex align-items-center gap-1" title="Pagamento effettuato">
-                    <span style="font-size: 1.3rem;">🟢</span> <small class="text-dark">Pagata</small>
-                </span>
-                <span class="d-flex align-items-center gap-1" title="Respinta o da rivedere">
-                    <span style="font-size: 1.3rem;">🔴</span> <small class="text-dark">Rifiutata</small>
-                </span>
-            </div>
-            <!-- Tabella -->
-            <table class="table table-striped mt-3">
-                <thead>
-                    <tr>
-                        <th>Data</th>
-                        <th>Categoria</th>
-                        <th>Importo (€)</th>
-                        <th>Creato da</th>
-                        <th>Stato</th>
-                    </tr>
-                </thead>
-                <tbody id="expensesTableBody">
-                    <!-- ✅ JS popolerà qui all'avvio. Nessun ciclo Django qui. -->
-                    <tr>
-                        <td colspan="5" class="text-center text-muted py-4">Caricamento spese...</td>
-                    </tr>
-                </tbody>
-            </table>
-
-            <p><strong>Totale spese:</strong> <span id="totalExpensesDisplay">0.00</span> €</p>
-
-            <div class="d-flex gap-2">
-                <a href="{% url 'expenses:add_expense' %}" class="btn btn-success btn-style mb-2">➕ Aggiungi Spesa</a>
-                <a href="{% url 'expenses:expenses_dashboard' %}" class="btn btn-success btn-style mb-2">📊 Vai alle Spese</a>
-                <a href="{% url 'expenses:download_expense_pdf' %}" class="btn btn-success btn-style mb-2 ">📄 Scarica PDF</a>
-            </div>
-        </div>
-
-</div>
-<!-- =======================
-     Documenti
-======================= -->
-<div class="card p-3 mb-2 shadow custom-card">
-    <h4>📄 Documenti</h4>
-    <div class="chat-box">
-
-                <!-- 📁 LINK UTILI -->
-                    <div class="p-3 border-bottom bg-light">
-                        <a href="{% url 'documents:documents_list' %}" class="btn btn-success btn-style mb-2">
-                            📁 Archivio documenti
-                        </a>
+                <div class="col">
+                    <div class="card shadow custom-card h-100 border-start border-4 border-primary">
+                    <!-- <div class="card h-100 border shadow-sm"> -->
+                        <div class="card-body">
+                            <h6 class="fw-bold mb-1">{{ child.name }} {{ child.surname }}</h6>
+                            <small class="text-muted d-block mb-2">
+                                🎂 {{ child.birth_date|date:"d/m/Y" }} • {{ child.age }} anni
+                            </small>
+                            <div class="d-flex gap-2">
+                                <a href="{% url 'children:child_edit' child.id %}" class="btn btn-sm btn-outline-warning flex-fill">✏️</a>
+                                <a href="{% url 'children:child_confirm_delete' child.id %}" class="btn btn-sm btn-outline-danger flex-fill">🗑️</a>
+                            </div>
+                        </div>
                     </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
     </div>
-</div>
-
-<!-- =======================
-     Calendario
-======================= -->
-<div class="card p-3 mb-2 shadow custom-card">
-    <h4>📅 Calendario</h4>
-
-    <div class="chat-box">
-        {% if events %}
-        <ul>
-            {% for event in events %}
-            <li>
-                <strong>{{ event.title }}</strong> –
-                {{ event.start_time|date:"d/m/Y H:i" }} → {{ event.end_time|date:"H:i" }}
-            </li>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <p class="text-muted">Nessun evento pianificato</p>
-        {% endif %}
-
-        <a href="{% url 'calendar:calendar_view' %}" class="btn btn-success btn-style mb-2">Vai al Calendario</a>
+    {% else %}
+    <div class="alert alert-light border d-flex justify-content-between align-items-center mb-4">
+        <span class="text-muted">👶 Nessun figlio registrato. Inizia aggiungendo i tuoi figli.</span>
+        <a href="{% url 'children:child_form' %}" class="btn btn-success btn-sm">➕ Aggiungi Figlio</a>
     </div>
-</div>
+    {% endif %}
 
+    {# ============================================ #}
+    {# 📐 GRIGLIA PRINCIPALE 2 COLONNE             #}
+    {# ============================================ #}
+    <div class="row g-3">
 
-<!-- =======================
-     Chat
-======================= -->
-<div class="card p-3 mb-2 shadow custom-card">
-    <h4>💬 Chat</h4>
+        {# ---------- COLONNA SINISTRA: SPESE ---------- #}
+        <div class="col-lg-8">
+            <div class="card shadow custom-card h-100 border-start border-4 border-primary">
+            <!-- <div class="card section-card mb-4"> -->
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>💰 Spese</span>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'expenses:add_expense' %}" class="btn btn-sm btn-success">➕ Aggiungi</a>
+                        <a href="{% url 'expenses:expenses_dashboard' %}" class="btn btn-sm btn-outline-primary">📊 Dashboard</a>
+                        <a href="{% url 'expenses:download_expense_pdf' %}" class="btn btn-sm btn-outline-secondary">📄 PDF</a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    {# Filtro figlio #}
+                    <div class="mb-3">
+                        <select id="childFilter" class="form-select form-select-sm" style="max-width:250px;">
+                            <option value="">Tutti i figli</option>
+                            {% for child in children %}
+                                <option value="{{ child.id }}">{{ child.name }} {{ child.surname }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
 
-    <div class="chat-box">
-        {% if messages %}
-        <ul>
-            {% for msg in messages %}
-            <li><strong>{{ msg.sender }}</strong>: {{ msg.text }}</li>
-            {% endfor %}
-        </ul>
-        {% else %}
-        <p class="text-muted">Nessun messaggio</p>
-        {% endif %}
+                    {# Grafico #}
+                    <div class="chart-container mb-3">
+                        <canvas id="categoryChart"></canvas>
+                    </div>
+                    <div id="chartLegend" class="mb-3"></div>
+                    <button id="resetCategory" class="btn btn-sm btn-outline-secondary mb-3">
+                        🔄 Reset categorie
+                    </button>
 
-        <a href="{% url 'chat:chat_home' %}" class="btn btn-success btn-style mb-2">Vai alla Chat</a>
+                    {# Legenda stato #}
+                    <div class="d-flex flex-wrap gap-3 mb-2 p-2 bg-light rounded small">
+                        <span class="d-flex align-items-center gap-1" title="In attesa">
+                            <span style="font-size: 1rem;">🟡</span> In Sospeso
+                        </span>
+                        <span class="d-flex align-items-center gap-1" title="Confermata">
+                            <span style="font-size: 1rem;">🔵</span> Accettata
+                        </span>
+                        <span class="d-flex align-items-center gap-1" title="Pagata">
+                            <span style="font-size: 1rem;">🟢</span> Pagata
+                        </span>
+                        <span class="d-flex align-items-center gap-1" title="Rifiutata">
+                            <span style="font-size: 1rem;">🔴</span> Rifiutata
+                        </span>
+                    </div>
+
+                    {# Tabella #}
+                    <div class="table-responsive">
+                        <table class="table compact-table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Data</th>
+                                    <th>Categoria</th>
+                                    <th>Importo</th>
+                                    <th>Creato da</th>
+                                    <th>Stato</th>
+                                </tr>
+                            </thead>
+                            <tbody id="expensesTableBody">
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted py-3">Caricamento spese...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p class="mt-2 mb-0 small text-muted">
+                        <strong>Totale:</strong> <span id="totalExpensesDisplay">0.00</span> €
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        {# ---------- COLONNA DESTRA: CALENDARIO + DOCUMENTI + CHAT ---------- #}
+        <div class="col-lg-4">
+
+            {# 📅 CALENDARIO #}
+            <div class="card shadow custom-card mb-3 border-start border-4 border-primary">
+            <!-- <div class="card section-card mb-3"> -->
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>📅 Prossimi Eventi</span>
+                    <a href="{% url 'calendar:calendar_view' %}" class="btn btn-sm btn-outline-primary">Vai →</a>
+                </div>
+                <div class="card-body p-0">
+                    {% if events %}
+                    <ul class="list-group list-group-flush compact-list">
+                        {% for event in events %}
+                        <li class="list-group-item d-flex align-items-start">
+                            <span class="me-2">📅</span>
+                            <div class="flex-grow-1">
+                                <div class="fw-semibold small">{{ event.title }}</div>
+                                <small class="text-muted">
+                                    {{ event.start_time|date:"d/m" }} • {{ event.start_time|date:"H:i" }} → {{ event.end_time|date:"H:i" }}
+                                </small>
+                            </div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="text-center py-3">
+                        <p class="text-muted small mb-0">Nessun evento pianificato</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# 📄 DOCUMENTI #}
+            <div class="card shadow custom-card mb-3 border-start border-4 border-primary">
+            <!-- <div class="card section-card mb-3"> -->
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>📄 Documenti</span>
+                    <a href="{% url 'documents:documents_list' %}" class="btn btn-sm btn-outline-primary">Archivio →</a>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted small mb-0">
+                        Gestisci buste paga, dichiarazioni dei redditi, accordi e documenti legali della famiglia.
+                    </p>
+                </div>
+            </div>
+
+            {# 💬 CHAT #}
+            <div class="card shadow custom-card mb-3 border-start border-4 border-primary">
+            <!-- <div class="card section-card mb-3"> -->
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>💬 Chat</span>
+                    <a href="{% url 'chat:chat_home' %}" class="btn btn-sm btn-outline-primary">Apri →</a>
+                </div>
+                <div class="card-body p-0">
+                    {% if messages %}
+                    <ul class="list-group list-group-flush compact-list">
+                        {% for msg in messages %}
+                        <li class="list-group-item">
+                            <strong class="small">{{ msg.sender }}</strong>
+                            <div class="text-muted small text-truncate">{{ msg.text }}</div>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                    {% else %}
+                    <div class="text-center py-3">
+                        <p class="text-muted small mb-0">Nessun messaggio recente</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+        </div>
     </div>
-</div>
 
+</div>
 {% endblock %}
 
 
@@ -205,29 +397,24 @@
 <!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
-<!-- ✅ PASSA I PERCORSI BASE (non URL completi con placeholder) -->
 <script>
     window.DJANGO_URLS = {
         expensesByChild: "{% url 'families:expenses_by_child' %}",
-        // ✅ Solo il percorso base, l'ID lo aggiungiamo in JS
         expenseEditBase: "/expenses/edit/",
         expenseDeleteBase: "/expenses/delete/",
         expenseUpdateStatusBase: "/expenses/update-status/"
     };
 </script>
 
-<!-- 👇 JS esterno DOPO aver definito le variabili -->
 <script src="{% static 'js/pages/families.js' %}"></script>
 
-<!-- Script per i pulsanti stato -->
 <script>
 document.addEventListener('DOMContentLoaded', function() {
+    // Pulsanti stato spese
     document.querySelectorAll('.status-btn').forEach(btn => {
         btn.addEventListener('click', function() {
             const expenseId = this.dataset.id;
             const newStatus = this.dataset.status;
-
-            // ✅ Costruisci URL con percorso base + ID + slash finale
             const url = `${window.DJANGO_URLS.expenseUpdateStatusBase}${expenseId}/`;
 
             fetch(url, {
@@ -246,12 +433,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     alert('Errore: ' + data.error);
                 }
             })
-            .catch(err => console.error('Errore update status:', err));
-        });
-    });
-
-    // Helper CSRF per Django
-    function getCookie(name) {
+            .catch(err => console.error(
         let cookieValue = null;
         if (document.cookie) {
             const cookies = document.cookie.split(';');

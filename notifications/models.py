@@ -13,6 +13,10 @@ class Notification(models.Model):
         ("expense_paid", "✅ Spesa Pagata"),
         ("event_reminder", "📅 Promemoria Evento"),
         ("invite", "📨 Nuovo Invito"),
+        ("document_expiring", "📄 Documento in Scadenza"),
+        ("agreement_pending", "✍️ Accordo in Attesa di Firma"),
+        ("event_imminent", "⏰ Evento Imminente"),
+        ("calendar_event_created", "📅 Nuovo Evento Calendario"),
     ]
 
     user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notifications")
@@ -41,6 +45,37 @@ class Notification(models.Model):
             models.Index(fields=["user", "-created_at"]),
             models.Index(fields=["user", "is_read"]),
         ]
+
+    # ✅ Proprietà per icone e colori dinamici (evita logica complessa nei template)
+    @property
+    def icon(self):
+        icons = {
+            'document_expiring': '📄',
+            'agreement_pending': '✍️',
+            'event_imminent': '⏰',
+            'expense_pending': '💰',
+            'expense_rejected': '🔴',
+            'expense_paid': '✅',
+            'chat_private': '💬',
+            'event_reminder': '📅',
+            'invite': '📨',
+        }
+        return icons.get(self.notification_type, '🔔')
+
+    @property
+    def color_class(self):
+        colors = {
+            'document_expiring': 'warning',
+            'agreement_pending': 'info',
+            'event_imminent': 'danger',
+            'expense_pending': 'success',
+            'expense_rejected': 'danger',
+            'expense_paid': 'success',
+            'chat_private': 'primary',
+            'event_reminder': 'secondary',
+            'invite': 'info',
+        }
+        return colors.get(self.notification_type, 'secondary')
 
     def __str__(self):
         return f"{self.user.email} - {self.get_notification_type_display()}"

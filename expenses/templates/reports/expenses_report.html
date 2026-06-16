@@ -11,6 +11,8 @@
             @top-center { content: element(header); }
             @bottom-center { content: element(footer); }
         }
+
+        /* --- HEADER E FOOTER --- */
         .pdf-header {
             position: running(header);
             text-align: center;
@@ -19,47 +21,147 @@
             margin-bottom: 15px;
         }
         .pdf-logo { max-height: 50px; margin-bottom: 5px; }
-        .pdf-title { font-size: 18pt; font-weight: bold; color: #0d6efd; margin: 5px 0; }
-        .pdf-meta { font-size: 9pt; color: #444; line-height: 1.5; }
+        .pdf-title { font-size: 16pt; font-weight: bold; color: #0d6efd; margin: 5px 0; }
+        .pdf-meta { font-size: 8pt; color: #555; line-height: 1.5; }
 
         .pdf-footer {
             position: running(footer);
             text-align: center;
-            font-size: 8pt;
+            font-size: 7pt;
             color: #666;
-            border-top: 1px solid #ddd;
+            border-top: 1px solid #ccc;
             padding-top: 8px;
+            margin-top: 10px;
         }
 
-        /* ✅ FONT SICURI PER PDF */
-        body { font-family: 'DejaVu Sans', Helvetica, Arial, sans-serif; font-size: 10pt; line-height: 1.4; color: #222; margin: 0; }
+        /* --- CORPO E TIPOGRAFIA --- */
+        body {
+            font-family: 'DejaVu Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+            font-size: 10pt;
+            line-height: 1.4;
+            color: #222;
+            margin: 0;
+        }
 
-        /* ✅ BOX RIASSUNTIVO (NO FLEXBOX) */
-        .summary-box { background: #f8f9fa; border: 1px solid #dee2e6; padding: 12px; margin-bottom: 20px; border-radius: 4px; }
-        .summary-item { display: inline-block; width: 48%; vertical-align: top; margin-bottom: 8px; box-sizing: border-box; }
-        .summary-label { font-size: 8pt; color: #666; display: block; margin-bottom: 2px; }
-        .summary-value { font-size: 11pt; font-weight: bold; color: #0d6efd; }
+        h3 {
+            font-size: 12pt;
+            color: #0d6efd;
+            margin: 20px 0 10px;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 6px;
+            font-weight: bold;
+        }
 
-        /* ✅ TABELLA */
-        table { width: 100%; border-collapse: collapse; margin-bottom: 15px; }
-        th, td { padding: 8px 10px; border: 1px solid #ccc; text-align: left; font-size: 9pt; }
-        th { background: #e9ecef; font-weight: 600; }
-        .text-right { text-align: right; }
-        .total-row td { background: #d1e7dd; font-weight: bold; border-top: 2px solid #0f5132; }
+        /* --- BOX RIASSUNTIVI (WeasyPrint Safe: inline-block) --- */
+        .info-row {
+            margin-bottom: 15px;
+            overflow: hidden; /* clearfix per inline-block */
+        }
+        .info-box {
+            width: 48%;
+            display: inline-block;
+            vertical-align: top;
+            background: #f8f9fa;
+            padding: 12px;
+            border-radius: 6px;
+            border-left: 3px solid #0d6efd;
+            margin-right: 2%;
+            box-sizing: border-box;
+            margin-bottom: 12px;
+        }
+        .info-box:nth-child(even) { margin-right: 0; border-left-color: #198754; }
+        .info-box:nth-child(3) { border-left-color: #0dcaf0; }
+        .info-box:nth-child(4) { border-left-color: #ffc107; }
+
+        .info-icon { font-size: 14pt; display: block; margin-bottom: 4px; }
+        .info-label {
+            font-size: 7.5pt;
+            color: #666;
+            display: block;
+            margin-bottom: 3px;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .info-value {
+            font-size: 12pt;
+            font-weight: bold;
+            color: #212529;
+        }
+
+        /* --- TABELLA --- */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+            border-radius: 6px;
+            overflow: hidden;
+        }
+        th, td {
+            padding: 8px 10px;
+            border: 1px solid #dee2e6;
+            text-align: left;
+            font-size: 9pt;
+        }
+        th {
+            background: #0d6efd;
+            color: #ffffff;
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 8pt;
+            letter-spacing: 0.5px;
+        }
+        tbody tr:nth-child(even) { background: #f8f9fa; }
+
+        /* Evita che una riga si spezzi a metà pagina */
         tr { page-break-inside: avoid; }
 
-        /* ✅ BADGE STATO */
-        .status { padding: 3px 6px; border-radius: 3px; font-size: 8pt; font-weight: 500; white-space: nowrap; }
-        .bg-pending { background: #fff3cd; color: #856404; }
-        .bg-accepted { background: #cfe2ff; color: #084298; }
-        .bg-paid { background: #d1e7dd; color: #0f5132; }
-        .bg-rejected { background: #f8d7da; color: #842029; }
+        .text-right { text-align: right; }
+
+        .total-row td {
+            background: #e9ecef;
+            font-weight: bold;
+            font-size: 10pt;
+            border-top: 2px solid #0d6efd;
+        }
+
+        /* --- BADGE STATO (Pill style) --- */
+        .status {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 8pt;
+            font-weight: 600;
+            white-space: nowrap;
+            text-align: center;
+            min-width: 80px;
+        }
+        .bg-pending { background: #fff3cd; color: #856404; border: 1px solid #ffe69c; }
+        .bg-accepted { background: #cfe2ff; color: #084298; border: 1px solid #9ec5fe; }
+        .bg-paid { background: #d1e7dd; color: #0f5132; border: 1px solid #a3cfbb; }
+        .bg-rejected { background: #f8d7da; color: #842029; border: 1px solid #f1aeb5; }
+
+        /* --- STATO VUOTO --- */
+        .empty-state {
+            text-align: center;
+            padding: 30px 20px;
+            color: #6c757d;
+            background: #f8f9fa;
+            border-radius: 6px;
+            border: 1px dashed #ced4da;
+        }
+    </style>
+    <!-- WeasyPrint richiede font specifici per i numeri di pagina -->
+    <style>
+        .page::after { content: counter(page); }
+        .topage::after { content: counter(pages); }
     </style>
 </head>
 <body>
+    <!-- Header PDF -->
     <div class="pdf-header">
         <img src="{% static 'images/icon-192x192.png' %}" alt="Logo CoParent" class="pdf-logo">
-        <div class="pdf-title">Report Spese Familiari</div>
+        <div class="pdf-title">📊 Report Spese Familiari</div>
         <div class="pdf-meta">
             Famiglia: <strong>{{ family.name }}</strong> &nbsp;|&nbsp;
             Generato il: <strong>{{ generation_date|date:"d/m/Y H:i" }}</strong> &nbsp;|&nbsp;
@@ -67,21 +169,41 @@
         </div>
     </div>
 
-    <div class="summary-box">
-        <div class="summary-item"><span class="summary-label">Totale Spese</span><span class="summary-value">{{ total_expenses|floatformat:2 }} €</span></div>
-        <div class="summary-item"><span class="summary-label">Quota Genitore A</span><span class="summary-value">{{ parent_a_total|floatformat:2 }} €</span></div>
-        <div class="summary-item"><span class="summary-label">Quota Genitore B</span><span class="summary-value">{{ parent_b_total|floatformat:2 }} €</span></div>
-        <div class="summary-item"><span class="summary-label">Numero Spese</span><span class="summary-value">{{ expenses.count }}</span></div>
+    <!-- Card Riepilogo Dati -->
+    <div class="info-row">
+        <div class="info-box">
+            <span class="info-icon">💰</span>
+            <span class="info-label">Totale Spese</span>
+            <span class="info-value">{{ total_expenses|floatformat:2 }} €</span>
+        </div>
+        <div class="info-box">
+            <span class="info-icon">👨</span>
+            <span class="info-label">Quota Genitore A</span>
+            <span class="info-value">{{ parent_a_total|floatformat:2 }} €</span>
+        </div>
+        <div class="info-box">
+            <span class="info-icon">👩</span>
+            <span class="info-label">Quota Genitore B</span>
+            <span class="info-value">{{ parent_b_total|floatformat:2 }} €</span>
+        </div>
+        <div class="info-box">
+            <span class="info-icon">📋</span>
+            <span class="info-label">Numero Spese</span>
+            <span class="info-value">{{ expenses.count }}</span>
+        </div>
     </div>
 
+    <h3>📝 Dettaglio Movimenti</h3>
+
+    <!-- Tabella Spese -->
     <table>
         <thead>
             <tr>
-                <th style="width:14%">Data</th>
-                <th style="width:18%">Figlio</th>
-                <th style="width:20%">Categoria</th>
-                <th style="width:12%" class="text-right">Importo</th>
-                <th style="width:14%">Stato</th>
+                <th style="width:14%">📅 Data</th>
+                <th style="width:18%">👶 Figlio</th>
+                <th style="width:20%">🏷️ Categoria</th>
+                <th style="width:12%" class="text-right">💶 Importo</th>
+                <th style="width:14%">📌 Stato</th>
                 <th style="width:11%" class="text-right">Quota A</th>
                 <th style="width:11%" class="text-right">Quota B</th>
             </tr>
@@ -94,16 +216,29 @@
                 <td>{{ exp.expense_type.display_name|default:exp.category_name_snapshot }}</td>
                 <td class="text-right">{{ exp.amount|floatformat:2 }} €</td>
                 <td>
-                    {% if exp.status == 'pending' %}<span class="status bg-pending">In Sospeso</span>
-                    {% elif exp.status == 'accepted' %}<span class="status bg-accepted">Accettata</span>
-                    {% elif exp.status == 'paid' %}<span class="status bg-paid">Pagata</span>
-                    {% else %}<span class="status bg-rejected">Rifiutata</span>{% endif %}
+                    {% if exp.status == 'pending' %}
+                        <span class="status bg-pending">In Sospeso</span>
+                    {% elif exp.status == 'accepted' %}
+                        <span class="status bg-accepted">Accettata</span>
+                    {% elif exp.status == 'paid' %}
+                        <span class="status bg-paid">Pagata</span>
+                    {% else %}
+                        <span class="status bg-rejected">Rifiutata</span>
+                    {% endif %}
                 </td>
                 <td class="text-right">{{ exp.quota_a|floatformat:2 }} €</td>
                 <td class="text-right">{{ exp.quota_b|floatformat:2 }} €</td>
             </tr>
             {% empty %}
-            <tr><td colspan="7" style="text-align:center; padding:20px; color:#666;">Nessuna spesa registrata nel periodo</td></tr>
+            <tr>
+                <td colspan="7">
+                    <div class="empty-state">
+                        <span style="font-size: 24pt; display: block; margin-bottom: 10px;">📭</span>
+                        <strong>Nessuna spesa registrata nel periodo</strong><br>
+                        <small>I movimenti approvati o in sospeso appariranno in questa sezione</small>
+                    </div>
+                </td>
+            </tr>
             {% endfor %}
         </tbody>
         <tfoot>
@@ -117,6 +252,7 @@
         </tfoot>
     </table>
 
+    <!-- Footer PDF -->
     <div class="pdf-footer">
         CoParent Manager © {% now "Y" %} | Documento riservato e generato automaticamente | Pagina <span class="page"></span> di <span class="topage"></span>
     </div>

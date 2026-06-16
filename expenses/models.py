@@ -1,9 +1,6 @@
-from django.conf.locale import fa
+from django.conf import settings
 from django.db import models
-from django.conf import settings
-
 from django.utils import timezone
-from django.conf import settings
 
 
 class ExpenseCategoryGroup(models.Model):

@@ -23,4 +23,8 @@ urlpatterns = [
 
     # 🗑️ Eliminazione evento
     path("event/<int:event_id>/delete/", views.delete_event_view, name="event_delete"),
+    # 📋 Lista eventi
+    path('events/', views.events_list_view, name='events_list'),
+    # 👁️ ✅ NUOVO: Dettaglio evento (aggiungi questa riga)
+    path('event/<int:event_id>/detail/', views.event_detail_view, name='event_detail'),
 ]

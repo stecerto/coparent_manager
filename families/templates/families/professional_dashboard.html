@@ -13,6 +13,8 @@
     body.professional-dashboard .navbar-nav .nav-link[href*="calendar"] {
         display: none !important;
     }
+    .hover-shadow:hover { transform: translateY(-3px); box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important; }
+    .transition-all { transition: all 0.3s ease; }
 </style>
 {% endblock %}
 
@@ -21,42 +23,60 @@
 {% block content %}
 <body class="professional-dashboard">
 
-{# 🔹 STATISTICHE RAPIDE #}
-<div class="row mb-4">
-    <div class="col-md-4">
+{# 🔹 STATISTICHE RAPIDE (CORRETTE PER 4 COLONNE) #}
+<div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
         <div class="card shadow-sm border-info h-100">
             <div class="card-body d-flex align-items-center">
                 <div class="display-4 text-info me-3">👥</div>
                 <div>
-                    <h6 class="text-muted mb-0">Famiglie Seguite</h6>
+                    <h6 class="text-muted mb-0">Famiglie</h6>
                     <h3 class="mb-0">{{ stats.total_families }}</h3>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
+
+    <div class="col-6 col-lg-3">
         <div class="card shadow-sm border-success h-100">
             <div class="card-body d-flex align-items-center">
                 <div class="display-4 text-success me-3">👶</div>
                 <div>
-                    <h6 class="text-muted mb-0">Minori Coinvolti</h6>
+                    <h6 class="text-muted mb-0">Minori</h6>
                     <h3 class="mb-0">{{ stats.total_children }}</h3>
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-md-4">
-        <div class="card shadow-sm border-warning h-100">
+
+    <div class="col-6 col-lg-3">
+        <div class="card shadow-sm border-secondary h-100">
             <div class="card-body d-flex align-items-center">
-                <div class="display-4 text-warning me-3">📄</div>
+                <div class="display-4 text-secondary me-3">📄</div>
                 <div>
-                    <h6 class="text-muted mb-0">Accordi Attivi</h6>
+                    <h6 class="text-muted mb-0">Accordi</h6>
                     <h3 class="mb-0">0</h3>
                 </div>
             </div>
         </div>
     </div>
+
+    <div class="col-6 col-lg-3">
+        {# ✅ NUOVA CARD: Link alla pagina dedicata #}
+        <a href="{% url 'families:professional_pending_events' %}" class="text-decoration-none">
+            <div class="card shadow-sm border-warning h-100 hover-shadow transition-all bg-warning bg-opacity-10">
+                <div class="card-body d-flex align-items-center">
+                    <div class="display-4 me-3">📅</div>
+                    <div>
+                        <h6 class="text-dark mb-0 fw-bold">Sospesi</h6>
+                        <h5 class="mb-0 text-warning fw-bold">Vedi →</h5>
+                    </div>
+                </div>
+            </div>
+        </a>
+    </div>
 </div>
+
 
 {# ✅ NUOVO BLOCCO LIMITI PIANO (DINAMICO) #}
 {% with limits=user|get_lawyer_limits %}
@@ -102,6 +122,8 @@
     {% endif %}
 {% endwith %}
 
+
+
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2 class="mb-0">👔 Le tue Famiglie in Gestione</h2>
@@ -145,6 +167,11 @@
                         <a href="{% url 'expenses:expenses_list' %}?family_id={{ item.family.id }}" class="btn btn-outline-primary btn-sm">💰 Spese</a>
                         <a href="{% url 'chat:chat_home' %}?family_id={{ item.family.id }}" class="btn btn-outline-success btn-sm">💬 Chat</a>
                         <a href="{% url 'calendar:calendar_view' %}?family_id={{ item.family.id }}" class="btn btn-outline-info btn-sm">📅 Calendario</a>
+
+                        <!-- ✅ NUOVO PULSANTE IMPOSTAZIONI -->
+                        <a href="{% url 'families:family_settings' %}?family_id={{ item.family.id }}" class="btn btn-outline-secondary btn-sm">
+                             <i class="bi bi-gear me-1"></i>Impostazioni
+                        </a>
                     </div>
                 </div>
                 <a href="{% url 'families:family_dashboard' %}?family_id={{ item.family.id }}"

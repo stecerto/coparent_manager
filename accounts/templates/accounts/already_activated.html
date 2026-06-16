@@ -1,27 +1,209 @@
-<div style="max-width:600px; margin:auto; padding:20px; font-family:Arial, sans-serif; text-align:center;">
+{% extends "base.html" %}
+{% load static %}
 
-    <h2 style="color:#006400;">Account già attivato ✅</h2>
+{% block title %}Account Attivo - CoParent Manager{% endblock %}
 
-    <p>
-        Il tuo account è già attivo.
-    </p>
+{% block extra_css %}
+<style>
+    /* 🎨 BACKGROUND GRADIENT (Coerente con Login/Register) */
+    .active-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem 0;
+    }
 
-    <p>
-        Puoi effettuare il login cliccando qui sotto:
-    </p>
+    /* 🎴 CARD */
+    .active-card {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        padding: 2.5rem;
+        max-width: 450px;
+        width: 100%;
+        animation: slideUp 0.5s ease;
+    }
 
-    <div style="margin-top:20px;">
-        <a href="{% url 'login' %}"
-           style="
-               background:#006400;
-               color:#ffffff;
-               padding:12px 24px;
-               border-radius:8px;
-               text-decoration:none;
-               font-size:16px;
-               display:inline-block;">
-           Vai al Login
-        </a>
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 🎯 LOGO */
+    .active-logo {
+        width: 80px;
+        height: 80px;
+        background: #ffffff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.15);
+        padding: 15px;
+    }
+
+    .active-logo img {
+        max-width: 80px;
+        height: auto;
+        object-fit: contain;
+    }
+
+    /* 🎨 ICONA SUCCESSO */
+    .success-icon {
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+        font-size: 2.5rem;
+        color: white;
+        box-shadow: 0 4px 15px rgba(72, 187, 120, 0.3);
+    }
+
+    /* 📝 TITOLI */
+    .active-title {
+        text-align: center;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 0.75rem;
+        font-size: 1.8rem;
+    }
+
+    .active-subtitle {
+        text-align: center;
+        color: #718096;
+        margin-bottom: 1.5rem;
+        font-size: 0.95rem;
+    }
+
+    /* 💡 INFO BOX */
+    .info-box {
+        background: #f0fff4;
+        border-left: 4px solid #48bb78;
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        margin: 1.5rem 0;
+        font-size: 0.9rem;
+        color: #22543d;
+    }
+
+    .info-box i {
+        font-size: 1.2rem;
+        margin-right: 0.5rem;
+        color: #38a169;
+    }
+
+    /* 🔘 PULSANTI */
+    .btn-primary-gradient {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        border-radius: 12px;
+        padding: 0.9rem;
+        font-weight: 600;
+        font-size: 1.05rem;
+        color: white;
+        width: 100%;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-primary-gradient:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+
+    .btn-secondary-custom {
+        border: 2px solid #e2e8f0;
+        background: white;
+        color: #4a5568;
+        border-radius: 12px;
+        padding: 0.75rem;
+        font-weight: 500;
+        width: 100%;
+        transition: all 0.2s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .btn-secondary-custom:hover {
+        border-color: #667eea;
+        color: #667eea;
+        background: #f7fafc;
+    }
+
+    /* 📦 GRUPPO PULSANTI */
+    .btn-group-custom {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-top: 1.5rem;
+    }
+
+    /* 📱 RESPONSIVE */
+    @media (max-width: 576px) {
+        .active-card {
+            padding: 2rem 1.5rem;
+        }
+        .active-title {
+            font-size: 1.5rem;
+        }
+        .success-icon {
+            width: 75px;
+            height: 75px;
+            font-size: 2rem;
+        }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="active-container">
+    <div class="active-card">
+        <!-- 🎯 LOGO -->
+        <div class="active-logo">
+            <img src="{% static 'images/logo-coparent.svg' %}" alt="CoParent Manager Logo">
+        </div>
+
+        <!-- ✅ ICONA SUCCESSO -->
+        <div class="success-icon">
+            <i class="bi bi-check-lg"></i>
+        </div>
+
+        <!-- 📝 TITOLO -->
+        <h2 class="active-title">Account Già Attivo</h2>
+        <p class="active-subtitle">
+            Il tuo account è stato già attivato con successo. Puoi accedere subito!
+        </p>
+
+        <!-- 💡 INFO BOX -->
+        <div class="info-box">
+            <i class="bi bi-info-circle-fill"></i>
+            <strong>Tutto pronto!</strong><br>
+            <small class="d-block mt-1">
+                Il tuo profilo è attivo e pronto all'uso. Effettua il login per iniziare a gestire le tue spese familiari.
+            </small>
+        </div>
+
+        <!-- 🔘 PULSANTI -->
+        <div class="btn-group-custom">
+            <a href="{% url 'accounts:login' %}" class="btn btn-primary-gradient">
+                <i class="bi bi-box-arrow-in-right me-2"></i>
+                Vai al Login
+            </a>
+            <a href="{% url 'home' %}" class="btn btn-secondary-custom">
+                <i class="bi bi-house-door me-2"></i>
+                Torna alla Home
+            </a>
+        </div>
     </div>
-
 </div>
+{% endblock content %}

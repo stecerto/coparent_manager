@@ -115,6 +115,10 @@ class ChildProfile(models.Model):
         return self.contribution_pct_parent_a or Decimal('50.00')
 
     @property
+    def effective_split_pct_parent_b(self):
+        return Decimal('100.00') - self.effective_split_pct_parent_a
+
+    @property
     def effective_split_pct_parent_a(self):
         # 1. Valore manuale diretto (quello che editi nel formset)
         if self.contribution_pct_parent_a is not None:
@@ -169,15 +173,62 @@ class ChildProfile(models.Model):
         # ✅ Capitalizza prima lettera di nome e cognome
         return f"{self.name.capitalize()} {self.surname.capitalize()}"
 
+
 class ChildSupport(models.Model):
+    SUPPORT_TYPE_CHOICES = [
+        ('child', 'Mantenimento Figli'),
+        ('spouse', 'Mantenimento al Coniuge'),
+    ]
+
+    PAYER_CHOICES = [
+        ('parent_a', 'Genitore A versa a Genitore B'),
+        ('parent_b', 'Genitore B versa a Genitore A'),
+    ]
+
+    STATUS_CHOICES = [
+        ('pending', 'In attesa di accettazione'),
+        ('active', 'Attivo e Accettato'),
+        ('rejected', 'Rifiutato'),
+    ]
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+
+    support_type = models.CharField(
+        max_length=20,
+        choices=SUPPORT_TYPE_CHOICES,
+        default='child',
+        verbose_name="Tipologia"
+    )
+
+    # ✅ NUOVO: Chi versa il mantenimento
+    payer_role = models.CharField(
+        max_length=20,
+        choices=PAYER_CHOICES,
+        default='parent_a',
+        verbose_name="Chi versa il mantenimento",
+        help_text="Stabilito dal giudice nella sentenza"
+    )
+
+    # ✅ ✅ ✅ AGGIUNTA FONDAMENTALE: Collega il supporto alla famiglia
+    family = models.ForeignKey(
+        'families.Family',
+        on_delete=models.CASCADE,
+        null=True,  # Permesso per non rompere i record esistenti durante la migrazione
+        blank=True,
+        related_name='supports',
+        verbose_name="Famiglia di riferimento"
+    )
+
     child = models.ForeignKey(
         "ChildProfile",
         on_delete=models.CASCADE,
-        related_name="supports"
+        related_name="supports",
+        null=True,  # ✅ Consente valore NULL (per il coniuge)
+        blank=True,  # ✅ Consente campo vuoto nei form
+        verbose_name="Figlio (se applicabile)"
     )
 
     amount = models.DecimalField(max_digits=10, decimal_places=2)
-    # ✅ NUOVO CAMPO (opzionale, sovrascrive il profilo se compilato)
+
     split_pct_parent_a = models.DecimalField(
         "Ripartizione Genitore A",
         max_digits=5, decimal_places=2,
@@ -205,7 +256,11 @@ class ChildSupport(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.child.name.capitalize()} - {self.amount} € (v{self.version})"
+        if self.support_type == 'spouse':
+            return f"Mantenimento Coniuge - {self.amount} € (v{self.version})"
+
+        child_name = self.child.name if self.child else 'N/D'
+        return f"{child_name} - {self.amount} € (v{self.version})"
 
 
 

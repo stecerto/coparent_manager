@@ -1,41 +1,45 @@
 from django.urls import path
-
-
 from .views import register_view, login_view, logout_view, activate_account, resend_activation
-
 from django.contrib.auth import views as auth_views
 from . import views
+
 app_name = "accounts"
-urlpatterns =[
+
+urlpatterns = [
     path("register/", register_view, name="register"),
     path("login/", login_view, name="login"),
     path("logout/", logout_view, name="logout"),
     path("activate/", activate_account, name="activate"),
-   # path("activate/<uidb64>/<token>/", activate_account, name="activate"),
     path("activate/resend/", resend_activation, name="resend_activation"),
-
 
     path("password_reset/",
          auth_views.PasswordResetView.as_view(
-             template_name="accounts/password_reset.html"
+             template_name="accounts/password_reset.html",
+             email_template_name='accounts/password_reset_email.txt',
+             html_email_template_name='accounts/password_reset_email.html',
+             subject_template_name='accounts/password_reset_subject.txt',
+             success_url='/accounts/password_reset_inviata/'
          ),
          name="password_reset"),
 
-    path("password_reset_done/",
+    path("password_reset_inviata/",
          auth_views.PasswordResetDoneView.as_view(
-             template_name="accounts/password_reset_done.html"
+             template_name="accounts/password_reset_inviata.html"
          ),
-         name="password_reset_done"),
+         name="password_reset_inviata"),
 
     path("reset/<uidb64>/<token>/",
          auth_views.PasswordResetConfirmView.as_view(
-             template_name="accounts/password_reset_confirm.html"
+             template_name="accounts/password_reset_confirm.html",
+             success_url='/accounts/password_reset_complete/'
          ),
          name="password_reset_confirm"),
 
-    path("reset_done/",
+    # ✅ AGGIUNGI QUESTA ROUTE MANCANTE
+    path("password_reset_complete/",
          auth_views.PasswordResetCompleteView.as_view(
              template_name="accounts/password_reset_complete.html"
          ),
          name="password_reset_complete"),
 ]
+

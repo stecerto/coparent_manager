@@ -1,292 +1,614 @@
 {% extends "base.html" %}
 {% load static %}
 
+{% block title %}💬 Chat - CoParent Manager{% endblock %}
+
 {% block extra_css %}
 <link href="{% static 'css/chat_style.css' %}" rel="stylesheet">
+<style>
+    /* ✅ OFFCANVAS UNIFICATO (Mobile + Desktop) */
+    .chat-offcanvas {
+        width: 340px !important;
+        border-right: 1px solid #dee2e6;
+    }
+
+    @media (max-width: 767px) {
+        .chat-offcanvas {
+            width: 85% !important;
+        }
+    }
+
+    /* ✅ EVIDENZIAZIONE RICERCA */
+    .search-highlight {
+        background-color: #fff3cd;
+        padding: 2px 4px;
+        border-radius: 3px;
+        font-weight: 600;
+    }
+    .chat-message.search-hidden {
+        display: none !important;
+    }
+    .search-no-results {
+        display: none;
+        text-align: center;
+        padding: 2rem;
+        color: #6c757d;
+    }
+    .search-no-results.active {
+        display: block;
+    }
+
+    /* ✅ ALTEZZA CHAT */
+    .chat-main-wrapper {
+        min-height: 70vh;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+    .chat-container {
+        max-height: 60vh;
+        overflow-y: auto;
+    }
+
+    /* ✅ SIDEBAR CHAT ITEM */
+    .sidebar-chat-item {
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+    }
+    .sidebar-chat-item:hover {
+        background-color: rgba(13, 110, 253, 0.05);
+        border-color: rgba(13, 110, 253, 0.2);
+        transform: translateX(4px);
+    }
+    .sidebar-chat-item.active-chat {
+        background-color: rgba(13, 110, 253, 0.1);
+        border-color: rgba(13, 110, 253, 0.3);
+        border-left: 3px solid #0d6efd;
+    }
+
+    /* ✅ BADGE CONTESTO */
+    .context-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.5rem;
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-size: 0.9rem;
+        font-weight: 500;
+    }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-3">
+<div class="container py-4">
+
     <!-- 📌 HEADER CONTESTUALE -->
-    <div class="card p-3 mb-3 shadow custom-card">
-        <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-            <div>
-                <span class="badge bg-primary fs-6 me-1">👨‍👩‍👧 Famiglia: {{ family.name }}</span>
-                {% if private_with_user %}
-                    <span class="badge bg-success fs-6">🤝 Chat con {{ private_with_user.first_name }} {{ private_with_user.last_name }}</span>
-                {% else %}
-                    <span class="badge bg-info text-dark fs-6">👥 Chat di Gruppo</span>
+    <div class="card shadow-sm mb-4 border-start border-1 border-primary">
+        <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+                <div class="d-flex align-items-center gap-3 flex-wrap">
+                    <span class="context-badge bg-primary bg-opacity-10 text-primary">
+                        <span class="fs-5">👨‍👩‍👧</span>
+                        <span class="fw-bold">{{ family.name }}</span>
+                    </span>
+                    {% if private_with_user %}
+                        <span class="context-badge bg-success bg-opacity-10 text-success">
+                            <span class="fs-5">🤝</span>
+                            <span class="fw-bold">Chat con {{ private_with_user.first_name }} {{ private_with_user.last_name }}</span>
+                        </span>
+                    {% else %}
+                        <span class="context-badge bg-info bg-opacity-10 text-info">
+                            <span class="fs-5">👥</span>
+                            <span class="fw-bold">Chat di Gruppo</span>
+                        </span>
+                    {% endif %}
+                </div>
+                {% if membership %}
+                <div class="text-muted small">
+                    <span class="badge bg-light text-dark border">
+                        Il tuo ruolo: <strong>{{ membership.get_role_display }}</strong>
+                    </span>
+                </div>
                 {% endif %}
             </div>
-            <div class="text-muted small">
-                {% if membership %}Il tuo ruolo: <strong>{{ membership.get_role_display }}</strong>{% endif %}
-            </div>
         </div>
     </div>
 
-    <div class="row g-0 shadow custom-card" style="min-height: 70vh; border-radius: 8px; overflow: hidden;">
+    <!-- AREA CHAT PRINCIPALE -->
+    <div class="card shadow-sm mb-4 border-start border-1 border-primary chat-main-wrapper">
 
-                <!-- ✅ COLONNA 1: SIDEBAR -->
-                <div class="col-md-3 col-lg-2 border-end bg-light d-flex flex-column">
-                    <!-- Header Centrato -->
-                    <div class="p-3 border-bottom bg-white text-center">
-                        <h6 class="mb-0 fw-bold">💬 Chat</h6>
+        <!-- Header della chat attiva -->
+        <div class="card-header bg-white border-bottom p-3">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                <div class="d-flex align-items-center flex-grow-1">
+                    <!-- PULSANTE SIDEBAR -->
+                    <button class="btn btn-sm btn-outline-primary d-flex align-items-center gap-2 me-3"
+                            type="button"
+                            data-bs-toggle="offcanvas"
+                            data-bs-target="#chatSidebar">
+                        <span class="fs-5">☰</span>
+                        <span class="d-none d-sm-inline fw-bold">Scegli Chat</span>
+                    </button>
+
+                    <div class="flex-grow-1">
+                        <h5 class="mb-0 fw-bold">
+                            {% for chat in available_chats %}
+                                {% if chat.is_active %}
+                                    <span class="fs-4 me-2">{{ chat.icon }}</span>
+                                    {{ chat.name }}
+                                {% endif %}
+                            {% endfor %}
+                        </h5>
                     </div>
+                </div>
 
-                    <!-- Lista con spaziatura (gap) tra gli elementi -->
-                    <div class="flex-grow-1 overflow-auto p-2 d-flex flex-column gap-2 sidebar-chat-container">
-    {% for chat in available_chats %}
-        <a href="{{ chat.url }}"
-           class="sidebar-chat-item d-flex align-items-start p-3 text-decoration-none {% if chat.is_active %}active-chat{% endif %} {% if chat.is_private %}chat-private-item{% endif %}"
-            {% if chat.is_private %}
-                <!-- Lucchetto per chat private -->
-                <span class="chat-lock-icon">🔒</span>
-            {% else %}
-                <!-- Icona normale per gruppi -->
-                <span class="fs-4 me-3 mt-1">{{ chat.icon }}</span>
+                <!-- PULSANTI AZIONE -->
+                <div class="d-flex gap-2">
+                    <a href="{{ add_expense_redirect_url }}" class="btn btn-sm btn-outline-success fw-bold">
+                        <span class="me-1">➕</span> Nuova Spesa
+                    </a>
+
+                    {% if active_thread == 'family' and has_deleted_family %}
+                        <a href="{% url 'chat:chat_history' %}?type=family" class="btn btn-sm btn-outline-secondary">
+                            <span class="me-1">📜</span> Cronologia
+                        </a>
+                    {% elif active_thread != 'family' and has_deleted_private %}
+                        <a href="{% url 'chat:chat_history' %}?type=private" class="btn btn-sm btn-outline-secondary">
+                            <span class="me-1">📜</span> Cronologia
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- BANNER CHAT PRIVATA -->
+            {% if private_with_user %}
+            <div class="alert alert-warning border-0 shadow-sm mb-3">
+                <div class="d-flex align-items-center gap-3">
+                    <span class="fs-3">🔒</span>
+                    <div class="flex-grow-1">
+                        <strong class="d-block">Chat riservata e crittografata</strong>
+                        <small class="text-muted">Visibile solo a te e <strong>{{ private_with_user.first_name|default:private_with_user.email }}</strong></small>
+                    </div>
+                </div>
+            </div>
             {% endif %}
 
-            <div class="flex-grow-1 text-wrap">
-                <!-- ✅ Rimosso text-truncate, aggiunto word-wrap per email lunghe -->
-                <h6 class="mb-0 small fw-bold" style="line-height: 1.3; word-wrap: break-word; overflow-wrap: break-word;">
-                    {{ chat.name }}
-                </h6>
+            <!-- BARRA DI RICERCA -->
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-white border-end-0">🔍</span>
+                <label for="messageSearch" class="visually-hidden">Cerca nei messaggi</label>
+                <input type="text"
+                       id="messageSearch"
+                       class="form-control border-start-0"
+                       placeholder="Cerca nei messaggi..."
+                       autocomplete="off">
+                <button class="btn btn-outline-secondary border-start-0" type="button" id="clearSearch" style="display: none;">✕</button>
             </div>
-        </a>
-    {% empty %}
-        <div class="p-3 text-muted small text-center">Nessuna chat disponibile.</div>
-    {% endfor %}
-</div>
-                </div>
+            <small class="text-muted d-none mt-2" id="searchInfo"></small>
+        </div>
 
-        <!-- ✅ COLONNA 2: AREA MESSAGGI (Dinamica in base ad active_thread) -->
-        <div class="col-md-9 col-lg-10 d-flex flex-column bg-white">
+        <!-- Container Messaggi -->
+        <div class="chat-container flex-grow-1 p-3 bg-light" id="chatMessages-current">
+            {% for msg in current_messages %}
+                <div class="chat-message {% if msg.sender == request.user %}mine{% else %}other{% endif %}"
+                     id="msg-{{ msg.id }}"
+                     data-message-content="{{ msg.content|escapejs }}">
 
-                        <!-- Header della chat attiva -->
-            <div class="p-3 border-bottom bg-light d-flex justify-content-between align-items-center">
-                <div>
-                    <h5 class="mb-1">
-                        {% for chat in available_chats %}
-                            {% if chat.is_active %}{{ chat.icon }} {{ chat.name }}{% endif %}
-                        {% endfor %}
-                    </h5>
-
-                    <!-- ✅ BANNER INFORMATIVO CHAT PRIVATA (Solo se c'è un destinatario) -->
-                    {% if private_with_user %}
-                        <div class="alert alert-danger d-flex align-items-center py-2 px-3 mb-0" style="font-size: 0.85rem; border-left: 4px solid #dc3545;">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-shield-lock-fill me-2" viewBox="0 0 16 16">
-                                <path fill-rule="evenodd" d="M8 0c-.69 0-1.843.265-2.928.56-1.11.3-2.229.655-2.887.87a1.54 1.54 0 0 0-1.044 1.262c-.596 4.477.787 7.795 2.465 9.99a11.775 11.775 0 0 0 2.517 2.453c.386.273.744.482 1.048.625.28.132.581.24.829.24s.548-.108.829-.24a7.159 7.159 0 0 0 1.048-.625 11.777 11.777 0 0 0 2.517-2.453c1.678-2.195 3.061-5.513 2.465-9.99a1.541 1.541 0 0 0-1.044-1.263 62.467 62.467 0 0 0-2.887-.87C9.843.266 8.69 0 8 0zm0 5a1.5 1.5 0 0 1 .5 2.915l.385 1.99a.5.5 0 0 1-.491.595h-.788a.5.5 0 0 1-.49-.595l.384-1.99A1.5 1.5 0 0 1 8 5z"/>
-                            </svg>
-                            <span class="fw-bold">Chat riservata e crittografata.</span>
-                            <span class="ms-1 text-muted">Visibile solo a te e <strong>{{ private_with_user.first_name|default:private_with_user.email }}</strong>.</span>
-                        </div>
-                    {% endif %}
-                </div>
-
-                <!-- Pulsanti History/PDF (solo se ci sono messaggi eliminati) -->
-                <div class="d-flex gap-2">
-                    {% if active_thread == 'family' and has_deleted_family %}
-                        <a href="{% url 'chat:chat_history' %}?type=family" class="btn btn-sm btn-outline-dark">📜 Cronologia</a>
-                    {% elif active_thread != 'family' and has_deleted_private %}
-                        <a href="{% url 'chat:chat_history' %}?type=private" class="btn btn-sm btn-outline-dark">📜 Cronologia</a>
-                    {% endif %}
-                </div>
-            </div>
-
-            <!-- Container Messaggi -->
-            <div class="chat-container flex-grow-1 p-3 overflow-auto" style="max-height: 60vh;" id="chatMessages-current">
-                {% for msg in current_messages %}
                     {% if msg.sender == request.user %}
-                        <div class="chat-message mine" id="msg-{{ msg.id }}">
-                            <div class="sender-avatar mine-avatar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>
-                            <div class="message-bubble">
-                                {% if msg.reply_to %}
-                                    <div class="message-reply"><strong>↩️ {{ msg.reply_to.sender.first_name|default:"Utente" }}</strong><br><small class="text-muted">{{ msg.reply_to.content|truncatechars:50 }}</small></div>
-                                {% endif %}
-                                <p class="message-content">{{ msg.content|linebreaksbr }}</p>
-                                {% if msg.attachments.all %}
-                                    <div class="message-attachments">
-                                        {% for file in msg.attachments.all %}
-                                            <a href="{{ file.file.url }}" target="_blank" class="d-block mb-1">📎 {{ file.file.name|slice:"30:"|default:"Allegato" }}</a>
-                                        {% endfor %}
-                                    </div>
-                                {% endif %}
-                                <div class="message-meta"><span>{{ msg.created_at|date:"H:i" }}</span>{% if msg.version > 1 %}<span title="Modificato">✏️</span>{% endif %}</div>
+                        <div class="sender-avatar mine-avatar">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                        </div>
+                        <div class="message-bubble">
+                            {% if msg.reply_to %}
+                                <div class="message-reply">
+                                    <strong>↩️ {{ msg.reply_to.sender.first_name|default:"Utente" }}</strong><br>
+                                    <small class="text-muted">{{ msg.reply_to.content|truncatechars:50 }}</small>
+                                </div>
+                            {% endif %}
+                            <p class="message-content">{{ msg.content|linebreaksbr }}</p>
+                            {% if msg.attachments.all %}
+                                <div class="message-attachments">
+                                    {% for file in msg.attachments.all %}
+                                        <a href="{{ file.file.url }}" target="_blank" class="d-block mb-1">📎 {{ file.file.name|slice:"30:"|default:"Allegato" }}</a>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="message-meta">
+                                <span>{{ msg.created_at|date:"H:i" }}</span>
+                                {% if msg.version > 1 %}<span title="Modificato">✏️</span>{% endif %}
                             </div>
-                            <div class="message-actions d-flex gap-1">
-                                <button class="btn btn-sm btn-link text-muted p-0" type="button" onclick="replyToMessage('{{ msg.id }}', '{{ msg.content|escapejs }}')">↩️</button>
-                                <form method="post" action="{% url 'chat:delete_message' msg.id %}" class="d-inline" onsubmit="return confirm('Eliminare questo messaggio?')">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-link text-danger p-0">🗑️</button>
-                                </form>
-                            </div>
+                        </div>
+                        <div class="message-actions d-flex gap-1">
+                            <button class="btn btn-sm btn-link text-muted p-0" type="button" onclick="replyToMessage('{{ msg.id }}', '{{ msg.content|escapejs }}')">↩️</button>
+                            <form method="post" action="{% url 'chat:delete_message' msg.id %}" class="d-inline" onsubmit="return confirm('Eliminare questo messaggio?')">
+                                {% csrf_token %}
+                                <input type="hidden" name="return_thread" value="{{ active_thread }}">
+                                {% if private_with_user %}<input type="hidden" name="return_chat_with" value="{{ private_with_user.id }}">{% endif %}
+                                <button type="submit" class="btn btn-sm btn-link text-danger p-0">🗑️</button>
+                            </form>
                         </div>
                     {% else %}
-                        <div class="chat-message other" id="msg-{{ msg.id }}">
-                            <div class="sender-avatar other-avatar"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg></div>
-                            <div class="message-bubble">
-                                {% if msg.reply_to %}
-                                    <div class="message-reply"><strong>↩️ {{ msg.reply_to.sender.first_name|default:"Utente" }}</strong><br><small class="text-muted">{{ msg.reply_to.content|truncatechars:50 }}</small></div>
-                                {% endif %}
-                                <p class="message-content">{{ msg.content|linebreaksbr }}</p>
-                                {% if msg.attachments.all %}
-                                    <div class="message-attachments">
-                                        {% for file in msg.attachments.all %}
-                                            <a href="{{ file.file.url }}" target="_blank" class="d-block mb-1">📎 {{ file.file.name|slice:"30:"|default:"Allegato" }}</a>
-                                        {% endfor %}
-                                    </div>
-                                {% endif %}
-                                <div class="message-meta"><span>{{ msg.sender.first_name|default:msg.sender.username|slice:":1" }} • {{ msg.created_at|date:"H:i" }}</span>{% if msg.version > 1 %}<span title="Modificato">✏️</span>{% endif %}</div>
-                            </div>
-                            <div class="message-actions d-flex gap-1">
-                                <button class="btn btn-sm btn-link text-muted p-0" onclick="replyToMessage('{{ msg.id }}', '{{ msg.content|escapejs }}')">↩️ Rispondi</button>
+                        <div class="sender-avatar other-avatar">
+                            <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                        </div>
+                        <div class="message-bubble">
+                            {% if msg.reply_to %}
+                                <div class="message-reply">
+                                    <strong>↩️ {{ msg.reply_to.sender.first_name|default:"Utente" }}</strong><br>
+                                    <small class="text-muted">{{ msg.reply_to.content|truncatechars:50 }}</small>
+                                </div>
+                            {% endif %}
+                            <p class="message-content">{{ msg.content|linebreaksbr }}</p>
+                            {% if msg.attachments.all %}
+                                <div class="message-attachments">
+                                    {% for file in msg.attachments.all %}
+                                        <a href="{{ file.file.url }}" target="_blank" class="d-block mb-1">📎 {{ file.file.name|slice:"30:"|default:"Allegato" }}</a>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="message-meta">
+                                <span>{{ msg.sender.first_name|default:msg.sender.username|slice:":1" }} • {{ msg.created_at|date:"H:i" }}</span>
+                                {% if msg.version > 1 %}<span title="Modificato">✏️</span>{% endif %}
                             </div>
                         </div>
+                        <div class="message-actions d-flex gap-1">
+                            <button class="btn btn-sm btn-link text-muted p-0" onclick="replyToMessage('{{ msg.id }}', '{{ msg.content|escapejs }}')">↩️ Rispondi</button>
+                        </div>
                     {% endif %}
-                {% empty %}
-                    <p class="text-center text-muted py-5">Nessun messaggio in questa chat.</p>
-                {% endfor %}
+                </div>
+            {% empty %}
+                <div class="text-center py-5">
+                    <span class="fs-1 d-block mb-3">💬</span>
+                    <p class="text-muted mb-0">Nessun messaggio in questa chat</p>
+                    <small class="text-muted">Inizia la conversazione!</small>
+                </div>
+            {% endfor %}
+
+            <!-- Messaggio quando la ricerca non trova nulla -->
+            <div class="search-no-results" id="searchNoResults">
+                <div class="fs-1 mb-2">🔍</div>
+                <p class="mb-0">Nessun messaggio trovato</p>
+                <small class="text-muted">Prova con parole diverse</small>
             </div>
+        </div>
 
-            <!-- ✍️ FORM DI INVIO (Dinamico) -->
-            <div class="p-3 border-top bg-light">
-                <form method="POST" enctype="multipart/form-data" id="chatForm-current">
-                    {% csrf_token %}
+        <!-- ✍️ FORM DI INVIO -->
+        <div class="card-footer bg-white border-top p-3">
+            <form method="POST" enctype="multipart/form-data" id="chatForm-current">
+                {% csrf_token %}
 
-                    <!-- ✅ CAMPO THREAD_TYPE FISSO E SICURO -->
-                    {% if active_thread == "family" %}
-                        <input type="hidden" name="thread_type" value="family">
-                    {% else %}
-                        <input type="hidden" name="thread_type" value="{{ active_thread }}">
-                    {% endif %}
+                {% if active_thread == "family" %}
+                    <input type="hidden" name="thread_type" value="family">
+                {% else %}
+                    <input type="hidden" name="thread_type" value="{{ active_thread }}">
+                {% endif %}
 
-                    {% if private_with_user %}
-                        <input type="hidden" name="recipient_id" value="{{ private_with_user.id }}">
-                    {% endif %}
+                {% if private_with_user %}
+                    <input type="hidden" name="recipient_id" value="{{ private_with_user.id }}">
+                {% endif %}
 
-                    <!-- Anteprima Risposta -->
-                    <div id="replyPreview" class="alert alert-info py-2 mb-3 d-none">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <span><strong>↩️ Risposta a:</strong> <span id="replyText"></span></span>
-                            <button type="button" class="btn-close btn-close-sm" onclick="cancelReply()"></button>
+                <!-- Anteprima Risposta -->
+                <div id="replyPreview" class="alert alert-info border-0 shadow-sm py-2 mb-3 d-none">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><strong>↩️ Risposta a:</strong> <span id="replyText"></span></span>
+                        <button type="button" class="btn-close btn-close-sm" onclick="cancelReply()"></button>
+                    </div>
+                </div>
+
+                <!-- Contesto Rifiuto Spesa -->
+                {% if reject_context and active_thread == 'family' %}
+                <div class="alert alert-warning border-0 shadow-sm mb-3">
+                    <div class="d-flex align-items-start gap-3">
+                        <span class="fs-3">🔴</span>
+                        <div class="flex-grow-1">
+                            <h6 class="mb-2 fw-bold">Giustificazione rifiuto spesa</h6>
+                            <div class="card bg-white border-0 shadow-sm mb-2">
+                                <div class="card-body p-3">
+                                    <div class="row g-2 small">
+                                        <div class="col-md-6"><strong>💰 Importo:</strong> € {{ reject_context.amount|floatformat:2 }}</div>
+                                        <div class="col-md-6"><strong>📅 Data:</strong> {{ reject_context.date }}</div>
+                                        <div class="col-md-6"><strong>🏷️ Categoria:</strong> {{ reject_context.category }}</div>
+                                        <div class="col-md-6"><strong>👤 Inserita da:</strong> {{ reject_context.created_by }}</div>
+                                        {% if reject_context.description %}
+                                        <div class="col-12"><strong>📝 Descrizione:</strong> {{ reject_context.description|truncatechars:100 }}</div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {% if reject_context.linked_event %}
+                            <div class="alert alert-info border-0 shadow-sm mb-2 py-2">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="fs-4">📅</span>
+                                    <div class="flex-grow-1">
+                                        <strong class="d-block">Evento collegato:</strong>
+                                        <a href="{{ reject_context.linked_event.url }}" target="_blank" class="text-decoration-none fw-bold">
+                                            {{ reject_context.linked_event.title }}
+                                        </a>
+                                        <small class="d-block text-muted">
+                                            {{ reject_context.linked_event.event_type }} • {{ reject_context.linked_event.date }}
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            <p class="mb-0 small fst-italic text-muted">Scrivi il motivo del rifiuto qui sotto.</p>
                         </div>
                     </div>
+                    <input type="hidden" name="reject_expense_id" value="{{ reject_context.expense_id }}">
+                </div>
+                {% endif %}
 
-                    <!-- Contesto Rifiuto Spesa (solo se presente) -->
-                    {% if reject_context and active_thread == 'family' %}
-                    <div class="alert alert-warning border-warning mb-3">
-                        <div class="d-flex align-items-start gap-2">
-                            <span class="fs-5">🔴</span>
-                            <div class="flex-grow-1">
-                                <h6 class="mb-2 fw-bold">Giustificazione rifiuto spesa</h6>
+                <!-- CAMPO MESSAGGIO -->
+                <div class="mb-3">
+                    <label for="messageInput" class="form-label visually-hidden">Messaggio</label>
+                    <textarea name="message" class="form-control" rows="3" placeholder="Scrivi un messaggio..." required id="messageInput"></textarea>
+                </div>
 
-                                <!-- Informazioni Spesa -->
-                                <div class="card bg-light border-0 mb-2">
-                                    <div class="card-body p-2">
-                                        <div class="row g-2 small">
-                                            <div class="col-md-6">
-                                                <strong>💰 Importo:</strong> € {{ reject_context.amount|floatformat:2 }}
-                                            </div>
-                                            <div class="col-md-6">
-                                                <strong>📅 Data:</strong> {{ reject_context.date }}
-                                            </div>
-                                            <div class="col-md-6">
-                                                <strong>🏷️ Categoria:</strong> {{ reject_context.category }}
-                                            </div>
-                                            <div class="col-md-6">
-                                                <strong>👤 Inserita da:</strong> {{ reject_context.created_by }}
-                                            </div>
-                                            {% if reject_context.description %}
-                                            <div class="col-12">
-                                                <strong>📝 Descrizione:</strong> {{ reject_context.description|truncatechars:100 }}
-                                            </div>
-                                            {% endif %}
-                                        </div>
+                <!-- PULSANTE PER MOSTRARE ALLEGATI E OPZIONI -->
+                <button class="btn btn-sm btn-outline-secondary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#chatExtras">
+                    <span class="me-1">📎</span> Allegati e Opzioni ▼
+                </button>
+
+                <!-- SEZIONE COLLABILE -->
+                <div class="collapse mb-3" id="chatExtras">
+                    <div class="card bg-light border-0">
+                        <div class="card-body p-3">
+                            <!-- Allegati -->
+                            <div class="mb-3">
+                                <label for="attachmentsInput" class="form-label small fw-bold text-muted">📎 Allegati (opzionale)</label>
+                                <input type="file" name="attachments" multiple class="form-control form-control-sm" id="attachmentsInput">
+                                <div class="form-text small">Formati supportati: JPG, PNG, PDF (max 5MB ciascuno)</div>
+                            </div>
+
+                            <!-- Crea Evento -->
+                            {% if can_create_event %}
+                            <div class="form-check mb-3">
+                                <input class="form-check-input" type="checkbox" name="create_event" id="createEventCheck" onchange="toggleEventFields()">
+                                <label class="form-check-label small fw-bold" for="createEventCheck">📅 Crea anche un evento nel calendario</label>
+                            </div>
+                            <div id="eventFields" class="d-none border rounded p-3 mb-3 bg-white">
+                                <div class="mb-2">
+                                    <label for="eventTitle" class="form-label small fw-bold text-muted">Titolo evento</label>
+                                    <input type="text" name="event_title" placeholder="Titolo evento" class="form-control form-control-sm" id="eventTitle">
+                                </div>
+                                <div class="row g-2 mb-2">
+                                    <div class="col-6">
+                                        <label for="eventStart" class="form-label small fw-bold text-muted">Inizio</label>
+                                        <input type="datetime-local" name="event_start" class="form-control form-control-sm" id="eventStart">
+                                    </div>
+                                    <div class="col-6">
+                                        <label for="eventEnd" class="form-label small fw-bold text-muted">Fine</label>
+                                        <input type="datetime-local" name="event_end" class="form-control form-control-sm" id="eventEnd">
                                     </div>
                                 </div>
 
-                                <!-- ✅ Informazioni Evento Collegato (se presente) -->
-                                {% if reject_context.linked_event %}
-                                <div class="alert alert-info border-info mb-2 py-2">
-                                    <div class="d-flex align-items-center gap-2">
-                                        <span class="fs-5">📅</span>
-                                        <div class="flex-grow-1">
-                                            <strong class="d-block">Evento collegato:</strong>
-                                            <a href="{{ reject_context.linked_event.url }}" target="_blank" class="text-decoration-none fw-bold">
-                                                {{ reject_context.linked_event.title }}
-                                            </a>
-                                            <small class="d-block text-muted">
-                                                {{ reject_context.linked_event.event_type }} • {{ reject_context.linked_event.date }}
-                                            </small>
-                                        </div>
-                                    </div>
+                                <div class="mb-2">
+                                    <label for="eventChildren" class="form-label small fw-bold text-muted">👶 Coinvolgi figli (opzionale)</label>
+                                    <select name="event_children" multiple class="form-select form-select-sm" size="3" id="eventChildren">
+                                        {% for child in family_children %}
+                                            <option value="{{ child.id }}">{{ child.name }} {{ child.surname }}</option>
+                                        {% endfor %}
+                                    </select>
                                 </div>
-                                {% endif %}
-
-                                <p class="mb-0 small fst-italic">Scrivi il motivo del rifiuto qui sotto.</p>
+                                <div class="mb-2">
+                                    <label for="eventDescription" class="form-label small fw-bold text-muted">Descrizione</label>
+                                    <textarea name="event_description" placeholder="Descrizione evento" class="form-control form-control-sm" rows="2" id="eventDescription"></textarea>
+                                </div>
                             </div>
+                            {% endif %}
                         </div>
-                        <input type="hidden" name="reject_expense_id" value="{{ reject_context.expense_id }}">
                     </div>
-                    {% endif %}
+                </div>
 
-                    <div class="mb-3">
-                        <textarea name="message" class="form-control" rows="3" placeholder="Scrivi un messaggio..." required id="messageInput"></textarea>
-                    </div>
+                <input type="hidden" name="reply_to" id="replyToInput">
 
-                    <div class="mb-3">
-                        <label class="form-label small text-muted">📎 Allegati (opzionale)</label>
-                        <input type="file" name="attachments" multiple class="form-control form-control-sm">
-                    </div>
-
-                    <!-- Crea Evento (SOLO per chat famiglia) -->
-                    {% if can_create_event %}
-                    <div class="form-check mb-3">
-                        <input class="form-check-input" type="checkbox" name="create_event" id="createEventCheck" onchange="toggleEventFields()">
-                        <label class="form-check-label small" for="createEventCheck">📅 Crea anche un evento nel calendario</label>
-                    </div>
-                    <div id="eventFields" class="d-none border rounded p-3 mb-3 bg-white">
-                        <input type="text" name="event_title" placeholder="Titolo evento" class="form-control form-control-sm mb-2" >
-                        <div class="row g-2">
-                            <div class="col-6"><input type="datetime-local" name="event_start" class="form-control form-control-sm" ><small class="text-muted">Inizio</small></div>
-                            <div class="col-6"><input type="datetime-local" name="event_end" class="form-control form-control-sm" ><small class="text-muted">Fine</small></div>
-                        </div>
-                        <div class="mb-2 mt-2">
-                            <label class="form-label small text-muted">👶 Coinvolgi figli (opzionale)</label>
-                            <select name="event_children" multiple class="form-select form-select-sm" size="3">
-                                {% for child in family_children %}
-                                    <option value="{{ child.id }}">{{ child.name }} {{ child.surname }}</option>
-                                {% endfor %}
-                            </select>
-                        </div>
-                        <textarea name="event_description" placeholder="Descrizione evento" class="form-control form-control-sm mt-2" rows="2"></textarea>
-                    </div>
-                    {% endif %}
-
-                    <input type="hidden" name="reply_to" id="replyToInput">
-
-                    <div class="d-flex gap-2 flex-wrap mt-3">
-                        <button type="submit" class="btn btn-success ms-auto px-4">📤 Invia messaggio</button>
-                    </div>
-                </form>
-            </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <button type="submit" class="btn btn-success ms-auto px-4 fw-bold">
+                        <span class="me-1">📤</span> Invia messaggio
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
+
+<!-- ✅ OFFCANVAS SIDEBAR -->
+<div class="offcanvas offcanvas-start chat-offcanvas" tabindex="-1" id="chatSidebar">
+    <div class="offcanvas-header border-bottom bg-light">
+        <h5 class="offcanvas-title fw-bold d-flex align-items-center gap-2">
+            <span class="fs-4">💬</span>
+            <span>Le tue Chat</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
+    </div>
+    <div class="offcanvas-body p-0">
+        <div class="d-flex flex-column gap-2 p-3">
+            {% for chat in available_chats %}
+                <a href="{{ chat.url }}"
+                   class="sidebar-chat-item d-flex align-items-start p-3 text-decoration-none rounded {% if chat.is_active %}active-chat{% endif %} {% if chat.is_private %}chat-private-item{% endif %}">
+
+                    {% if chat.is_private %}
+                        <span class="fs-4 me-3 mt-1">🔒</span>
+                    {% else %}
+                        <span class="fs-4 me-3 mt-1">{{ chat.icon }}</span>
+                    {% endif %}
+
+                    <div class="flex-grow-1">
+                        <h6 class="mb-0 small fw-bold" style="line-height: 1.4;">
+                            {{ chat.name }}
+                        </h6>
+                        {% if chat.is_private %}
+                            <small class="text-muted">Chat privata</small>
+                        {% endif %}
+                    </div>
+                </a>
+            {% empty %}
+                <div class="p-4 text-center">
+                    <span class="fs-1 d-block mb-2">💬</span>
+                    <p class="text-muted small mb-0">Nessuna chat disponibile</p>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-    // ✅ SCROLL AUTOMATICO IN BASSO (con delay per garantire che il DOM sia pronto)
-    setTimeout(() => {
-        const el = document.getElementById("chatMessages-current");
-        if (el) {
-            el.scrollTop = el.scrollHeight;
-        }
-    }, 100);
+   // ✅ SCROLL AUTOMATICO: pagina + container chat
+function scrollChatIntoView() {
+    // 1️⃣ Scrolla il container interno dei messaggi in fondo
+    const chatContainer = document.getElementById("chatMessages-current");
+    if (chatContainer) {
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
 
-    // Reply logic
+    // 2️⃣ Scrolla la PAGINA PRINCIPALE fino al wrapper della chat
+    const chatWrapper = document.querySelector(".chat-main-wrapper");
+    if (chatWrapper) {
+        chatWrapper.scrollIntoView({ behavior: 'instant', block: 'start' });
+        // Piccolo offset per non attaccare la chat al bordo superiore
+        window.scrollBy(0, -10);
+    }
+}
+
+// Tentativo 1: immediato
+scrollChatIntoView();
+
+// Tentativo 2: dopo caricamento completo (immagini, font, CSS)
+window.addEventListener('load', function() {
+    setTimeout(scrollChatIntoView, 50);
+});
+
+// Tentativo 3: doppio requestAnimationFrame per timing perfetto
+requestAnimationFrame(() => {
+    requestAnimationFrame(scrollChatIntoView);
+});
+
+// Tentativo 4: fallback tardivo (per form con allegati pesanti)
+setTimeout(scrollChatIntoView, 300);
+
+    // ✅ PRE-COMPILAZIONE MESSAGGIO
+    const prefillMessage = "{{ prefill_message|escapejs }}";
+    if (prefillMessage && prefillMessage !== "None" && prefillMessage.trim() !== "") {
+        const ta = document.getElementById("messageInput");
+        if (ta) {
+            ta.value = prefillMessage;
+            ta.focus();
+            const form = document.getElementById("chatForm-current");
+            if(form) form.scrollIntoView({behavior: 'smooth', block: 'center'});
+        }
+    }
+
+    // ✅ GESTIONE CLICK SUI LINK DELLA SIDEBAR
+    const sidebarLinks = document.querySelectorAll('.sidebar-chat-item');
+    const offcanvasEl = document.getElementById('chatSidebar');
+
+    sidebarLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const url = this.getAttribute('href');
+
+            const offcanvas = bootstrap.Offcanvas.getInstance(offcanvasEl);
+            if (offcanvas) {
+                offcanvas.hide();
+                setTimeout(() => {
+                    window.location.href = url;
+                }, 300);
+            } else {
+                window.location.href = url;
+            }
+        });
+    });
+
+    // ✅ RICERCA NEI MESSAGGI
+    const searchInput = document.getElementById('messageSearch');
+    const clearBtn = document.getElementById('clearSearch');
+    const searchInfo = document.getElementById('searchInfo');
+    const noResults = document.getElementById('searchNoResults');
+    const messagesContainer = document.getElementById('chatMessages-current');
+    let searchTimeout;
+
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => performSearch(this.value), 200);
+        });
+
+        clearBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            performSearch('');
+            searchInput.focus();
+        });
+    }
+
+    function performSearch(query) {
+        const messages = messagesContainer.querySelectorAll('.chat-message');
+
+        messages.forEach(msg => {
+            msg.classList.remove('search-hidden');
+            msg.querySelectorAll('.search-highlight').forEach(hl => {
+                hl.outerHTML = hl.textContent;
+            });
+        });
+        noResults.classList.remove('active');
+
+        if (!query || query.trim().length < 2) {
+            clearBtn.style.display = 'none';
+            searchInfo.classList.add('d-none');
+            return;
+        }
+
+        clearBtn.style.display = 'block';
+        const normalizedQuery = query.toLowerCase().trim();
+        let matchCount = 0;
+
+        messages.forEach(msg => {
+            const content = (msg.dataset.messageContent || '').toLowerCase();
+            if (content.includes(normalizedQuery)) {
+                matchCount++;
+                highlightText(msg, query);
+            } else {
+                msg.classList.add('search-hidden');
+            }
+        });
+
+        searchInfo.classList.remove('d-none');
+        if (matchCount === 0) {
+            searchInfo.innerHTML = `<span class="text-danger">Nessun risultato per "<strong>${escapeHtml(query)}</strong>"</span>`;
+            noResults.classList.add('active');
+        } else {
+            searchInfo.innerHTML = `<span class="text-success">✓ Trovati <strong>${matchCount}</strong> messaggi</span>`;
+
+            const firstMatch = messagesContainer.querySelector('.chat-message:not(.search-hidden)');
+            if (firstMatch) {
+                firstMatch.scrollIntoView({behavior: 'smooth', block: 'center'});
+            }
+        }
+    }
+
+    function highlightText(messageEl, query) {
+        const contentEl = messageEl.querySelector('.message-content');
+        if (!contentEl) return;
+
+        const regex = new RegExp(`(${escapeRegex(query)})`, 'gi');
+        contentEl.innerHTML = contentEl.innerHTML.replace(regex, '<span class="search-highlight">$1</span>');
+    }
+
+    function escapeRegex(string) {
+        return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    }
+
+    function escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // ✅ Reply logic
     window.replyToMessage = function(id, content) {
         document.getElementById("replyToInput").value = id;
         document.getElementById("replyText").textContent = content.split('\n')[0].slice(0, 50) + (content.length > 50 ? '...' : '');
@@ -300,26 +622,20 @@ document.addEventListener("DOMContentLoaded", () => {
         document.getElementById("replyPreview").classList.add("d-none");
     };
 
-    // ✅ Gestione dinamica required per campi evento
+    // ✅ Gestione campi evento
     window.toggleEventFields = function() {
         const cb = document.getElementById("createEventCheck");
         const f = document.getElementById("eventFields");
         if (f && cb) {
             f.classList.toggle("d-none", !cb.checked);
-
-            // Aggiungi/rimuovi required dinamicamente
             const eventInputs = f.querySelectorAll("input[name^='event_']");
             eventInputs.forEach(input => {
-                if (cb.checked) {
-                    input.setAttribute("required", "required");
-                } else {
-                    input.removeAttribute("required");
-                }
+                if (cb.checked) input.setAttribute("required", "required");
+                else input.removeAttribute("required");
             });
         }
     };
 
-    // ESC per cancellare reply
     document.addEventListener("keydown", e => {
         if(e.key === "Escape") cancelReply();
     });

@@ -1,32 +1,28 @@
+# children/views.py
 import json
-from datetime import date
-from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.http import FileResponse
-from django.shortcuts import render, redirect, get_object_or_404
-from django.utils import timezone
+from django.shortcuts import render, redirect
 
-from children.forms import ChildForm
-from children.models import ChildProfile
+
+from children.models import ChildSupport
 from children.services.child_service import (
     create_child,
     update_child,
     archive_child
 )
-# children/views.py
+
 from children.utils import calculate_expense_shares, get_child_split_pct
 from expenses.models import Expense
-from families.utils import get_family_of_user
-from .forms import ChildSupportForm
+from expenses.services.expences_service import calculate_monthly_net_balance
+from families.models import FamilyMember
+from .forms import ChildSupportForm, ChildForm
 from .notifications.services_notification import notify_other_parent
 from .services.child_service import update_child_support
 
-
-# children/views.py
-# ... altri import ...
 
 @login_required
 def children_list(request):
@@ -38,10 +34,27 @@ def children_list(request):
     # ✅ Prefetcha relazioni per evitare query N+1
     children = list(family.children.filter(is_active=True).prefetch_related('supports', 'expenses'))
 
+    # 👫 RECUPERA MANTENIMENTO CONIUGE ATTIVO
+    current_spouse_support = ChildSupport.objects.filter(
+        child__family=family,  # ✅ Usa child__family perché ChildSupport non ha family diretto
+        support_type='spouse',
+        is_active=True
+    ).order_by('-start_date').first()
+
     for child in children:
+        # ✅ NUOVO: Calcola il saldo netto mensile
+        balance_data = calculate_monthly_net_balance(child, today.month, today.year)
+
+        # Assegna i dati al child per il template
+        child.current_support = balance_data['maintenance']
+        child.net_balance = balance_data['net_balance']
+        child.payer = balance_data['payer']
+        child.receiver = balance_data['receiver']
+        child.balance_message = balance_data['message']
+
         expenses_qs = Expense.objects.filter(child=child, is_active=True, status="accepted")
         # 💰 Mantenimento
-        child.current_support = child.effective_maintenance_amount
+        #child.current_support = child.effective_maintenance_amount
 
         # 📊 Quote di ripartizione (fallback a 50/50 se mancante)
         pct_a = float(child.contribution_pct_parent_a or 50.0)
@@ -91,17 +104,31 @@ def children_list(request):
         child.split_pct_a = get_child_split_pct(child)
         child.split_pct_b = 100.0 - child.split_pct_a
 
-    return render(request, "children/children_list.html", {"children": children})
+
+
+    context = {
+        "children": children,
+        "current_spouse_support": current_spouse_support,  # ✅ Nuovo
+    }
+
+    return render(request, "children/children_list.html", context)
 
 @login_required
 def child_detail(request, child_id):
-    child = get_object_or_404(ChildProfile, id=child_id, is_active=True)
+    # ✅ 1. Recupera la famiglia (Best Practice di sicurezza)
+    family = get_family_of_user(request.user, request=request)
+    if not family:
+        return redirect("children:children_list")
+
+    # ✅ 2. FIX SICUREZZA: Aggiunto family=family per prevenire IDOR
+    child = get_object_or_404(ChildProfile, id=child_id, is_active=True, family=family)
 
     today = date.today()
 
     # 👉 mantenimento attuale
     current_support = child.supports.filter(
-        start_date__lte=today
+        start_date__lte=today,
+        is_active=True
     ).filter(
         Q(end_date__isnull=True) | Q(end_date__gte=today)
     ).order_by("-start_date").first()
@@ -123,7 +150,8 @@ def child_detail(request, child_id):
         "supports_history": supports_history,
         "support_data": json.dumps(support_data)
     })
-from django.db import transaction
+
+
 # children/views.py
 from decimal import Decimal
 from django.utils import timezone
@@ -133,6 +161,14 @@ from django.db import transaction
 @login_required
 def child_create_view(request):
     family = get_family_of_user(request.user, request=request)
+    membership = FamilyMember.objects.filter(family=family, user=request.user).first()
+
+    # ✅ BLOCCO AVVOCATI
+    if membership and membership.role in ['lawyer_a', 'lawyer_b']:
+        messages.error(request,
+                       "⚠️ Gli avvocati non possono aggiungere figli. Questa operazione è riservata ai genitori.")
+        return redirect('children:children_list')
+
     if not family:
         messages.error(request, "⚠️ Nessuna famiglia associata.")
         return redirect("families:setup")
@@ -209,9 +245,13 @@ def child_update_view(request, pk):
     return render(request, "children/child_form.html", {"form": form, "child": child})
 
 
+
+
 @login_required
 def update_support(request, child_id):
-    child = get_object_or_404(ChildProfile, id=child_id, is_active=True)
+    # ✅ FIX SICUREZZA: Anche qui aggiungiamo il filtro famiglia
+    family = get_family_of_user(request.user, request=request)
+    child = get_object_or_404(ChildProfile, id=child_id, is_active=True, family=family)
     form = ChildSupportForm(request.POST or None)
 
     if request.method == "POST" and form.is_valid():

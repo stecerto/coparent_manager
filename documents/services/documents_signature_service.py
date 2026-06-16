@@ -34,4 +34,3 @@ def sign_document(document, user, role):
 
     return document
 
-    return document

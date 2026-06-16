@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}👫 Mantenimento al Coniuge - {{ family.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+
+            <!-- Header -->
+            <div class="d-flex align-items-center mb-4">
+                <a href="{% url 'families:family_dashboard' %}" class="btn btn-outline-secondary btn-sm me-3 shadow-sm">
+                    <i class="bi bi-arrow-left"></i> Dashboard
+                </a>
+                <div>
+                    <h1 class="h3 fw-bold mb-0">👫 Mantenimento al Coniuge</h1>
+                    <p class="text-muted mb-0 small">Famiglia: <strong>{{ family.name }}</strong></p>
+                </div>
+            </div>
+
+            <!-- Card Form -->
+            <div class="card shadow-sm border-0" style="border-radius: 12px;">
+                <div class="card-header bg-white border-bottom border-start border-1 border-info d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                    <i class="bi bi-cash-coin fs-3 text-info me-3"></i>
+                    <h5 class="mb-0 fw-bold">Imposta o Aggiorna Importo</h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST">
+                        {% csrf_token %}
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-uppercase text-muted">Importo Mensile (€)</label>
+                            {{ form.amount }}
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-uppercase text-muted">Data di Decorrenza</label>
+                            {{ form.start_date }}
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-info text-white btn-lg">
+                                <i class="bi bi-check-circle me-2"></i>Salva Mantenimento
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

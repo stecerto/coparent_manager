@@ -1,12 +1,15 @@
 {% extends "base.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% load custom_filters %}
+
+{% block title %}📄 Lista Spese - CoParent Manager{% endblock %}
 
 {% block extra_css %}
 <!-- Bootstrap -->
 <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
 
-<!-- FullCalendar (URL corretto) -->
+<!-- FullCalendar -->
 <link href='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css' rel='stylesheet'/>
 
 <!-- Custom CSS -->
@@ -14,10 +17,10 @@
 /* 🎨 PULSANTI STATO - BASE */
 .status-btn {
     width: 30px; height: 30px;
-    border-radius: 15%;
+    border-radius: 12%;
     display: flex; align-items: center; justify-content: center;
     font-size: 1.2rem;
-    border: 2px solid #dee2e6;
+    border: 1px solid #dee2e6;
     background: #f8f9fa;
     opacity: 1;
     transition: all 0.2s ease;
@@ -26,7 +29,6 @@
 }
 
 /* 🟡 PENDING */
-
 .btn-pending.active { opacity: 1; background: #ffc107 !important; border-color: black !important;}
 
 /* 🔵 ACCEPTED */
@@ -52,13 +54,13 @@
     opacity: 1; border-color: black !important;
 }
 
-/* 🟣 BORDO VIOLA COMUNE (per tutti gli stati) */
+/* 🟣 BORDO VIOLA COMUNE */
 .status-btn.has-purple-border {
     border-color: black !important;
     box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1) !important;
 }
 
-/* ✅ PULSANTE ABILITATO (cliccabile) */
+/* ✅ PULSANTE ABILITATO */
 .status-btn:not([disabled]):not(.active):not(.half-blue):not(.half-green) {
     opacity: 0.6; cursor: pointer;
 }
@@ -69,7 +71,6 @@
 }
 
 /* ❌ PULSANTE DISABILITATO */
-/* 🔒 FORZA lo stile dei pulsanti disabilitati, sovrascrivendo qualsiasi CSS esterno */
 .status-btn[disabled],
 .status-btn[disabled]:hover,
 .status-btn[disabled]:focus {
@@ -81,242 +82,371 @@
     box-shadow: none !important;
 }
 
-/* 🎨 Mantieni il bordo viola anche quando disabilitato */
 .status-btn.has-purple-border[disabled] {
     border-color: black !important;
 }
 
 /* 🏷️ BADGE STATO */
-.status-badge { font-size: 0.85rem;
+.status-badge {
+    font-size: 0.85rem;
     padding: 0.5em 0.8em;
-    font-weight: 500; }
+    font-weight: 500;
+}
 
-/* ♿ FIX LABEL (accessibilità) */
+/* ♿ FIX LABEL */
 .form-label[for] { cursor: pointer; }
+
+/* 📊 TABELLA MODERNA */
+.table-modern {
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.table-modern thead {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.table-modern thead th {
+    border: none;
+    padding: 1rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.85rem;
+    letter-spacing: 0.5px;
+}
+
+.table-modern tbody tr {
+    transition: all 0.2s ease;
+}
+
+.table-modern tbody tr:hover {
+    background-color: #f8f9fa !important;
+    transform: scale(1.01);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.table-modern tbody td {
+    padding: 1rem;
+    vertical-align: middle;
+    border-color: #e9ecef;
+}
+
+/* 🏷️ BADGE CATEGORIA */
+.category-badge {
+    display: inline-block;
+    padding: 0.4em 0.8em;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
 </style>
 {% endblock %}
 
 {% block content %}
-{% csrf_token %}
+<div class="container py-4">
 
-<input type="hidden" id="csrfToken" value="{{ csrf_token }}">
- <!-- tabella ricerca spesa -->
-    <div class="card p-3 mb-2 shadow custom-card">
-        <form method="get" class="card p-3 mb-4 shadow-sm">
-
-            <div class="row g-3 mb-1">
-                <div class="col-md-2">
-                    <label class="form-label" for="id_child">{{ form.child.label }}</label>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label" for="id_status">{{ form.status.label }}</label>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label" for="id_expense_type">{{ form.expense_type.label }}</label>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label" for="id_date_from">{{ form.date_from.label }}</label>
-                </div>
-                <div class="col-md-2">
-                    <label class="form-label" for="id_date_to">{{ form.date_to.label }}</label>
-                </div>
-            </div>
-
-            <div class="row g-3">
-                <div class="col-md-2">
-                    {{ form.child }}
-                </div>
-                <div class="col-md-2">
-                    {{ form.status }}
-                </div>
-                <div class="col-md-2">
-                    {{ form.expense_type }}
-                </div>
-                <div class="col-md-2">
-                    {{ form.date_from }}
-                </div>
-                <div class="col-md-2">
-                    {{ form.date_to }}
-                </div>
-            </div>
-
-            <br>
-
-            <div class="d-flex gap-2">
-                <button class="btn btn-primary btn-sm">
-                    🔎 Filtra
-                </button>
-
-                <a href="{% url 'expenses:expenses_list' %}" class="btn btn-secondary btn-sm">
-                    Reset
-                </a>
-            </div>
-        </form>
-
-        <p class="text-muted small"><strong>Totale:
-            {{ total_expenses }} € </strong>
-        </p>
-        <a href="{% url 'expenses:download_expense_pdf' %}" class="btn btn-success btn-style mb-2">
-            📄 Scarica Report PDF
-            </a>
-    </div>
-<div class="card p-3 mb-2 shadow custom-card">
-        <!-- Tabella -->
-        <h3>📄 {{ page_title }}</h3>
-    <!-- ✅ LEGENDA STATO SPESE -->
-            <!-- ✅ LEGENDA STATO -->
-        <div class="d-flex flex-wrap justify-content-center gap-3 mb-3 p-2 bg-light border rounded shadow-sm">
-            <span class="fw-bold text-secondary small me-2">Legenda Stato:</span>
-            <span class="d-flex align-items-center gap-1"><span style="font-size:1.3rem">🟡</span> <small>In Sospeso</small></span>
-            <span class="d-flex align-items-center gap-1"><span style="font-size:1.3rem">🔵</span> <small>Conferma</small></span>
-            <span class="d-flex align-items-center gap-1"><span style="font-size:1.3rem"> 🟢</span> <small>Pagata</small></span>
-            <span class="d-flex align-items-center gap-1"><span style="font-size:1.3rem">🔴</span> <small>Rifiutata</small></span>
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h2 class="fw-bold mb-1">📄 Gestione Spese</h2>
+            <p class="text-muted mb-0">{{ page_title }}</p>
         </div>
-            <table class="table table-striped mt-4 ">
-                <thead>
-                <tr>
-                    <th>Figlio</th>
-                    <th>Data</th>
-                    <th>Categoria</th>
-                    <th>Importo</th>
-                    <th>Creato da</th>
-                   <!-- <th>Stato</th> -->
-                    <th class="text-left">Azioni</th>
-                </tr>
-                </thead>
-                <tbody>
-                    {% for expense in expenses %}
-                        <span class="badge" style="background-color:{{ exp.category_color_snapshot }}; color: #fff;">
-                          {{ exp.category_name_snapshot }} ({{ exp.get_group_snapshot_display }})
-                      </span>
-                    <!-- expenses_list.html - riga <tr> corretta -->
-                    <tr data-expense-id="{{ expense.id }}"
-                        data-version="{{ expense.version }}"
-                        data-is-creator="{% if expense.created_by == request.user %}true{% else %}false{% endif %}"
+        <div class="d-flex gap-2">
+            <a href="{% url 'expenses:expenses_dashboard' %}" class="btn btn-outline-secondary">
+                📊 Dashboard
+            </a>
+            {% if membership.role in 'parent_a,parent_b' %}
+            <a href="{% url 'expenses:add_expense' %}" class="btn btn-success">
+                ➕ Nuova Spesa
+            </a>
+            {% endif %}
+        </div>
+    </div>
 
-                        <!--# ✅ FIX: isConfirmed dipende dal RUOLO dell'utente loggato, non hardcoded su parent_b -->
-                        {% if request.user.profile.role == "parent_a" or request.user.profile.role.value == "parent_a" %}
-                            data-is-confirmed="{% if expense.approved_by_parent_a %}true{% else %}false{% endif %}"
-                        {% else %}
-                            data-is-confirmed="{% if expense.approved_by_parent_b %}true{% else %}false{% endif %}"
-                        {% endif %}
+    <!-- Card Riepilogo Rapido -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-4 border border-1 border-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted small mb-1">Totale Spese Filtrate</p>
+                            <h3 class="fw-bold mb-0 text-success">€ {{ total_expenses|floatformat:2 }}</h3>
+                        </div>
+                        <span class="fs-1 text-success opacity-20">💰</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-                        data-status="{{ expense.status }}"
-                        data-payment-state="{{ expense.payment_state|default:'unpaid' }}"
-                        data-amount="{{ expense.amount }}">
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-4 border border-1 border-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted small mb-1">Spese Trovate</p>
+                            <h3 class="fw-bold mb-0 text-info">{{ expenses|length }}</h3>
+                        </div>
+                        <span class="fs-1 text-info opacity-20">📊</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-                        <td>{{ expense.child }}</td>
-                        <td>{{ expense.expense_date|date:"d/m/Y" }}</td>
-                        <td>{{ expense.expense_type }}</td>
-                        <td>{{ expense.amount }} €</td>
-                        <td>{{ expense.created_by }}</td>
+        <div class="col-md-4">
+            <div class="card shadow-sm mb-4 border border-1 border-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted small mb-1">Azioni Rapide</p>
+                            <a href="{% url 'expenses:download_expense_pdf' %}" class="btn btn-sm btn-primary w-100">
+                                📥 Scarica Report PDF
+                            </a>
+                        </div>
+                        <span class="fs-1 text-primary opacity-20">📄</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                        <!-- ✅ STATI CON BORDO VIOLA -->
-                        <td class="status-col text-center">
-                            <div class="d-flex flex-column align-items-center">
-                                {% if can_manage_expenses %}
-                                    <div class="d-flex gap-1 mb-1">
+    <!-- Form Ricerca -->
+    <div class="card shadow-sm mb-4 border border-1 border-primary">
+        <div class="card-header bg-white fw-bold d-flex align-items-center gap-2">
+            <span class="fs-4">🔍</span>
+            <span>Filtra Spese</span>
+        </div>
+        <div class="card-body">
+            <form method="get">
+                {% csrf_token %}
+                <div class="row g-3">
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold small" for="id_child">{{ form.child.label }}</label>
+                        {{ form.child }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold small" for="id_status">{{ form.status.label }}</label>
+                        {{ form.status }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold small" for="id_expense_type">{{ form.expense_type.label }}</label>
+                        {{ form.expense_type }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold small" for="id_date_from">{{ form.date_from.label }}</label>
+                        {{ form.date_from }}
+                    </div>
+                    <div class="col-md-2">
+                        <label class="form-label fw-bold small" for="id_date_to">{{ form.date_to.label }}</label>
+                        {{ form.date_to }}
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end gap-2">
+                        <button type="submit" class="btn btn-primary flex-grow-1">
+                            🔎 Filtra
+                        </button>
+                        <a href="{% url 'expenses:expenses_list' %}" class="btn btn-outline-secondary">
+                            ✕
+                        </a>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Tabella Spese -->
+    <div class="card shadow custom-card h-100 border-start border-1 border-primary mb-4" id="expensesTable">
+        <div class="card-header bg-white fw-bold d-flex align-items-center gap-2">
+
+            <span class="fs-4">📋</span>
+            <span>Lista Spese</span>
+
+            <!-- Legenda Stato -->
+            <div class="ms-auto d-flex flex-wrap gap-2">
+                <span class="badge bg-warning text-dark">🟡 In Sospeso</span>
+                <span class="badge bg-primary">🔵 Accettata</span>
+                <span class="badge bg-success">🟢 Pagata</span>
+                <span class="badge bg-danger">🔴 Rifiutata</span>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-modern mb-0">
+                    <thead>
+                        <tr>
+                            <th>👶 Figlio</th>
+                            <th>📅 Data</th>
+                            <th>🏷️ Categoria</th>
+                            <th>💰 Importo</th>
+                            <th>👤 Creato da</th>
+                            <th class="text-center">📊 Stato</th>
+                            <th class="text-center">⚡ Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for expense in expenses %}
+                        <tr data-expense-id="{{ expense.id }}"
+                            data-version="{{ expense.version }}"
+                            data-is-creator="{% if expense.created_by == request.user %}true{% else %}false{% endif %}"
+                            {% if request.user.profile.role == "parent_a" or request.user.profile.role.value == "parent_a" %}
+                                data-is-confirmed="{% if expense.approved_by_parent_a %}true{% else %}false{% endif %}"
+                            {% else %}
+                                data-is-confirmed="{% if expense.approved_by_parent_b %}true{% else %}false{% endif %}"
+                            {% endif %}
+                            data-status="{{ expense.status }}"
+                            data-payment-state="{{ expense.payment_state|default:'unpaid' }}"
+                            data-amount="{{ expense.amount }}">
+
+                            <td>
+                                <div class="p-3 bg-light rounded-3 border-start border-1  border-{{ expense.child|get_child_color }} shadow-sm">
+                                <strong>{{ expense.child|default:"-" }}</strong>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="text-muted">{{ expense.expense_date|date:"d/m/Y" }}</span>
+                            </td>
+                            <td>
+                                <span class="category-badge" style="background-color:{{ expense.category_color_snapshot }}; color: #fff;">
+                                    {{ expense.category_name_snapshot }}
+                                </span>
+                            </td>
+                            <td>
+                                <strong class="text-success">€ {{ expense.amount|floatformat:2 }}</strong>
+                            </td>
+                            <td>
+                                <small class="text-muted">{{ expense.created_by.get_full_name|default:expense.created_by.email }}</small>
+                            </td>
+
+                            <!-- STATI CON BORDO VIOLA -->
+                            <td class="text-center">
+                                <div class="d-flex flex-column align-items-center gap-2">
+                                    {% if can_manage_expenses %}
+                                    <div class="d-flex gap-1">
                                         <button class="btn btn-sm status-btn btn-pending has-purple-border" data-status="pending" title="In Sospeso">🟡</button>
                                         <button class="btn btn-sm status-btn btn-accepted has-purple-border" data-status="accepted" title="Accettata">🔵</button>
                                         <button class="btn btn-sm status-btn btn-rejected has-purple-border" data-status="rejected" title="Rifiutata">🔴</button>
                                         <button class="btn btn-sm status-btn btn-paid-trigger has-purple-border" data-status="paid" title="Pagata">🟢</button>
                                     </div>
                                     {% else %}
-                                        <div class="d-flex gap-1 mb-1 opacity-0" style="height: 32px;">
-                                            <!-- Placeholder invisibile per mantenere l'allineamento della tabella -->
-                                        </div>
+                                    <div class="d-flex gap-1 opacity-0" style="height: 32px;">
+                                        <!-- Placeholder invisibile -->
+                                    </div>
                                     {% endif %}
-                                
-                                <span class="badge status-badge
-                                    {% if expense.status == 'pending' %}bg-warning text-dark
-                                    {% elif expense.status == 'accepted' %}bg-primary
-                                    {% elif expense.status == 'paid' %}bg-success
-                                    {% elif expense.status == 'rejected' %}bg-danger
-                                    {% endif %}">
-                                    {{ expense.get_status_display }}
-                                    {% if expense.version > 1 %}<small class="ms-1" title="Versione {{ expense.version }}">v{{ expense.version }}</small>{% endif %}
-                                </span>
-                            </div>
-                        </td>
 
-                        <!-- ✅ AZIONI (solo per creatore) -->
-                        <td class="actions-col">
-                            {% if expense.created_by == request.user %}
-                                <a href="{% url 'expenses:edit_expense' expense.id %}" class="btn btn-sm btn-outline-primary" title="Modifica">✏️</a>
-                                <a href="{% url 'expenses:expense_history' expense.id %}" class="btn btn-sm btn-outline-info" title="Cronologia versioni">📜</a>
-                                <a href="{% url 'expenses:delete_expense' expense.id %}" class="btn btn-sm btn-outline-danger" title="Elimina">🗑️</a>
-                            {% else %}
-                                <span class="text-muted small">Solo il creatore può modificare</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    {% empty %}
-                    <tr><td colspan="6" class="text-center text-muted py-4">Nessuna spesa trovata</td></tr>
-                    {% endfor %}
+                                    <span class="badge status-badge
+                                        {% if expense.status == 'pending' %}bg-warning text-dark
+                                        {% elif expense.status == 'accepted' %}bg-primary
+                                        {% elif expense.status == 'paid' %}bg-success
+                                        {% elif expense.status == 'rejected' %}bg-danger
+                                        {% endif %}">
+                                        {{ expense.get_status_display }}
+                                        {% if expense.version > 1 %}<small class="ms-1" title="Versione {{ expense.version }}">v{{ expense.version }}</small>{% endif %}
+                                    </span>
+                                </div>
+                            </td>
+
+                            <!-- AZIONI -->
+                            <td class="text-center">
+                                {% if expense.created_by == request.user %}
+                                <div class="d-flex gap-1 justify-content-center">
+                                    <a href="{% url 'expenses:edit_expense' expense.id %}" class="btn btn-sm btn-outline-primary" title="Modifica">✏️</a>
+                                    <a href="{% url 'expenses:expense_history' expense.id %}" class="btn btn-sm btn-outline-info" title="Cronologia">📜</a>
+                                    <a href="{% url 'expenses:delete_expense' expense.id %}" class="btn btn-sm btn-outline-danger" title="Elimina">🗑️</a>
+                                </div>
+                                {% else %}
+                                <small class="text-muted">-</small>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="7" class="text-center py-5">
+                                <div class="text-muted">
+                                    <span class="fs-1 d-block mb-3">📭</span>
+                                    <p class="mb-0">Nessuna spesa trovata</p>
+                                    <a href="{% url 'expenses:add_expense' %}" class="btn btn-success btn-sm mt-3">➕ Aggiungi la prima spesa</a>
+                                </div>
+                            </td>
+                        </tr>
+
+                        {% endfor %}
                     </tbody>
-    </table>
-</div>
-<!-- 🟢 MODALE PAGAMENTO (UNA SOLA VOLTA) -->
-<div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-light">
-        <h5 class="modal-title">💸 Completa Pagamento</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <p class="mb-3">Importo da corrispondere: <strong id="modalAmount" class="fs-5 text-primary"></strong></p>
-        <form id="paymentForm" enctype="multipart/form-data">
-          <input type="hidden" id="modalExpenseId">
-          <div class="mb-3">
-            <label class="form-label">Carica ricevuta / bonifico</label>
-            <input type="file" class="form-control" name="proof_file" accept="image/*,.pdf" required>
-            <div class="form-text">JPG, PNG, PDF (max 5MB)</div>
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
-        <button type="button" id="confirmPaymentBtn" class="btn btn-success">📤 Conferma e Salva</button>
-      </div>
+                </table>
+            </div>
+        </div>
     </div>
-  </div>
+
 </div>
+
+<!-- 🟢 MODALE PAGAMENTO -->
+<div class="modal fade" id="paymentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title">💸 Completa Pagamento</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3">Importo da corrispondere: <strong id="modalAmount" class="fs-4 text-success"></strong></p>
+                <form id="paymentForm" enctype="multipart/form-data">
+                    <input type="hidden" id="modalExpenseId">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Carica ricevuta / bonifico</label>
+                        <input type="file" class="form-control" name="proof_file" accept="image/*,.pdf" required>
+                        <div class="form-text">JPG, PNG, PDF (max 5MB)</div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" id="confirmPaymentBtn" class="btn btn-success">📤 Conferma e Salva</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- 🚫 MODAL GIUSTIFICAZIONE RIFIUTO -->
 <div class="modal fade" id="rejectModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content">
-      <div class="modal-header bg-danger text-white">
-        <h5 class="modal-title">🔴 Motivo del Rifiuto</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <input type="hidden" id="rejectExpenseId">
-        <p class="small text-muted mb-3">
-          Stai rifiutando la spesa di <strong id="rejectCreatedBy"></strong>:<br>
-          📅 <span id="rejectDate"></span> | 🏷️ <span id="rejectCategory"></span> | 💰 €<span id="rejectAmount"></span>
-        </p>
-        <form id="rejectForm">
-          <div class="mb-3">
-            <label class="form-label fw-bold">Spiega il motivo (visibile in chat):</label>
-            <textarea class="form-control" id="rejectReason" rows="3"
-                      placeholder="Es: Non preventivata, documento illeggibile, ecc." required></textarea>
-          </div>
-          <div class="form-check">
-            <input class="form-check-input" type="checkbox" id="notifySender">
-            <label class="form-check-label" for="notifySender">
-              Notifica il creatore della spesa via email
-            </label>
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
-        <button type="button" class="btn btn-danger" id="confirmRejectBtn">📤 Invia in Chat</button>
-      </div>
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">🔴 Motivo del Rifiuto</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <input type="hidden" id="rejectExpenseId">
+                <div class="alert alert-light border mb-3">
+                    <p class="small mb-1">Stai rifiutando la spesa di <strong id="rejectCreatedBy"></strong>:</p>
+                    <div class="d-flex gap-3 small text-muted">
+                        <span>📅 <span id="rejectDate"></span></span>
+                        <span>🏷️ <span id="rejectCategory"></span></span>
+                        <span>💰 €<span id="rejectAmount"></span></span>
+                    </div>
+                </div>
+                <form id="rejectForm">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Spiega il motivo (visibile in chat):</label>
+                        <textarea class="form-control" id="rejectReason" rows="3"
+                                  placeholder="Es: Non preventivata, documento illeggibile, ecc." required></textarea>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="checkbox" id="notifySender">
+                        <label class="form-check-label" for="notifySender">
+                            Notifica il creatore della spesa via email
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                <button type="button" id="confirmRejectBtn" class="btn btn-danger">📤 Invia in Chat</button>
+            </div>
+        </div>
     </div>
-  </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -353,7 +483,6 @@
 
     // 🔹 RENDER UI: Legge dal server e applica lo stato corretto
     function renderRow(row) {
-        // 📥 LEGGI DATI DAL SERVER (fonte di verità)
         const isCreator = row.dataset.isCreator === 'true';
         const isConfirmed = row.dataset.isConfirmed === 'true';
         const status = row.dataset.status?.trim();
@@ -368,7 +497,7 @@
         };
         const badge = row.querySelector(".status-badge");
 
-        // 🔒 1. RESET: Disabilita TUTTI i pulsanti (stato sicuro di partenza)
+        // 🔒 1. RESET: Disabilita TUTTI i pulsanti
         Object.values(btns).forEach(btn => {
             if (btn) {
                 btn.disabled = true;
@@ -395,9 +524,9 @@
                 badge.textContent = "Accettata";
             }
             if (isConfirmed) {
-                if (btns.accepted) btns.accepted.classList.add("active");  // ✅ Blu pieno
+                if (btns.accepted) btns.accepted.classList.add("active");
             } else {
-                if (btns.accepted) btns.accepted.classList.add("half-blue");  // ⏳ Mezzo blu
+                if (btns.accepted) btns.accepted.classList.add("half-blue");
             }
         }
         else if (status === "rejected") {
@@ -415,31 +544,24 @@
             if (btns.paid) btns.paid.classList.add("active");
         }
 
-        // ⚡ 3. ABILITA PULSANTI (SOLO se le condizioni del server lo permettono)
-
-        // 🔒 Regola 1: Se status è chiuso (rejected/paid) → ESCI, niente abilitazioni
+        // ⚡ 3. ABILITA PULSANTI
         if (status === "rejected" || status === "paid") {
-            return;  // 🔥 Tutti restano disabled ✅
+            return;
         }
 
-        // 🔒 Regola 2: Se è il creatore → niente abilitazioni
         if (isCreator) {
-            return;  // 🔥 Tutti restano disabled ✅
+            return;
         }
 
-        // ✅ Se siamo qui: status è pending/accepted E isCreator=false
-
-        // 🔵 Accetta & 🔴 Rifiuta: attivi SOLO se non ancora confermato
         if (!isConfirmed) {
             enableBtn(btns.accepted, "✅ Accetta la spesa");
             enableBtn(btns.rejected, "❌ Rifiuta la spesa");
         }
 
-        // 🟢 Paga: SEMPRE attivo per pending/accepted (per caricare la prova)
         enableBtn(btns.paid, "📤 Carica prova di pagamento");
     }
 
-    // 🚀 INIZIALIZZAZIONE: Applica renderRow a tutte le righe
+    // 🚀 INIZIALIZZAZIONE
     function initRows() {
         document.querySelectorAll("tr[data-expense-id]").forEach(row => {
             try {
@@ -450,14 +572,13 @@
         });
     }
 
-    // Esegui subito se DOM pronto, altrimenti attendi
     if (document.readyState === "loading") {
         document.addEventListener("DOMContentLoaded", initRows);
     } else {
         initRows();
     }
 
-    // 🔵 CLICK "ACCETTATA" - AJAX
+    // 🔵 CLICK "ACCETTATA"
     document.querySelectorAll(".btn-accepted").forEach(btn => {
         btn.addEventListener("click", async function(e) {
             e.preventDefault();
@@ -477,7 +598,6 @@
                 const data = await res.json();
 
                 if (data.success) {
-                    // ✅ Aggiorna attributi e UI
                     row.dataset.status = "accepted";
                     row.dataset.isConfirmed = "true";
                     renderRow(row);
@@ -492,7 +612,7 @@
         });
     });
 
-    // 🔴 CLICK "RIFIUTATA" → Apre Modale
+    // 🔴 CLICK "RIFIUTATA"
     document.querySelectorAll(".btn-rejected").forEach(btn => {
         btn.addEventListener("click", function(e) {
             e.preventDefault();
@@ -510,7 +630,7 @@
         });
     });
 
-    // ✅ CONFERMA RIFIUTO → Chat + Aggiorna stato
+    // ✅ CONFERMA RIFIUTO
     document.getElementById("confirmRejectBtn")?.addEventListener("click", async function() {
         const expenseId = document.getElementById("rejectExpenseId").value;
         const reason = document.getElementById("rejectReason").value.trim();
@@ -520,21 +640,18 @@
         this.disabled = true; this.textContent = "⏳ Invio...";
 
         try {
-            // 1️⃣ Invia messaggio in chat
             await fetch(URL_REJECT_MSG, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
                 body: JSON.stringify({ expense_id: expenseId, reason })
             });
 
-            // 2️⃣ Aggiorna stato a rejected
             await fetch(URL_UPDATE_STATUS, {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "X-CSRFToken": csrf },
                 body: JSON.stringify({ expense_id: expenseId, status: "rejected" })
             });
 
-            // 3️⃣ Aggiorna UI
             const row = document.querySelector(`tr[data-expense-id="${expenseId}"]`);
             if (row) {
                 row.dataset.status = "rejected";
@@ -551,7 +668,7 @@
         }
     });
 
-    // 🟢 CLICK "PAGATA" → Apre Modale Upload
+    // 🟢 CLICK "PAGATA"
     document.querySelectorAll(".btn-paid-trigger").forEach(btn => {
         btn.addEventListener("click", function(e) {
             e.preventDefault();
@@ -569,7 +686,7 @@
         });
     });
 
-    // ✅ CONFERMA PAGAMENTO (Upload documento)
+    // ✅ CONFERMA PAGAMENTO
     confirmPaymentBtn?.addEventListener("click", async function() {
         if (!currentRow) return;
         const fileInput = document.querySelector("#paymentForm input[name='proof_file']");
@@ -605,7 +722,7 @@
         }
     });
 
-    // ❌ Reset modali alla chiusura
+    // ❌ Reset modali
     modalEl?.addEventListener("hidden.bs.modal", () => {
         document.getElementById("paymentForm")?.reset();
         currentRow = null;
@@ -613,7 +730,37 @@
     document.getElementById("rejectModal")?.addEventListener("hidden.bs.modal", () => {
         document.getElementById("rejectForm")?.reset();
     });
-
 })();
 </script>
+<!-- ✅ AUTO-SCROLL DOPO FILTRO -->
+<!-- ✅ AUTO-SCROLL PRECISO DOPO FILTRO -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const hasFilters = urlParams.has('child') || urlParams.has('status') ||
+                      urlParams.has('expense_type') || urlParams.has('date_from') ||
+                      urlParams.has('date_to');
+
+    if (hasFilters) {
+        const tableEl = document.getElementById('expensesTable');
+        if (tableEl) {
+            // 1. Calcola la posizione assoluta dell'elemento rispetto alla pagina
+            const elementPosition = tableEl.getBoundingClientRect().top;
+            const offsetPosition = elementPosition + window.pageYOffset;
+
+            // 2. Offset per la navbar/header fissa.
+            // ⚠️ Se la tua navbar è molto alta, aumenta questo valore (es. 100 o 120)
+            const headerOffset = 140;
+
+            // 3. Scroll fluido alla posizione esatta calcolata
+            window.scrollTo({
+                top: offsetPosition - headerOffset,
+                behavior: 'smooth'
+            });
+        }
+    }
+});
+</script>
+
+
 {% endblock %}

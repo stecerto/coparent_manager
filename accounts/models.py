@@ -4,6 +4,7 @@ from django.contrib.auth.models import AbstractUser
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+from datetime import timedelta
 from phonenumber_field.modelfields import PhoneNumberField
 
 from core.choices import RoleChoices
@@ -62,7 +63,6 @@ class UserProfile(models.Model):
     # Dati personali
     address = models.CharField(max_length=255, blank=True)
     birth_date = models.DateField(default=timezone.now)
-
     birth_place = models.CharField(max_length=255, blank=True)
     phone = PhoneNumberField(null=True, blank=True)
 
@@ -74,8 +74,7 @@ class UserProfile(models.Model):
         help_text="Obbligatoria per avvocati e professionisti"
     )
 
-
-    # ✅ NUOVO: Piano scelto alla registrazione
+    # ✅ PIANO ABBONAMENTO
     plan = models.CharField(
         max_length=20,
         choices=[
@@ -88,14 +87,118 @@ class UserProfile(models.Model):
     )
     plan_started_at = models.DateTimeField(null=True, blank=True)
     plan_expires_at = models.DateTimeField(null=True, blank=True)
+
+    pending_plan = models.CharField(
+        max_length=20,
+        blank=True,
+        null=True,
+        help_text="Piano futuro (si attiva alla scadenza)"
+    )
+    pending_plan_start = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Quando partirà il piano pending"
+    )
+
+    payment_status = models.CharField(
+        max_length=20,
+        choices=[
+            ("active", "✅ Attivo"),
+            ("pending_payment", "⏳ In attesa pagamento"),
+            ("suspended", "🚫 Sospeso"),
+            ("cancelled", "❌ Annullato"),
+        ],
+        default="active",
+        help_text="Stato attuale dell'abbonamento"
+    )
+
+    auto_renew = models.BooleanField(
+        default=True,
+        help_text="Rinnovo automatico mensile"
+    )
+
+    last_payment_date = models.DateTimeField(null=True, blank=True)
+    next_payment_date = models.DateTimeField(null=True, blank=True)
+
     # Stato
     setup_complete = models.BooleanField(default=False)
-    # privacy
+
+    # Privacy
     privacy_accepted_at = models.DateTimeField("Data accettazione privacy", null=True, blank=True)
     privacy_version_accepted = models.CharField("Versione policy accettata", max_length=10, default="1.0")
 
     def __str__(self):
         return f"Profilo di {self.user.email}"
+
+    # ==========================================================
+    # ✅ PROPRIETÀ E METODI (DEVONO ESSERE INDENTATI DENTRO LA CLASSE!)
+    # ==========================================================
+
+    @property
+    def days_until_expiration(self):
+        """Giorni rimanenti prima della scadenza"""
+        if not self.plan_expires_at:
+            return None
+        if timezone.now() > self.plan_expires_at:
+            return 0
+        delta = self.plan_expires_at - timezone.now()
+        return delta.days
+
+    @property
+    def is_expired(self):
+        """Controlla se l'abbonamento è scaduto"""
+        if not self.plan_expires_at:
+            return False
+        return timezone.now() > self.plan_expires_at
+
+    @property
+    def is_suspended(self):
+        """Controlla se l'account è sospeso"""
+        return self.payment_status == "suspended"
+
+    # ✅ NUOVA PROPERTY AGGIUNTA QUI:
+    @property
+    def is_blocked(self):
+        """Restituisce True se l'account è scaduto o sospeso (bloccato)"""
+        return self.is_expired or self.is_suspended
+
+    def activate_pending_plan(self):
+        """Attiva il piano pending (chiamato alla scadenza o dopo il pagamento)"""
+        if self.pending_plan:
+            self.plan = self.pending_plan
+            self.pending_plan = None
+            self.pending_plan_start = None
+            self.plan_started_at = timezone.now()
+            self.plan_expires_at = timezone.now() + timedelta(days=30)
+            self.payment_status = "active"  # Riattiva lo stato
+            self.save()
+
+    @property
+    def role_base(self):
+        """Restituisce il ruolo normalizzato senza suffissi _a/_b"""
+        return RoleChoices.normalize_role(self.role)
+
+    @property
+    def is_professional(self):
+        """True se l'utente è un professionista (avvocato, mediatore, consulente)"""
+        return RoleChoices.is_professional(self.role)
+
+    @property
+    def is_parent(self):
+        """True se l'utente è un genitore"""
+        return RoleChoices.is_parent(self.role)
+
+    @property
+    def is_lawyer(self):
+        return RoleChoices.is_lawyer(self.role)
+
+    @property
+    def is_mediator(self):
+        return RoleChoices.is_mediator(self.role)
+
+    @property
+    def is_consultant(self):
+        return RoleChoices.is_consultant(self.role)
 '''
     def clean(self):
         """🔒 Blocca modifica del telefono dopo la creazione"""

@@ -10,6 +10,41 @@
         <p class="lead text-muted">Strumenti professionali per famiglie e operatori del diritto.</p>
     </div>
 
+    {% if user.is_authenticated %}
+        {% if user.profile.is_suspended %}
+            <!-- Account SOSPESO -->
+            <div class="alert alert-danger text-center shadow-lg border-danger" style="border-width: 3px;">
+                <h3 class="mb-3">🚫 Account Sospeso</h3>
+                <p class="lead mb-3">Il tuo account è stato sospeso per mancato pagamento.</p>
+                <p class="mb-4">Rinnova l'abbonamento per riattivare immediatamente l'accesso a tutti i servizi.</p>
+                <a href="{% url 'payment' %}" class="btn btn-danger btn-lg px-5">
+                    💳 Riattiva Ora
+                </a>
+            </div>
+
+        {% elif user.profile.is_expired %}
+            <!-- Account SCADUTO -->
+            <div class="alert alert-warning text-center shadow-lg border-warning" style="border-width: 3px;">
+                <h3 class="mb-3">⏰ Abbonamento Scaduto</h3>
+                <p class="lead mb-3">Il tuo abbonamento è scaduto.</p>
+                <p class="mb-4">Rinnova ora per continuare a usare tutti i servizi senza interruzioni.</p>
+                <a href="{% url 'payment' %}" class="btn btn-warning btn-lg px-5">
+                    💳 Rinnova Ora
+                </a>
+            </div>
+
+        {% elif user.profile.days_until_expiration and user.profile.days_until_expiration <= 7 %}
+            <!-- Scadenza IMMINENTE -->
+            <div class="alert alert-info text-center shadow">
+                <h4 class="mb-2">⏰ Scadenza imminente</h4>
+                <p class="mb-3">Il tuo abbonamento scade tra <strong>{{ user.profile.days_until_expiration }} giorni</strong>.</p>
+                <a href="{% url 'payment' %}" class="btn btn-info btn-sm">
+                    Rinnova Ora
+                </a>
+            </div>
+        {% endif %}
+    {% endif %}
+
     <!-- 🔀 Tab Ruoli -->
     <ul class="nav nav-pills justify-content-center mb-4" id="pricingTabs" role="tablist">
         <li class="nav-item" role="presentation">
@@ -28,10 +63,43 @@
 
     <!-- 📦 Contenuto Tab -->
     <div class="tab-content" id="pricingTabContent">
-        {% include "core/pricing/_genitori.html" with role="parent" %}
-        {% include "core/pricing/_avvocati.html" with role="lawyer" %}
-        {% include "core/pricing/_mediatori.html" with role="mediator" %}
-        {% include "core/pricing/_consulenti.html" with role="consultant" %}
+
+        <!-- GENITORI -->
+        <div class="tab-pane fade show active" id="pricing-genitori" role="tabpanel">
+            <div class="row g-4 justify-content-center">
+                {% for plan in plans_by_role.parent %}
+                    {% include "core/pricing/_pricing_card.html" with plan=plan role="parent" %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- AVVOCATI -->
+        <div class="tab-pane fade" id="pricing-avvocati" role="tabpanel">
+            <div class="row g-4 justify-content-center">
+                {% for plan in plans_by_role.lawyer %}
+                    {% include "core/pricing/_pricing_card.html" with plan=plan role="lawyer" %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- MEDIATORI -->
+        <div class="tab-pane fade" id="pricing-mediatori" role="tabpanel">
+            <div class="row g-4 justify-content-center">
+                {% for plan in plans_by_role.mediator %}
+                    {% include "core/pricing/_pricing_card.html" with plan=plan role="mediator" %}
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- CONSULENTI -->
+        <div class="tab-pane fade" id="pricing-consulenti" role="tabpanel">
+            <div class="row g-4 justify-content-center">
+                {% for plan in plans_by_role.consultant %}
+                    {% include "core/pricing/_pricing_card.html" with plan=plan role="consultant" %}
+                {% endfor %}
+            </div>
+        </div>
+
     </div>
 
     <!-- ❓ FAQ Rapide -->

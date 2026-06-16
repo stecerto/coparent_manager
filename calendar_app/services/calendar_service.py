@@ -1,30 +1,27 @@
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-from django.utils import timezone
-from datetime import timedelta
-from calendar_app.models import CalendarEvent, EventReminder
+import logging
 from datetime import timedelta
 
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
-from datetime import timedelta
-from calendar_app.models import CalendarEvent, EventReminder
 
-# calendar_app/services/calendar_service.py
-from django.utils import timezone
 from calendar_app.models import CalendarEvent, EventReminder
-from expenses.models import Expense, ExpenseCategory
+from core.choices import RoleChoices
+from families.models import FamilyMember
+from notifications.services import create_notification
+
+logger = logging.getLogger(__name__)
+
+# ❌ RIMOSSO: from expenses.models import Expense, ExpenseCategory
+# Il calendario non deve più sapere nulla delle spese.
 
 
 def create_event(family, created_by, title, start_time, end_time, **kwargs):
     """
     Crea un evento calendario.
-    Se expense_category e amount sono forniti, crea automaticamente una Expense.
+    ✅ ARCHITETTURA AGGIORNATA: Non crea più spese automaticamente.
+    Le spese si gestiscono esclusivamente dall'app Expenses.
     """
-    expense_category = kwargs.get("expense_category")
-    amount = kwargs.get("amount")
-
     # Crea l'evento
     event = CalendarEvent.objects.create(
         family=family,
@@ -36,37 +33,39 @@ def create_event(family, created_by, title, start_time, end_time, **kwargs):
         event_type=kwargs.get("event_type", "other"),
         is_shared=kwargs.get("is_shared", True),
         source=kwargs.get("source", "manual"),
-        expense_category=expense_category,  # ✅ Link a categoria
+        # ❌ RIMOSSO: expense_category=kwargs.get("expense_category"),
     )
 
-    # ✅ Se c'è categoria e importo, crea automaticamente la spesa
-    if expense_category and amount:
-        from decimal import Decimal
-
-        # Crea la spesa collegata
-        expense = Expense.objects.create(
-            family=family,
-            created_by=created_by,
-            category=expense_category,
-            description=f"{title}: {kwargs.get('description', '')}",
-            amount=Decimal(str(amount)),
-            expense_date=start_time.date(),
-            status='pending',  # Stato in attesa di approvazione
-            expense_type='shared',
-        )
-
-        # Collega l'evento alla spesa
-        event.linked_expense = expense
-        event.save(update_fields=['linked_expense'])
-
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"✅ Spesa automatica creata: ID {expense.id} per evento {event.id}")
+    # ❌ RIMOSSO: L'intero blocco "if expense_category and amount:"
+    # che creava l'oggetto Expense e lo collegava a event.linked_expense.
 
     # Gestione figli (ManyToMany)
     children = kwargs.get("children")
     if children:
         event.children.set(children)
+
+    professional_roles = [
+        RoleChoices.LAWYER_A, RoleChoices.LAWYER_B,
+        RoleChoices.MEDIATOR, RoleChoices.CONSULTANT
+    ]
+
+    # Trova tutti i membri della famiglia che sono professionisti
+    pros = FamilyMember.objects.filter(family=family, role__in=professional_roles).select_related('user')
+
+    for pro in pros:
+        try:
+            create_notification(
+                user=pro.user,
+                notification_type="calendar_event_created",
+                title=f"📅 Nuovo evento: {title}",
+                message=f"È stato creato un nuovo evento '{title}' per il {start_time.strftime('%d/%m/%Y')} nella famiglia {family.name}.",
+                target_url=f"/calendar/events/",
+                target_model="CalendarEvent",
+                target_id=event.id,
+                metadata={"event_type": event.event_type}
+            )
+        except Exception as e:
+            logger.error(f"Errore invio notifica evento a {pro.user.email}: {e}")
 
     return event
 
@@ -74,7 +73,7 @@ def create_event(family, created_by, title, start_time, end_time, **kwargs):
 def update_event(event, user, data):
     """
     Crea nuova versione e archivia la precedente.
-    Se amount cambia, aggiorna la spesa collegata.
+    ✅ ARCHITETTURA AGGIORNATA: Non aggiorna più le spese collegate.
     """
     # Archivia evento precedente
     event.is_active = False
@@ -94,28 +93,11 @@ def update_event(event, user, data):
         previous_version=event,
         version=event.version + 1,
         is_shared=event.is_shared,
-        expense_category=data.get("expense_category", event.expense_category),
+        # ❌ RIMOSSO: expense_category=data.get("expense_category", event.expense_category),
     )
 
-    # ✅ Se c'è una spesa collegata, aggiornala se necessario
-    if event.linked_expense:
-        new_amount = data.get("amount")
-        new_category = data.get("expense_category", event.expense_category)
-
-        # Aggiorna spesa se importo o categoria sono cambiati
-        if new_amount or new_category != event.expense_category:
-            expense = event.linked_expense
-            if new_amount:
-                from decimal import Decimal
-                expense.amount = Decimal(str(new_amount))
-            if new_category:
-                expense.category = new_category
-            expense.description = f"{new_event.title}: {new_event.description}"
-            expense.save()
-
-        # Collega la stessa spesa al nuovo evento
-        new_event.linked_expense = event.linked_expense
-        new_event.save(update_fields=['linked_expense'])
+    # ❌ RIMOSSO: L'intero blocco "if event.linked_expense:"
+    # che aggiornava importo e categoria della spesa collegata.
 
     # Gestione figli
     children = data.get("children")
@@ -125,8 +107,6 @@ def update_event(event, user, data):
         new_event.children.set(event.children.all())
 
     return new_event
-
-
 
 
 def get_family_events(family):
@@ -139,6 +119,7 @@ def get_family_events(family):
 # ✅ Usa la stringa per evitare AppRegistryNotReady
 @receiver(post_save, sender='calendar_app.CalendarEvent')
 def auto_create_reminders(sender, instance, created, **kwargs):
+    """Crea automaticamente i promemoria per i nuovi eventi."""
     # Solo eventi nuovi e non auto-generati
     if not created or instance.is_auto_generated:
         return

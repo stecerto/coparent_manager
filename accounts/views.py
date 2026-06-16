@@ -300,25 +300,48 @@ def login_view(request):
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
-            # ✅ CONTROLLA STATO ABBONAMENTO
-            subscription = getattr(user, 'subscription', None)
-            if subscription:
-                if subscription.status == 'suspended':
-                    messages.error(
-                        request,
-                        f"❌ Il tuo account è stato disattivato per mancato pagamento. "
-                        f"Effettua il pagamento per riattivarlo."
-                    )
-                    return redirect('accounts:subscription_expired')
-
-                elif subscription.status == 'grace_period':
-                    days_left = (subscription.grace_period_end - timezone.now()).days
-                    messages.warning(
-                        request,
-                        f"⚠️ Il tuo abbonamento è scaduto. Hai ancora {days_left} giorni "
-                        f"prima della disattivazione dell'account."
-                    )
+            # ✅ 2. LOGIN PRIMA DEL CONTROLLO (così i messaggi e la sessione funzionano correttamente)
             login(request, user)
+            # ✅ RESETTA il contatore dei tentativi falliti al login riuscito
+            if 'failed_login_attempts' in request.session:
+                del request.session['failed_login_attempts']
+
+            # ✅ 3. CONTROLLO STATO ABBONAMENTO (Robusto: controlla sia profile che subscription)
+            profile = getattr(user, 'profile', None)
+            subscription = getattr(user, 'subscription', None)
+
+            is_suspended = False
+            is_expired = False
+            days_left = 0
+
+            # Priorità al nuovo modello UserProfile
+            if profile:
+                is_suspended = getattr(profile, 'is_suspended', False) or getattr(profile, 'payment_status',
+                                                                                  '') == 'suspended'
+                is_expired = getattr(profile, 'is_expired', False)
+                if hasattr(profile, 'days_until_expiration') and profile.days_until_expiration is not None:
+                    days_left = profile.days_until_expiration
+            # Fallback al modello PaymentSubscription (se ancora in uso)
+            elif subscription:
+                is_suspended = subscription.status == 'suspended'
+                is_expired = subscription.is_expired
+                if subscription.grace_period_end:
+                    days_left = max(0, (subscription.grace_period_end - timezone.now()).days)
+
+            # Se sospeso o scaduto, reindirizza alla pagina prezzi con messaggio
+            if is_suspended:
+                messages.error(
+                    request,
+                    "🚫 Il tuo account è sospeso per mancato pagamento. Rinnova l'abbonamento per riattivare l'accesso."
+                )
+                return redirect('pricing')
+
+            elif is_expired:
+                messages.warning(
+                    request,
+                    f"⏰ Il tuo abbonamento è scaduto. Hai ancora {days_left} giorni di periodo di grazia prima della sospensione. Rinnova ora."
+                )
+                return redirect('pricing')
 
             # 🔑 GESTIONE INVITO PENDENTE (priorità massima!)
             pending_token = request.session.pop("pending_invite_token", None)
@@ -344,11 +367,11 @@ def login_view(request):
                         messages.success(request,
                                          f"✅ Invito accettato! La tua famiglia è stata creata.")
 
-                    # ✅ REDIRECT IMMEDIATO alla dashboard corretta
+                    # ✅ REDIRECT IMMEDIATO alla home corretta
                     profile = getattr(user, 'profile', None)
                     if profile and profile.role in ['lawyer', 'mediator', 'consultant']:
-                        return redirect('families:professional_dashboard')
-                    return redirect('families:family_dashboard')
+                        return redirect('lawyer_home')
+                    return redirect('home')
 
                 except Invitation.DoesNotExist:
                     messages.warning(request, "⚠️ Invito non valido o già utilizzato")
@@ -384,7 +407,7 @@ def login_view(request):
             # 🎯 1. AVVOCATI / MEDIATORI / CONSULENTI
             if profile.role in ['lawyer', 'mediator', 'consultant']:
                 if profile.setup_complete:
-                    return redirect('families:professional_dashboard')
+                    return redirect('home')
                 return redirect('families:summary')
 
             # 🎯 2. GENITORI
@@ -398,12 +421,22 @@ def login_view(request):
             # ✅ Tutto ok → redirect alla home (che smisterà in base al ruolo)
             return redirect('home')
 
+        else:
+            # ❌ FORM NON VALIDO: Incrementa il contatore in sessione
+            attempts = request.session.get('failed_login_attempts', 0) + 1
+            request.session['failed_login_attempts'] = attempts
+            messages.error(request, "Credenziali non valide. Riprova.")
+
         # ⚠️ Se il form NON è valido, il codice CONTINUA qui sotto
 
     else:
         form = AuthenticationForm()
-
-    return render(request, "accounts/login.html", {"form": form})
+        # ✅ PASSA il contatore al template
+    context = {
+        "form": form,
+        "failed_attempts": request.session.get('failed_login_attempts', 0)
+    }
+    return render(request, "accounts/login.html", context)
 
 
 # =========================
@@ -534,6 +567,6 @@ def resend_activation(request):
 # =========================
 def logout_view(request):
     logout(request)
-    return redirect("/")
+    return redirect("accounts:login")
 
 

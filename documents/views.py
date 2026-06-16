@@ -1,21 +1,20 @@
+import base64
+import logging
 import mimetypes
+import os
 from pathlib import Path
 
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.http import FileResponse, HttpResponseForbidden, HttpResponse
 from django.shortcuts import get_object_or_404
-from django.shortcuts import render, redirect
-import os, base64
-from django.conf import settings
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect
+from django.shortcuts import redirect
 from django.template.loader import render_to_string
 from django.utils import timezone
 from weasyprint import HTML
+
 from core.plans import PLAN_LEVELS  # o il tuo import per i piani
-from calendar_app.models import CalendarEvent
-from chat.models import FamilyMessage
 from families.models import FamilyMember
 from families.utils import get_family_of_user
 from .forms import DocumentUploadForm
@@ -26,6 +25,7 @@ from .services.documents_signature_service import sign_document
 from .services.workflow_service import approve_document
 from .validators import check_file_sizes
 
+logger = logging.getLogger(__name__)
 
 @login_required
 def document_list_view(request):
@@ -102,23 +102,39 @@ def document_list_view(request):
 def document_preview_view(request, doc_id):
     doc = get_object_or_404(Document, id=doc_id)
 
-    if not can_access_document(request.user, doc):
+    if not can_access_document(request.user, doc, request=request):
         return HttpResponseForbidden("Permessi insufficienti.")
 
-    mime_type, _ = mimetypes.guess_type(doc.file.name)
-    content_type = mime_type or 'application/octet-stream'
+    try:
+        # ✅ Usa esplicitamente lo storage del file
+        file_storage = doc.file.storage
+        file_name = doc.file.name
 
-    response = FileResponse(doc.file.open('rb'), content_type=content_type, as_attachment=False)
-    response['Content-Disposition'] = f'inline; filename="{doc.file.name}"'
+        # Verifica se il file esiste nello storage
+        if not file_storage.exists(file_name):
+            logger.error(f"File non trovato nello storage: {file_name}")
+            messages.error(request, f"Il file '{doc.title}' non è stato trovato nel sistema di archiviazione.")
+            return redirect('documents:documents_list')
 
-    # ✅ Permetti esplicitamente il framing stessa origine
-    response['X-Frame-Options'] = 'SAMEORIGIN'
-    response['Access-Control-Allow-Origin'] = request.build_absolute_uri('/').rstrip('/')
+        # Apre il file usando lo storage corretto
+        file_obj = file_storage.open(file_name, 'rb')
 
-    return response
+        mime_type, _ = mimetypes.guess_type(file_name)
+        content_type = mime_type or 'application/octet-stream'
+
+        response = FileResponse(file_obj, content_type=content_type, as_attachment=False)
+        response['Content-Disposition'] = f'inline; filename="{Path(file_name).name}"'
+        response['X-Frame-Options'] = 'SAMEORIGIN'
+        response['Access-Control-Allow-Origin'] = request.build_absolute_uri('/').rstrip('/')
+
+        return response
+
+    except Exception as e:
+        logger.error(f"Errore apertura file {doc.id}: {e}", exc_info=True)
+        messages.error(request, f"Errore durante l'apertura del file: {str(e)}")
+        return redirect('documents:documents_list')
 
 
-from django.core.exceptions import ValidationError
 from django.contrib import messages
 @login_required
 def upload_document_view(request):
@@ -205,6 +221,25 @@ def upload_document_view(request):
                             user=request.user,
                             action="upload"
                         )
+                        from django.contrib import messages
+                        # ✅ FASE E: Trigger estrazione automatica per sentenze
+                        if category == "ruling":
+                            try:
+                                from .services.sentence_extractor import extract_sentence_data
+
+                                extracted = extract_sentence_data(doc)
+                                if extracted:
+                                    doc.extracted_data = extracted
+                                    doc.save(update_fields=["extracted_data"])
+                                    # ✅ Reindirizza alla pagina di revisione invece che alla lista
+                                    return redirect("documents:sentence_data_review", doc_id=doc.id)
+                                else:
+                                    messages.info(request,
+                                                  "📄 Sentenza caricata. Nessun dato strutturato è stato estratto automaticamente. Puoi inserirli manualmente nei dettagli.")
+                            except Exception as e:
+                                logger.error(f"Errore estrazione sentenza: {e}", exc_info=True)
+                                messages.warning(request,
+                                                 "⚠️ Sentenza caricata, ma l'estrazione automatica dei dati è fallita. Procedi manualmente.")
 
             return redirect("documents:documents_list")
 
@@ -272,7 +307,6 @@ def upload_shared_document_view(request):
 
 
 # documents/views.py
-from django.db.models import Sum
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 
@@ -281,7 +315,6 @@ from django.contrib.auth.decorators import login_required
 @login_required
 def storage_usage_view(request):
     from documents.models import Document
-    from core.plans import PLAN_LEVELS
     import logging
 
     logger = logging.getLogger(__name__)
@@ -432,35 +465,60 @@ def approve_document_view(request, doc_id):
     return redirect("documents:documents_detail", doc_id=doc_id)
 
 
-@login_required
-# documents/views.py (o families/views.py)
+from django.utils import timezone
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect
 
+from families.utils import get_family_of_user
+from documents.models import Document
+from calendar_app.models import CalendarEvent
+from chat.models import FamilyMessage
+from core.plans import PLAN_LEVELS  # Adatta l'import se il tuo è diverso
+
+
+@login_required
 def family_dossier_view(request):
     family = get_family_of_user(request.user, request=request)
     if not family:
-        return redirect('home')
+        return redirect('documents:documents_list')
 
-    # ... tue query esistenti per documents, events ...
+    # 1️⃣ Controllo piano (Pro vs Starter)
+    profile = getattr(request.user, 'profile', None)
+    plan = getattr(profile, 'plan', 'starter') if profile else 'starter'
+    is_pro_or_higher = PLAN_LEVELS.get(plan, 1) >= 2
 
-    # ✅ LIMITA CHAT A 10 MESSAGGI + ORDINA PER DATA (più recenti prima)
-    from chat.models import FamilyMessage
+    # 2️⃣ Query Documenti (ultimi 5 recenti)
+    documents = Document.objects.filter(
+        family=family,
+        is_active=True
+    ).order_by('-created_at')[:5]
+
+    # 3️⃣ Query Eventi (prossimi 5 eventi futuri)
+    events = CalendarEvent.objects.filter(
+        family=family,
+        is_active=True,
+        start_time__gte=timezone.now().date()
+    ).order_by('start_time')[:5]
+
+    # 4️⃣ Query Chat (ultimi 10 messaggi, invertiti per cronologia dal più vecchio al nuovo)
     recent_messages = FamilyMessage.objects.filter(
         family=family,
         is_active=True,
         recipient__isnull=True  # Solo chat famiglia, non private
     ).select_related('sender').order_by('-created_at')[:10]
 
-    # ✅ Inverti l'ordine per visualizzazione cronologica corretta (dal più vecchio al più recente)
-    recent_messages = list(reversed(recent_messages))
+    messages_list = list(reversed(recent_messages))
 
+    # 5️⃣ Context completo
     context = {
-        # ... tuoi context esistenti ...
-        "messages": recent_messages,  # ✅ Solo 10 messaggi, ordinati
-        # ...
+        'family': family,
+        'documents': documents,
+        'events': events,
+        'messages': messages_list,
+        'is_pro_or_higher': is_pro_or_higher,  # ✅ Fondamentale per mostrare il blocco
     }
-    return render(request, "documents/dossier.html", context)
 
-# documents/views.py
+    return render(request, "documents/dossier.html", context)
 
 
 def _get_logo_base64():
@@ -520,3 +578,55 @@ def dossier_export_pdf(request):
     filename = f"Fascicolo_{family.name.replace(' ', '_')}_{timezone.now().strftime('%Y%m%d')}.pdf"
     response['Content-Disposition'] = f'attachment; filename="{filename}"'
     return response
+
+
+@login_required
+def sentence_data_review_view(request, doc_id):
+    """
+    ✅ FASE E: Permette all'utente di rivedere e correggere i dati estratti automaticamente dalla sentenza.
+    """
+    doc = get_object_or_404(Document, id=doc_id)
+
+    # 1. Controllo permessi
+    if not can_access_document(request.user, doc):
+        return HttpResponseForbidden("Permessi insufficienti per accedere a questo documento.")
+
+    # 2. Controllo che sia effettivamente una sentenza
+    if doc.category != "ruling":
+        messages.warning(request, "Questo documento non è una sentenza.")
+        return redirect("documents:document_detail", doc_id=doc.id)
+
+    if request.method == "POST":
+        # 3. Salvataggio dei dati corretti dall'utente
+        doc.extracted_data = {
+            "maintenance_amount": request.POST.get("maintenance_amount", "").strip(),
+            "custody_type": request.POST.get("custody_type", "").strip(),
+            "house_assigned_to": request.POST.get("house_assigned_to", "").strip(),
+            "vehicle_assignment": request.POST.get("vehicle_assignment", "").strip(),
+            "parent_quotas": request.POST.get("parent_quotas", "").strip(),
+            "ruling_date": request.POST.get("ruling_date", "").strip(),
+            "rg_number": request.POST.get("rg_number", "").strip(),
+        }
+
+        # Pulisce le chiavi vuote per mantenere il JSON pulito
+        doc.extracted_data = {k: v for k, v in doc.extracted_data.items() if v}
+        doc.save(update_fields=["extracted_data"])
+
+        messages.success(request, "✅ Dati della sentenza aggiornati e salvati con successo.")
+        return redirect("documents:document_detail", doc_id=doc.id)
+
+    # 4. GET: Prepara i dati per il template
+    data = doc.extracted_data or {}
+
+    context = {
+        "document": doc,
+        "maintenance_amount": data.get("maintenance_amount", ""),
+        "custody_type": data.get("custody_type", ""),
+        "house_assigned_to": data.get("house_assigned_to", ""),
+        "vehicle_assignment": data.get("vehicle_assignment", ""),
+        "parent_quotas": data.get("parent_quotas", ""),
+        "ruling_date": data.get("ruling_date", ""),
+        "rg_number": data.get("rg_number", ""),
+    }
+
+    return render(request, "documents/sentence_data_review.html", context)

@@ -2,7 +2,8 @@ from django.urls import path
 from django.views.generic import RedirectView
 
 from families.views import family_summary, lawyer_expenses_dashboard_view, professional_dashboard, set_active_family, \
-    lawyer_exit_family_context, exit_family_context
+    lawyer_exit_family_context, exit_family_context, professional_pending_events_view, spousal_support_view, \
+    family_settings_view, support_agreement_view
 from chat.views import delete_message_view
 from .views import (
     approve_expense_view,
@@ -23,7 +24,7 @@ urlpatterns = [
     # DASHBOARD
     # =========================
     path("dashboard/", dashboard_view, name="family_dashboard"),
-    #path("lawyer/dashboard/", lawyer_dashboard_view, name="lawyer_dashboard"),
+
     path("summary/", family_summary, name="summary"),
 
     # =========================
@@ -39,7 +40,9 @@ urlpatterns = [
     path("invite/<uuid:token>/confirm/", confirm_invitation_view, name="invite_confirm"),
     path("message/<int:pk>/delete/", delete_message_view, name="delete_message"),
     path("accept-invite/<str:token>/", accept_invite_view, name="accept_invite"),
-
+    path("spousal-support/", spousal_support_view, name="spousal_support"),
+    path('family-settings/', family_settings_view, name='family_settings'),
+    path("support-agreement/", support_agreement_view, name="support_agreement"),
     # =========================
     # EXPENSES
     # =========================
@@ -59,6 +62,7 @@ urlpatterns = [
     path('lawyer/expenses/<int:family_id>/', lawyer_expenses_dashboard_view, name='lawyer_expenses'),
 
     path('professional/dashboard/', professional_dashboard, name='professional_dashboard'),
+    path('professional/pending-events/', professional_pending_events_view, name='professional_pending_events'),
     path('set-active/<int:family_id>/', set_active_family, name='set_active_family'),
     path("families/exit-lawyer-context/", lawyer_exit_family_context, name="exit_lawyer_context"),
     path("families/exit-context/", exit_family_context, name="exit_family_context"),

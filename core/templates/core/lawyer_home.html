@@ -28,7 +28,22 @@
 
     <!-- 🚀 Pulsante Principale -->
     <div class="text-center mb-5">
-        <a href="{% url 'families:professional_dashboard' %}" class="btn btn-success btn-style" >📊 Vai al Pannello di controllo Avvocato</a>
+        {% if user.profile.is_professional %}
+
+            <!-- ✅ Punta a exit_family_context che pulisce la sessione e redirecta a professional_dashboard -->
+            <a class="btn btn-success btn-style  {% if user.profile.is_blocked %}disabled-sub{% endif %}"
+               href="{% url 'families:exit_family_context' %}"
+               title="Torna alla dashboard principale (esci dal contesto famiglia)"
+                {% if user.profile.is_blocked %}title="⚠️ Funzione bloccata: rinnova l'abbonamento per accedere"{% endif %}>
+                📊 Vai al Pannello di controllo
+            </a>
+        {% endif %}
+
+        {% if user.profile.is_blocked %}
+            <div class="mt-3">
+                <a href="{% url 'pricing' %}" class="btn btn-warning btn-sm">💳 Rinnova ora per sbloccare</a>
+            </div>
+        {% endif %}
 
    <!--     <div class="mt-3">
             <a href="{% url 'families:setup' %}" class="text-muted text-decoration-none">⚙️ Impostazioni Profilo</a>

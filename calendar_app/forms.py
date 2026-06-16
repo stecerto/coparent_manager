@@ -1,5 +1,7 @@
 # calendar_app/forms.py
 from django import forms
+
+from children.models import ChildProfile
 from .models import CalendarEvent
 from expenses.models import ExpenseCategory
 
@@ -34,6 +36,10 @@ class EventForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         # Filtra categorie per famiglia
         if self.instance and self.instance.family:
+            self.fields['children'].queryset = ChildProfile.objects.filter(
+                family=self.instance.family,
+                is_active=True
+            )
             self.fields['expense_category'].queryset = ExpenseCategory.objects.filter(
                 family=self.instance.family,
                 is_active=True
@@ -42,3 +48,4 @@ class EventForm(forms.ModelForm):
         # Se stiamo modificando un evento esistente con spesa, precompila amount
         if self.instance and self.instance.linked_expense:
             self.fields['amount'].initial = self.instance.linked_expense.amount
+            self.fields['expense_category'].initial = self.instance.linked_expense.category

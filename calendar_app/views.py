@@ -1,7 +1,7 @@
 # calendar_app/views.py
 from datetime import datetime
 from django.contrib.auth.decorators import login_required
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime as django_parse_datetime
@@ -160,3 +160,63 @@ def _get_event_color(event_type):
         "custody": "#6f42c1", "school": "#0d6efd", "medical": "#198754",
         "expense": "#ffc107", "legal": "#dc3545", "other": "#6c757d"
     }.get(event_type, "#6c757d")
+
+
+from django.core.paginator import Paginator
+
+@login_required
+def events_list_view(request):
+    """Lista eventi con filtri e paginazione"""
+    family = get_family_of_user(request.user, request=request)
+    if not family:
+        return render(request, "calendar_app/no_family.html")
+
+    # Query base
+    events = CalendarEvent.objects.filter(
+        family=family,
+        is_active=True
+    ).select_related("created_by").prefetch_related("children").order_by("-start_time")
+
+    # Filtri
+    event_type = request.GET.get("event_type")
+    if event_type:
+        events = events.filter(event_type=event_type)
+
+    date_from = request.GET.get("date_from")
+    if date_from:
+        events = events.filter(start_time__date__gte=date_from)
+
+    date_to = request.GET.get("date_to")
+    if date_to:
+        events = events.filter(end_time__date__lte=date_to)
+
+    # Paginazione
+    paginator = Paginator(events, 12)  # 12 eventi per pagina
+    page_number = request.GET.get("page")
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, "calendar_app/lista_eventi.html", {
+        "events": page_obj,
+        "event_types": CalendarEvent.EVENT_TYPES,
+        "family": family,
+    })
+
+
+@login_required
+def event_detail_view(request, event_id):
+    """Visualizza i dettagli di un singolo evento"""
+    event = get_object_or_404(CalendarEvent, id=event_id)
+
+    # ✅ Sicurezza: verifica che l'evento appartenga alla famiglia dell'utente loggato
+    family = get_family_of_user(request.user, request=request)
+    if event.family != family:
+        return HttpResponseForbidden("Non hai i permessi per visualizzare questo evento.")
+
+    # 3. Recupera i figli coinvolti (se presenti)
+    involved_children = event.children.all()
+
+    context = {
+        "event": event,
+        "involved_children": involved_children,
+    }
+    return render(request, "calendar_app/event_detail.html", context)

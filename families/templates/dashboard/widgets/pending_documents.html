@@ -1,0 +1,30 @@
+{# Widget: Documenti in Attesa #}
+<div class="card shadow-sm border-0 h-100">
+    <div class="card-header bg-warning bg-opacity-10 text-warning fw-bold">
+        📄 Documenti in Attesa
+    </div>
+    <div class="card-body p-0">
+        {% if pending_documents %}
+            <ul class="list-group list-group-flush">
+                {% for doc in pending_documents %}
+                    <li class="list-group-item d-flex align-items-center py-2">
+                        <span class="fs-4 me-3">{{ doc.icon }}</span>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold small">{{ doc.title }}</div>
+                            <span class="badge bg-{{ doc.status_class }} text-dark">{{ doc.status }}</span>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <div class="text-center py-4">
+                <p class="text-muted small mb-0">Nessun documento in attesa</p>
+            </div>
+        {% endif %}
+    </div>
+    <div class="card-footer bg-white text-center">
+        <a href="{% url 'documents:documents_list' %}" class="btn btn-sm btn-outline-warning">
+            Vai all'Archivio
+        </a>
+    </div>
+</div>

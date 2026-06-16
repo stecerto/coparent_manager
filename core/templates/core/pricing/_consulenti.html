@@ -1,59 +1,7 @@
 <div class="tab-pane fade" id="pricing-consulenti" role="tabpanel">
     <div class="row g-4 justify-content-center">
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm border">
-                <div class="card-body text-center">
-                    <h5 class="card-title">Consulente Base</h5>
-                    <h2 class="display-6 fw-bold">€19,99<span class="fs-6 text-muted">/mese</span></h2>
-                    <p class="text-muted small">Dopo i 14 giorni di prova</p>
-                    <p class="text-muted">Fino a 4 clienti</p>
-                    <ul class="list-unstyled text-start mb-4">
-                        <li>✅ Dashboard dedicata</li>
-                        <li>✅ Analisi spese familiari</li>
-                        <li>✅ Note riservate</li>
-                        <li>❌ Modelli personalizzabili</li>
-                    </ul>
-                    <a href="{% url 'accounts:register' %}?role={{ role }}&plan=base" class="btn btn-outline-info w-100">
-                        🎁 Prova 14 giorni gratis
-                    </a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card h-100 shadow border-info">
-                <div class="card-header bg-info text-dark text-center fw-bold">⭐ CONSULENTE PRO</div>
-                <div class="card-body text-center">
-                    <h5 class="card-title">Consulente Pro</h5>
-                    <h2 class="display-6 fw-bold">€34,99<span class="fs-6 text-muted">/mese</span></h2>
-                    <p class="text-muted small">Dopo i 14 giorni di prova</p>
-                    <p class="text-muted">Fino a 10 clienti</p>
-                    <ul class="list-unstyled text-start mb-4">
-                        <li>✅ Tutto di Base</li>
-                        <li>✅ Template report avanzati</li>
-                        <li>✅ Simulatore economico</li>
-                        <li>✅ Accesso API read-only</li>
-                    </ul>
-                    <a href="{% url 'accounts:register' %}?role={{ role }}&plan=pro" class="btn btn-info text-dark w-100">
-                        🎁 Prova 14 giorni gratis
-                    </a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-4">
-            <div class="card h-100 shadow-sm border">
-                <div class="card-body text-center">
-                    <h5 class="card-title">Agenzia / Studio</h5>
-                    <h2 class="display-6 fw-bold">Custom</h2>
-                    <p class="text-muted">Per team multidisciplinari</p>
-                    <ul class="list-unstyled text-start mb-4">
-                        <li>✅ Clienti illimitati</li>
-                        <li>✅ Gestione ruoli interni</li>
-                        <li>✅ Audit e compliance</li>
-                        <li>✅ Supporto dedicato 24/7</li>
-                    </ul>
-                    <a href="mailto:info@coparentmanager.it" class="btn btn-outline-dark w-100">Parla con noi</a>
-                </div>
-            </div>
-        </div>
+        {% for plan in plans %}
+            {% include "core/pricing/_pricing_card.html" with plan=plan role="consultant" %}
+        {% endfor %}
     </div>
 </div>

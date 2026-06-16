@@ -1,93 +1,170 @@
 {% extends "base.html" %}
 {% load crispy_forms_tags %}
 
-{% block title %}{% if form.instance.pk %}Modifica{% else %}Nuovo{% endif %} Figlio{% endblock %}
+{% block title %}{% if form.instance.pk %}✏️ Modifica{% else %}➕ Nuovo{% endif %} Figlio - CoParent Manager{% endblock %}
 
 {% block content %}
-<div class="container-fluid mt-4">
+<div class="container py-4">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h2 class="fw-bold mb-1">
+                {% if form.instance.pk %}
+                    ✏️ Modifica Figlio
+                {% else %}
+                    ➕ Nuovo Figlio
+                {% endif %}
+            </h2>
+            <p class="text-muted mb-0">Compila i dati anagrafici e le condizioni di mantenimento</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'children:children_list' %}" class="btn btn-outline-secondary">
+                📋 Lista Figli
+            </a>
+        </div>
+    </div>
+
     <div class="row justify-content-center">
         <div class="col-lg-8">
-
-            <!-- Header -->
-            <div class="card p-3 mb-3 shadow custom-card text-center">
-                <h2 class="mb-0">{% if form.instance.pk %}Modifica{% else %}Nuovo{% endif %} Figlio</h2>
-                <small class="text-muted">Compila i dati anagrafici e le condizioni di mantenimento</small>
-            </div>
 
             <form method="POST" id="childForm">
                 {% csrf_token %}
 
                 <!-- 📋 SEZIONE 1: Dati Anagrafici -->
-                <div class="card p-3 mb-3 shadow custom-card">
-                    <h5 class="card-title mb-3">👤 Dati Personali</h5>
-                    <div class="row g-3">
-                        <div class="col-md-6">{{ form.name|as_crispy_field }}</div>
-                        <div class="col-md-6">{{ form.surname|as_crispy_field }}</div>
-                        <div class="col-12">{{ form.birth_date|as_crispy_field }}</div>
-                        <div class="col-12">{{ form.notes|as_crispy_field }}</div>
+                <div class="card shadow-sm mb-4 border-start border-2 border-primary">
+                    <div class="card-header bg-white fw-bold d-flex align-items-center gap-2">
+                        <span class="fs-4">👤</span>
+                        <span>Dati Personali</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                {{ form.name|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.surname|as_crispy_field }}
+                            </div>
+                            <div class="col-12">
+                                {{ form.birth_date|as_crispy_field }}
+                            </div>
+                            <div class="col-12">
+                                {{ form.notes|as_crispy_field }}
+                            </div>
+                        </div>
                     </div>
                 </div>
 
                 <!-- ⚖️ SEZIONE 2: Affidamento & Mantenimento -->
-                <div class="card p-3 mb-3 shadow custom-card border-primary">
-                    <h5 class="card-title mb-3 text-primary">⚖️ Affidamento e Ripartizione Spese</h5>
-
-                    <!-- Tipo Affidamento -->
-                    <div class="mb-3">
-                        {{ form.custody_type|as_crispy_field }}
+                <div class="card shadow-sm mb-4 border-start border-2 border-success">
+                    <div class="card-header bg-white fw-bold d-flex align-items-center gap-2">
+                        <span class="fs-4">⚖️</span>
+                        <span>Affidamento e Ripartizione Spese</span>
                     </div>
-                    <div class="col-md-6">
-                        {{ form.manual_maintenance_amount|as_crispy_field }}
-                        <div class="mt-1 small text-muted p-1 bg-white rounded border">
-                            💰 Importo effettivo: <strong class="eff-amount">{{ form.instance.effective_maintenance_amount|floatformat:2|default:"Non definito" }} €</strong>
-                            <br><small class="text-muted">
-                                {% if form.instance.family.support_agreements.filter.is_active.exists %}
-                                    📜 Da sentenza
-                                {% elif form.instance.manual_maintenance_amount %}
-                                    ✍️ Manuale
-                                {% else %}
-                                    ⚠️ Non configurato
-                                {% endif %}
-                            </small>
+                    <div class="card-body">
+
+                        <!-- Tipo Affidamento -->
+                        <div class="mb-4">
+                            {{ form.custody_type|as_crispy_field }}
                         </div>
-                    </div>
 
-                    <!-- Percentuale Genitore A + Calcolo Live -->
-                    <div class="mb-3">
-                        {{ form.contribution_pct_parent_a|as_crispy_field }}
-
-                        <!-- 💡 Feedback visivo in tempo reale -->
-                        <div class="mt-2 p-2 bg-light rounded border" id="pct-feedback">
-                            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
-                                <span class="fw-bold">📊 Ripartizione calcolata:</span>
-                                <div class="d-flex align-items-center gap-3">
-                                    <span>
-                                        Genitore A: <strong id="pctA_display" class="text-primary">50.00%</strong>
-                                    </span>
-                                    <span>
-                                        Genitore B: <strong id="pctB_display" class="text-success">50.00%</strong>
+                        <!-- Mantenimento -->
+                        <div class="mb-4">
+                            {{ form.manual_maintenance_amount|as_crispy_field }}
+                            <div class="mt-2 p-3 bg-light rounded border">
+                                <div class="d-flex align-items-center gap-2 mb-2">
+                                    <span class="fs-5">💰</span>
+                                    <strong>Importo effettivo:</strong>
+                                    <span class="fs-5 fw-bold text-success eff-amount">
+                                        € {{ form.instance.effective_maintenance_amount|floatformat:2|default:"0.00" }}
                                     </span>
                                 </div>
+                                <small class="text-muted d-block">
+                                    {% if form.instance.family.support_agreements.filter.is_active.exists %}
+                                        📜 <strong>Da sentenza</strong> - L'importo viene calcolato automaticamente
+                                    {% elif form.instance.manual_maintenance_amount %}
+                                        ✍️ <strong>Manuale</strong> - Hai impostato un importo personalizzato
+                                    {% else %}
+                                        ⚠️ <strong>Non configurato</strong> - Imposta un importo manuale o carica una sentenza
+                                    {% endif %}
+                                </small>
                             </div>
-                            <small class="text-muted d-block mt-1">
-                                <i class="bi bi-info-circle"></i> La somma deve essere 100%. Modificando la % del Genitore A, quella del Genitore B si aggiorna automaticamente.
-                            </small>
-                            <!-- ✅ Messaggio di errore nascosto di default -->
-                            <div id="pct-error" class="alert alert-warning mt-2 mb-0 d-none" role="alert">
-                                ⚠️ Valore non valido: inserire un numero tra 0 e 100.
+                        </div>
+
+                        <!-- Percentuale Genitore A + Calcolo Live -->
+                        <div class="mb-3">
+                            {{ form.contribution_pct_parent_a|as_crispy_field }}
+
+                            <!-- 💡 Feedback visivo in tempo reale -->
+                            <div class="mt-3 p-3 bg-light rounded border" id="pct-feedback">
+                                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+                                    <span class="fw-bold d-flex align-items-center gap-2">
+                                        <span class="fs-5">📊</span>
+                                        <span>Ripartizione calcolata:</span>
+                                    </span>
+                                    <div class="d-flex align-items-center gap-3">
+                                        <span class="d-flex align-items-center gap-1">
+                                            <span>👨</span>
+                                            <span>Genitore A:</span>
+                                            <strong id="pctA_display" class="text-primary fs-5">50.00%</strong>
+                                        </span>
+                                        <span class="d-flex align-items-center gap-1">
+                                            <span>👩</span>
+                                            <span>Genitore B:</span>
+                                            <strong id="pctB_display" class="text-success fs-5">50.00%</strong>
+                                        </span>
+                                    </div>
+                                </div>
+                                <small class="text-muted d-block mt-2">
+                                    <span class="me-1">💡</span> La somma deve essere 100%. Modificando la % del Genitore A, quella del Genitore B si aggiorna automaticamente.
+                                </small>
+                                <!-- ✅ Messaggio di errore nascosto di default -->
+                                <div id="pct-error" class="alert alert-warning mt-2 mb-0 d-none" role="alert">
+                                    <span class="me-1">⚠️</span> Valore non valido: inserire un numero tra 0 e 100.
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
                 <!-- Pulsanti -->
-                <div class="d-flex gap-2 flex-wrap">
-                    <button type="submit" class="btn btn-success btn-style flex-grow-1">
-                        {% if form.instance.pk %}💾 Salva Modifiche{% else %}✅ Salva Figlio{% endif %}
+                <div class="d-flex gap-2 flex-wrap pt-3">
+                    <button type="submit" class="btn btn-success btn-lg px-4">
+                        💾 {% if form.instance.pk %}Salva Modifiche{% else %}Salva Figlio{% endif %}
                     </button>
-                    <a href="{% url 'children:children_list' %}" class="btn btn-outline-secondary">↩️ Annulla</a>
+                    <a href="{% url 'children:children_list' %}" class="btn btn-outline-secondary btn-lg">
+                        ✕ Annulla
+                    </a>
                 </div>
             </form>
+
+            <!-- Card Info Utili -->
+            <div class="card shadow-sm mt-4 border-start border-2 border-info">
+                <div class="card-header bg-white fw-bold d-flex align-items-center gap-2">
+                    <span class="fs-4">ℹ️</span>
+                    <span>Informazioni Utili</span>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2">
+                            <span class="text-primary me-2">✓</span>
+                            <strong>Mantenimento:</strong> Può essere impostato manualmente o estratto automaticamente da una sentenza
+                        </li>
+                        <li class="mb-2">
+                            <span class="text-primary me-2">✓</span>
+                            <strong>Ripartizione:</strong> La percentuale determina come dividere le spese tra i genitori
+                        </li>
+                        <li class="mb-2">
+                            <span class="text-primary me-2">✓</span>
+                            <strong>Spese:</strong> Ogni spesa inserita verrà automaticamente ripartita secondo queste percentuali
+                        </li>
+                        <li class="mb-0">
+                            <span class="text-primary me-2">✓</span>
+                            <strong>Saldo:</strong> Il sistema calcola automaticamente i rimborsi tra genitori
+                        </li>
+                    </ul>
+                </div>
+            </div>
 
         </div>
     </div>

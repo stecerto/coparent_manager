@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Riepilogo Modifica Piano - CoParent Manager{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h3 class="mb-0">💳 Riepilogo Modifica Piano</h3>
+                </div>
+                <div class="card-body">
+
+                    {% if profile.is_expired or profile.is_suspended %}
+                        <div class="alert alert-danger">
+                            <strong>⚠️ Attenzione:</strong> Il tuo abbonamento è {% if profile.is_suspended %}sospeso{% else %}scaduto{% endif %}.
+                            Effettua questa operazione per riattivare immediatamente l'accesso.
+                        </div>
+                    {% endif %}
+
+                    <!-- Riepilogo -->
+                    <div class="mb-4">
+                        <h5>📋 Situazione Attuale</h5>
+                        <table class="table table-borderless">
+                            <tr>
+                                <td><strong>Piano corrente:</strong></td>
+                                <td><span class="badge bg-secondary">{{ profile.plan|title }}</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Nuovo piano:</strong></td>
+                                <td><span class="badge bg-primary">{{ plan_to_process|title }}</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Data di attivazione:</strong></td>
+                                <td>
+                                    {% if is_immediate %}
+                                        <span class="text-success fw-bold">Immediata (dopo il pagamento)</span>
+                                    {% else %}
+                                        <span class="text-info fw-bold">{{ change_date }} (alla scadenza attuale)</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Scadenza attuale:</strong></td>
+                                <td>
+                                    {% if profile.plan_expires_at %}
+                                        {{ profile.plan_expires_at|date:"d/m/Y" }}
+                                        <span class="text-muted">({{ days_remaining|default:0 }} giorni)</span>
+                                    {% else %}
+                                        Non impostata
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <!-- Importo -->
+                    <div class="alert alert-info d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="mb-1">💰 Importo</h5>
+                            {% if is_immediate %}
+                                <p class="mb-0 text-muted">Da pagare ora per l'attivazione immediata.</p>
+                            {% else %}
+                                <p class="mb-0 text-muted">Verrà addebitato automaticamente alla data di attivazione.</p>
+                            {% endif %}
+                        </div>
+                        <h2 class="text-primary mb-0">{{ amount_formatted }}</h2>
+                    </div>
+
+                    <!-- Form conferma -->
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                {% if is_immediate %}💳 Paga e Attiva Ora{% else %}✅ Conferma Modifica Programmata{% endif %}
+                            </button>
+                            <a href="{% url 'pricing' %}" class="btn btn-outline-secondary">
+                                ← Torna ai Piani
+                            </a>
+                        </div>
+                    </form>
+
+                    <hr class="my-4">
+                    <div class="text-center text-muted">
+                        <small><i class="bi bi-shield-check"></i> Pagamento sicuro e crittografato</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

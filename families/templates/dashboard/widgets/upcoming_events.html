@@ -1,0 +1,30 @@
+{# Widget: Prossimi Eventi #}
+<div class="card shadow-sm border-0 h-100">
+    <div class="card-header bg-info bg-opacity-10 text-info fw-bold">
+        📅 Prossimi Eventi
+    </div>
+    <div class="card-body p-0">
+        {% if upcoming_events %}
+            <ul class="list-group list-group-flush">
+                {% for event in upcoming_events %}
+                    <li class="list-group-item d-flex align-items-center py-2">
+                        <span class="fs-4 me-3">{{ event.icon }}</span>
+                        <div class="flex-grow-1">
+                            <div class="fw-semibold small">{{ event.title }}</div>
+                            <small class="text-muted">{{ event.date }} • {{ event.time }}</small>
+                        </div>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            <div class="text-center py-4">
+                <p class="text-muted small mb-0">Nessun evento nei prossimi 30 giorni</p>
+            </div>
+        {% endif %}
+    </div>
+    <div class="card-footer bg-white text-center">
+        <a href="{% url 'calendar:calendar_view' %}" class="btn btn-sm btn-outline-info">
+            Vedi Calendario Completo
+        </a>
+    </div>
+</div>

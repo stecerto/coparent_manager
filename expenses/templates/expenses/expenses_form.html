@@ -2,44 +2,129 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block title %}{{ title }}{% endblock title %}
+{% block title %}{{ title }} - CoParent Manager{% endblock title %}
 
 {% block content %}
-<div class="container-fluid mt-4">
+<div class="container py-4">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h2 class="fw-bold mb-1">{{ title }}</h2>
+            <p class="text-muted mb-0">Inserisci o modifica una spesa familiare</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'expenses:expenses_list' %}" class="btn btn-outline-secondary">
+                📄 Lista Spese
+            </a>
+            <a href="{% url 'expenses:expenses_dashboard' %}" class="btn btn-outline-primary">
+                📊 Dashboard
+            </a>
+        </div>
+    </div>
+
     <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card p-3 mb-2 shadow custom-card text-center">
-                <h2>{{ title }}</h2>
-            </div>
+        <div class="col-lg-8">
 
-             <div class="card p-3 shadow custom-card h-100">
-                <!-- ✅ enctype="multipart/form-data" è già presente, fondamentale per i file -->
-                <form method="post" enctype="multipart/form-data">
-                    {% csrf_token %}
-                    {{ form|crispy }}
+            <!-- Card Form Principale -->
+            <div class="card shadow-sm mb-4 border-start border-2 border-success">
+                <div class="card-header bg-white fw-bold d-flex align-items-center gap-2">
+                    <span class="fs-4">💰</span>
+                    <span>Dati Spesa</span>
+                </div>
+                <div class="card-body">
 
-                    <!-- 📎 SEZIONE UPLOAD DOCUMENTO PAGAMENTO -->
-                    <div class="mb-3 mt-3 p-2 bg-light border rounded">
-                        <label for="payment_proof" class="form-label fw-bold">
-                            📎 Ricevuta / Prova di Pagamento <span class="text-muted fw-normal">(opzionale)</span>
-                        </label>
-                        <input type="file" class="form-control" id="payment_proof" name="payment_proof" accept="image/*,.pdf" multiple>
-                        <div class="form-text">
-                            Carica ricevuta, screenshot o estratto conto. Formati: JPG, PNG, PDF (max 5MB ciascuno)
+                    <!-- Alert Contesto Chat -->
+                    {% if next_url %}
+                    <div class="alert alert-info border-0 shadow-sm mb-4">
+                        <div class="d-flex align-items-center gap-3">
+                            <span class="fs-3">💡</span>
+                            <div class="flex-grow-1">
+                                <strong>Tornerai alla Chat</strong>
+                                <p class="mb-0 small text-muted">Dopo il salvataggio, sarai reindirizzato automaticamente alla chat per comunicare la spesa.</p>
+                            </div>
                         </div>
                     </div>
-                    {% if split_preview %}
-                    <div class="alert alert-info">
-                        📊 Ripartizione per questo figlio: <strong>{{ split_preview }}</strong>
-                    </div>
+                    <input type="hidden" name="next" value="{{ next_url }}">
                     {% endif %}
 
-                    <button type="submit" class="btn btn-success btn-style">💾 Salva Spesa</button>
-                </form>
+                    <!-- Form -->
+                    <form method="post" enctype="multipart/form-data">
+                        {% csrf_token %}
 
-                <hr style="border: 1px solid #ccc; width: 50%; margin: 20px auto;">
-                <a href="{% url 'expenses:expenses_dashboard' %}">← Al Pannello di controllo</a>
+                        <!-- Campi Form -->
+                        <div class="mb-4">
+                            {{ form|crispy }}
+                        </div>
+
+                        <!-- Sezione Upload Documento -->
+                        <div class="mb-4 p-3 bg-light border rounded">
+                            <label for="payment_proof" class="form-label fw-bold d-flex align-items-center gap-2">
+                                <span class="fs-4">📎</span>
+                                <span>Ricevuta / Prova di Pagamento</span>
+                                <span class="badge bg-secondary ms-auto">Opzionale</span>
+                            </label>
+                            <input type="file" class="form-control" id="payment_proof" name="payment_proof" accept="image/*,.pdf" multiple>
+                            <div class="form-text mt-2">
+                                📄 Carica ricevuta, screenshot o estratto conto. Formati supportati: JPG, PNG, PDF (max 5MB ciascuno)
+                            </div>
+                        </div>
+
+                        <!-- Preview Ripartizione -->
+                        {% if split_preview %}
+                        <div class="alert alert-info border-0 shadow-sm mb-4">
+                            <div class="d-flex align-items-center gap-3">
+                                <span class="fs-3">📊</span>
+                                <div class="flex-grow-1">
+                                    <strong>Ripartizione per questo figlio:</strong>
+                                    <p class="mb-0 mt-1">{{ split_preview }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+
+                        <!-- Bottoni Azione -->
+                        <div class="d-flex gap-2 pt-3 border-top">
+                            <button type="submit" class="btn btn-success btn-lg px-4">
+                                💾 Salva Spesa
+                            </button>
+                            <a href="{% url 'expenses:expenses_list' %}" class="btn btn-outline-secondary btn-lg">
+                                ✕ Annulla
+                            </a>
+                        </div>
+                    </form>
+
+                </div>
             </div>
+
+            <!-- Card Info Utili -->
+            <div class="card shadow-sm mb-4 border-start border-2 border-info">
+                <div class="card-header bg-white fw-bold d-flex align-items-center gap-2">
+                    <span class="fs-4">ℹ️</span>
+                    <span>Informazioni Utili</span>
+                </div>
+                <div class="card-body">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-2">
+                            <span class="text-primary me-2">✓</span>
+                            <strong>Approvazione:</strong> La spesa dovrà essere approvata dall'altro genitore
+                        </li>
+                        <li class="mb-2">
+                            <span class="text-primary me-2">✓</span>
+                            <strong>Ripartizione:</strong> L'importo sarà diviso secondo le percentuali definite per il figlio
+                        </li>
+                        <li class="mb-2">
+                            <span class="text-primary me-2">✓</span>
+                            <strong>Documenti:</strong> Carica sempre la ricevuta per facilitare la verifica
+                        </li>
+                        <li class="mb-0">
+                            <span class="text-primary me-2">✓</span>
+                            <strong>Modifiche:</strong> Potrai modificare la spesa finché non è approvata da entrambi
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
@@ -48,32 +133,32 @@
 {% block scripts %}
 <script src="{% static 'js/coparentmanager.js' %}"></script>
 <script>
+// ✅ Logica esistente preservata
 const childSelect = document.getElementById('id_child');
 const amountInput = document.getElementById('id_amount');
-const splitInput = document.getElementById('id_split_percentage_a'); // Nuovo campo nel form
+const splitInput = document.getElementById('id_split_percentage_a');
 
-childSelect.addEventListener('change', function() {
-    // Chiedi al server o leggi da un data-attribute la % di quel figlio
-    const childId = this.value;
-    const defaultPct = getChildDefaultPercentage(childId); // es. 60.00
+if (childSelect) {
+    childSelect.addEventListener('change', function() {
+        const childId = this.value;
+        const defaultPct = getChildDefaultPercentage(childId);
 
-    // Pre-compila il campo
-    splitInput.value = defaultPct;
-});
+        if (splitInput && defaultPct) {
+            splitInput.value = defaultPct;
+        }
+    });
+}
 
-</script>
-<script>
+// ✅ Placeholder intelligente per parent_a_share
 document.getElementById("id_parent_a_share")?.addEventListener("blur", function() {
     if (!this.value) {
         this.value = "Default automatico";
         this.style.color = "#999";
-        setTimeout(() => { this.value = ""; this.style.color = ""; }, 1500);
+        setTimeout(() => {
+            this.value = "";
+            this.style.color = "";
+        }, 1500);
     }
 });
 </script>
 {% endblock scripts %}
-
-
-
-
-

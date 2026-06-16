@@ -1,6 +1,9 @@
 from django.urls import resolve, Resolver404, reverse
 from django.apps import apps
 
+from core.plans import PLAN_FEATURES, PLAN_LEVELS
+from .models import DashboardWidget  # ✅ NUOVO: Import per i widget
+
 # 🔹 URL → label leggibile
 LABEL_MAP = {
     "family_dashboard": "Generale",
@@ -106,9 +109,6 @@ def breadcrumbs(request):
     return {"breadcrumbs": crumbs}
 
 
-from core.plans import PLAN_FEATURES, PLAN_LEVELS
-
-
 def subscription_context(request):
     if not request.user.is_authenticated:
         return {"current_plan": "starter", "plan_features": {}, "plan_level": 1}
@@ -123,4 +123,38 @@ def subscription_context(request):
         "plan_level": level,
         "plan_features": features,
         "is_pro_or_higher": level >= 2,
+    }
+
+
+# ==============================================================================
+# ✅ NUOVO CONTEXT PROCESSOR AGGIUNTO: dashboard_context
+# ==============================================================================
+def dashboard_context(request):
+    """
+    Fornisce automaticamente i widget della dashboard attivi per il ruolo dell'utente.
+    Disponibile in tutti i template come variabile {{ dashboard_widgets }}
+
+    ✅ FILTRO ENTERPRISE: Restituisce lista vuota se l'utente non ha piano Enterprise.
+    """
+    if not request.user.is_authenticated:
+        return {"dashboard_widgets": []}
+
+    profile = getattr(request.user, 'profile', None)
+    if not profile or not profile.role:
+        return {"dashboard_widgets": []}
+
+    # ✅ FILTRO PIANO: Solo Enterprise (level 3) vede i widget dinamici
+    from core.plans import PLAN_LEVELS
+    current_plan = getattr(profile, 'plan', 'starter')
+    plan_level = PLAN_LEVELS.get(current_plan, 1)
+
+    if plan_level < 3:  # 3 = Enterprise
+        return {"dashboard_widgets": []}
+
+    # Recupera i widget ordinati per posizione, specifici per il ruolo dell'utente
+    from core.models import DashboardWidget
+    widgets = DashboardWidget.get_active_for_role_and_plan(profile.role, plan_level)
+
+    return {
+        "dashboard_widgets": widgets
     }

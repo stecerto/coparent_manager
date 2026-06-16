@@ -1,28 +1,340 @@
-<h3>Carica documenti reddito</h3>
+{% extends "base.html" %}
+{% load static %}
 
-<form method="POST" enctype="multipart/form-data">
-    {% csrf_token %}
+{% block title %}Carica Documenti Reddito - CoParent Manager{% endblock %}
 
-    <select name="type">
-        <option value="payslip">Busta paga</option>
-        <option value="tax_return">Dichiarazione redditi</option>
-    </select>
+{% block extra_css %}
+<style>
+    /* 🎨 BACKGROUND GRADIENT (Coerente con il resto dell'app) */
+    .upload-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: flex-start; /* Cambiato da center per gestire liste lunghe */
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 3rem 1rem;
+    }
 
-    <input type="number" name="year" placeholder="Anno">
+    /* 🎴 CARD PRINCIPALE */
+    .upload-card {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        padding: 2.5rem;
+        max-width: 600px;
+        width: 100%;
+        animation: slideUp 0.5s ease;
+    }
 
-    <input type="file" name="files" multiple>
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
 
-    <button type="submit">Carica</button>
-    {% if not valid %}
-        <div class="alert alert-warning">
-        Devi caricare almeno 3 buste paga e 3 dichiarazioni dei redditi.
+    /* 🎯 LOGO */
+    .upload-logo {
+        width: 70px;
+        height: 70px;
+        background: #ffffff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.15);
+        padding: 12px;
+    }
+    .upload-logo img { max-width: 100%; height: auto; object-fit: contain; }
+
+    /* 📝 TITOLI */
+    .upload-title {
+        text-align: center;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 0.5rem;
+        font-size: 1.8rem;
+    }
+    .upload-subtitle {
+        text-align: center;
+        color: #718096;
+        margin-bottom: 2rem;
+        font-size: 0.95rem;
+    }
+
+    /* 🏷️ LABEL E INPUT */
+    .form-label {
+        font-weight: 600;
+        color: #4a5568;
+        font-size: 0.9rem;
+        margin-bottom: 0.4rem;
+    }
+    .form-control, .form-select {
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 0.75rem 1rem;
+        transition: all 0.3s ease;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
+    }
+
+    /* 📁 AREA UPLOAD FILE */
+    .file-upload-wrapper {
+        position: relative;
+        border: 2px dashed #cbd5e0;
+        border-radius: 12px;
+        padding: 2rem 1rem;
+        text-align: center;
+        background: #f8fafc;
+        transition: all 0.3s ease;
+        cursor: pointer;
+    }
+    .file-upload-wrapper:hover {
+        border-color: #667eea;
+        background: #f0f4ff;
+    }
+    .file-upload-wrapper input[type="file"] {
+        position: absolute;
+        top: 0; left: 0; width: 100%; height: 100%;
+        opacity: 0;
+        cursor: pointer;
+    }
+    .file-upload-icon {
+        font-size: 2.5rem;
+        color: #667eea;
+        margin-bottom: 0.5rem;
+    }
+    .file-upload-text {
+        color: #4a5568;
+        font-weight: 500;
+    }
+    .file-upload-hint {
+        color: #a0aec0;
+        font-size: 0.85rem;
+        margin-top: 0.25rem;
+    }
+
+    /* ⚠️ ALERT VALIDAZIONE */
+    .validation-alert {
+        background: #fffaf0;
+        border-left: 4px solid #ed8936;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        color: #c05621;
+        font-size: 0.9rem;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    .validation-alert i { font-size: 1.2rem; margin-top: 2px; }
+
+    /* 🔘 PULSANTE */
+    .btn-upload {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        border-radius: 12px;
+        padding: 0.9rem;
+        font-weight: 600;
+        font-size: 1.05rem;
+        color: white;
+        width: 100%;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        margin-top: 1rem;
+    }
+    .btn-upload:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+
+    /* 📋 LISTA DOCUMENTI */
+    .docs-section {
+        margin-top: 2.5rem;
+        padding-top: 2rem;
+        border-top: 1px solid #e2e8f0;
+    }
+    .docs-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+    .doc-item {
+        display: flex;
+        align-items: center;
+        padding: 0.75rem 1rem;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        margin-bottom: 0.5rem;
+        transition: all 0.2s ease;
+    }
+    .doc-item:hover {
+        background: #edf2f7;
+        border-color: #cbd5e0;
+    }
+    .doc-icon {
+        font-size: 1.5rem;
+        color: #667eea;
+        margin-right: 1rem;
+    }
+    .doc-info {
+        flex: 1;
+    }
+    .doc-type {
+        font-weight: 600;
+        color: #2d3748;
+        font-size: 0.95rem;
+    }
+    .doc-year {
+        font-size: 0.85rem;
+        color: #718096;
+    }
+
+    /* 📱 RESPONSIVE */
+    @media (max-width: 576px) {
+        .upload-card { padding: 1.5rem; }
+        .upload-title { font-size: 1.5rem; }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="upload-container">
+    <div class="upload-card">
+        <!-- 🎯 LOGO -->
+        <div class="upload-logo">
+            <img src="{% static 'images/logo-coparent.svg' %}" alt="CoParent Manager Logo">
         </div>
-    {% endif %}
 
-</form>
+        <!-- 📝 TITOLO -->
+        <h2 class="upload-title">Carica Documenti Reddito</h2>
+        <p class="upload-subtitle">
+            Carica buste paga o dichiarazioni dei redditi per il calcolo corretto del mantenimento.
+        </p>
 
-<hr>
+        <!-- ⚠️ ALERT VALIDAZIONE (mostrato solo se necessario) -->
+        {% if not valid %}
+        <div class="validation-alert">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <div>
+                <strong>Attenzione:</strong> Devi caricare almeno 3 buste paga e 3 dichiarazioni dei redditi per procedere.
+            </div>
+        </div>
+        {% endif %}
 
-{% for doc in docs %}
-    <p>{{ doc.document_type }} - {{ doc.reference_year }}</p>
-{% endfor %}
+        <!-- 📝 FORM UPLOAD -->
+        <form method="POST" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            <div class="row g-3 mb-3">
+                <!-- Tipo Documento -->
+                <div class="col-md-7">
+                    <label for="doc_type" class="form-label">
+                        <i class="bi bi-file-earmark-text me-1"></i> Tipo di documento
+                    </label>
+                    <select name="type" id="doc_type" class="form-select" required>
+                        <option value="" disabled selected>Seleziona...</option>
+                        <option value="payslip">Busta paga</option>
+                        <option value="tax_return">Dichiarazione dei redditi</option>
+                    </select>
+                </div>
+
+                <!-- Anno -->
+                <div class="col-md-5">
+                    <label for="doc_year" class="form-label">
+                        <i class="bi bi-calendar3 me-1"></i> Anno
+                    </label>
+                    <input type="number"
+                           name="year"
+                           id="doc_year"
+                           class="form-control"
+                           placeholder="Es. 2023"
+                           min="1900"
+                           max="2100"
+                           required>
+                </div>
+            </div>
+
+            <!-- Area Upload File -->
+            <div class="mb-3">
+                <label class="form-label">
+                    <i class="bi bi-cloud-upload me-1"></i> File da caricare
+                </label>
+                <div class="file-upload-wrapper">
+                    <input type="file" name="files" id="doc_files" multiple required>
+                    <div class="file-upload-icon">
+                        <i class="bi bi-cloud-arrow-up"></i>
+                    </div>
+                    <div class="file-upload-text">Clicca o trascina i file qui</div>
+                    <div class="file-upload-hint">PDF, JPG, PNG (più file contemporaneamente)</div>
+                </div>
+            </div>
+
+            <!-- 🔘 PULSANTE INVIO -->
+            <button type="submit" class="btn btn-upload">
+                <i class="bi bi-upload me-2"></i>
+                Carica Documenti
+            </button>
+        </form>
+
+        <!-- 📋 LISTA DOCUMENTI ESISTENTI -->
+        <div class="docs-section">
+            <h4 class="docs-title">
+                <i class="bi bi-folder2-open text-primary"></i>
+                Documenti già caricati
+            </h4>
+
+            {% if docs %}
+                <div class="document-list">
+                    {% for doc in docs %}
+                    <div class="doc-item">
+                        <div class="doc-icon">
+                            {% if 'payslip' in doc.document_type|lower or 'busta' in doc.document_type|lower %}
+                                <i class="bi bi-file-earmark-ruled"></i>
+                            {% else %}
+                                <i class="bi bi-file-earmark-spreadsheet"></i>
+                            {% endif %}
+                        </div>
+                        <div class="doc-info">
+                            <div class="doc-type">{{ doc.document_type }}</div>
+                            <div class="doc-year">Anno di riferimento: {{ doc.reference_year }}</div>
+                        </div>
+                        <i class="bi bi-check-circle-fill text-success" title="Caricato con successo"></i>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-inbox fs-1 d-block mb-2 opacity-25"></i>
+                    <small>Nessun documento caricato finora.</small>
+                </div>
+            {% endif %}
+        </div>
+
+    </div>
+</div>
+
+<!-- ✨ PICCOLO SCRIPT PER MIGLIORARE UX (mostra nome file selezionato) -->
+<script>
+document.getElementById('doc_files').addEventListener('change', function() {
+    const fileCount = this.files.length;
+    const textElement = this.parentElement.querySelector('.file-upload-text');
+    if (fileCount > 0) {
+        textElement.textContent = fileCount === 1 ? this.files[0].name : `${fileCount} file selezionati`;
+        textElement.style.color = '#667eea';
+        textElement.style.fontWeight = '600';
+    } else {
+        textElement.textContent = 'Clicca o trascina i file qui';
+        textElement.style.color = '#4a5568';
+        textElement.style.fontWeight = '500';
+    }
+});
+</script>
+{% endblock content %}

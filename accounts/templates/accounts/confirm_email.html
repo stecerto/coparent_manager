@@ -1,52 +1,240 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}Controlla la tua email - CoParentManager{% endblock %}
+{% block title %}Controlla la tua email - CoParent Manager{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* 🎨 BACKGROUND GRADIENT (Coerente con il resto del flusso) */
+    .confirm-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem 1rem;
+    }
+
+    /* 🎴 CARD PRINCIPALE */
+    .confirm-card {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        padding: 2.5rem;
+        max-width: 500px;
+        width: 100%;
+        animation: slideUp 0.5s ease;
+    }
+
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 🎯 LOGO */
+    .confirm-logo {
+        width: 70px;
+        height: 70px;
+        background: #ffffff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1rem;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.15);
+        padding: 12px;
+    }
+    .confirm-logo img { max-width: 100%; height: auto; object-fit: contain; }
+
+    /* 🎨 ICONA EMAIL */
+    .email-icon {
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #63b3ed 0%, #3182ce 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+        font-size: 2.5rem;
+        color: white;
+        box-shadow: 0 4px 15px rgba(99, 179, 237, 0.3);
+    }
+
+    /* 📝 TITOLI */
+    .confirm-title {
+        text-align: center;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 0.5rem;
+        font-size: 1.8rem;
+    }
+
+    .confirm-subtitle {
+        text-align: center;
+        color: #718096;
+        margin-bottom: 2rem;
+        font-size: 0.95rem;
+        line-height: 1.5;
+    }
+
+    .email-highlight {
+        color: #667eea;
+        font-weight: 700;
+        background: #f0f4ff;
+        padding: 0.2rem 0.5rem;
+        border-radius: 6px;
+        word-break: break-all;
+    }
+
+    /* 📋 BOX ISTRUZIONI */
+    .steps-box {
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1.25rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .steps-title {
+        font-size: 0.9rem;
+        font-weight: 700;
+        color: #4a5568;
+        margin-bottom: 0.75rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+    }
+
+    .steps-list {
+        list-style: none;
+        padding: 0;
+        margin: 0;
+    }
+
+    .steps-list li {
+        position: relative;
+        padding-left: 1.75rem;
+        margin-bottom: 0.75rem;
+        color: #4a5568;
+        font-size: 0.9rem;
+        line-height: 1.4;
+    }
+
+    .steps-list li:last-child {
+        margin-bottom: 0;
+    }
+
+    .steps-list li::before {
+        content: "✓";
+        position: absolute;
+        left: 0;
+        top: 0;
+        color: #48bb78;
+        font-weight: 700;
+    }
+
+    .steps-list li strong {
+        color: #2d3748;
+    }
+
+    /* ⚠️ ALERT SPAM */
+    .spam-alert {
+        background: #fffaf0;
+        border-left: 4px solid #ed8936;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        font-size: 0.9rem;
+        color: #c05621;
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+    }
+    .spam-alert i { font-size: 1.2rem; margin-top: 2px; flex-shrink: 0; }
+
+    /* 🔘 PULSANTE */
+    .btn-primary-gradient {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        border-radius: 12px;
+        padding: 0.9rem;
+        font-weight: 600;
+        font-size: 1.05rem;
+        color: white;
+        width: 100%;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        text-decoration: none;
+        display: inline-block;
+        text-align: center;
+    }
+
+    .btn-primary-gradient:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+
+    /* 📱 RESPONSIVE */
+    @media (max-width: 576px) {
+        .confirm-card { padding: 2rem 1.5rem; }
+        .confirm-title { font-size: 1.5rem; }
+        .email-icon { width: 75px; height: 75px; font-size: 2rem; }
+    }
+</style>
+{% endblock extra_css %}
 
 {% block content %}
-<div class="container py-5">
-    <div class="row justify-content-center">
-        <div class="col-md-6 col-lg-5">
-            <div class="card shadow border-0 rounded-4 text-center">
-                <div class="card-body p-5">
+<div class="confirm-container">
+    <div class="confirm-card">
+        <!-- 🎯 LOGO -->
+        <div class="confirm-logo">
+            <img src="{% static 'images/logo-coparent.svg' %}" alt="CoParent Manager Logo">
+        </div>
 
-                    <div class="mb-4">
-                        <span class="display-4">📧</span>
-                        <h2 class="fw-bold mt-3">Controlla la tua email</h2>
-                    </div>
+        <!-- 📧 ICONA EMAIL -->
+        <div class="email-icon">
+            <i class="bi bi-envelope-check"></i>
+        </div>
 
-                    <p class="text-muted mb-4">
-                        Ciao! Ti abbiamo inviato un link di attivazione all'indirizzo:<br>
-                        <strong class="text-primary">{{ email }}</strong>
-                    </p>
+        <!-- 📝 TITOLO -->
+        <h2 class="confirm-title">Controlla la tua email</h2>
+        <p class="confirm-subtitle">
+            Ciao! Ti abbiamo inviato un link di attivazione all'indirizzo:<br>
+            <span class="email-highlight">{{ email }}</span>
+        </p>
 
-                    <div class="alert alert-light border text-start mb-4">
-                        <p class="mb-2 small"><strong>Cosa fare ora:</strong></p>
-                        <ol class="small mb-0 ps-3">
-                            <li>Apri la tua casella di posta.</li>
-                            <li>Cerca l'email con oggetto <em>"Attiva il tuo account - CoParentManager"</em>.</li>
-                            <li>Clicca sul pulsante <strong>"Attiva il mio account"</strong> all'interno dell'email.</li>
-                        </ol>
-                    </div>
+        <!-- 📋 ISTRUZIONI -->
+        <div class="steps-box">
+            <div class="steps-title">
+                <i class="bi bi-list-check text-primary"></i>
+                Cosa fare ora:
+            </div>
+            <ol class="steps-list">
+                <li>Apri la tua casella di posta elettronica.</li>
+                <li>Cerca l'email con oggetto <strong>"Attiva il tuo account - CoParent Manager"</strong>.</li>
+                <li>Clicca sul pulsante <strong>"Attiva il mio account"</strong> all'interno del messaggio.</li>
+            </ol>
+        </div>
 
-                    <div class="alert alert-warning small mb-4">
-                        💡 <strong>Non trovi l'email?</strong> Controlla anche nella cartella <em>Spam</em> o <em>Posta Indesiderata</em>.
-                    </div>
-
-                    <hr class="my-4">
-
-                    <div class="d-grid gap-2">
-                        <a href="{% url 'accounts:login' %}" class="btn btn-primary btn-lg">
-                            🔐 Vai al Login
-                        </a>
-                    </div>
-
-                </div>
+        <!-- ⚠️ AVVISO SPAM -->
+        <div class="spam-alert">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            <div>
+                <strong>Non trovi l'email?</strong><br>
+                <small>Controlla anche nella cartella <em>Spam</em> o <em>Posta Indesiderata</em>. A volte i filtri antispam sono un po' troppo zelanti!</small>
             </div>
         </div>
+
+        <!-- 🔘 PULSANTE LOGIN -->
+        <a href="{% url 'accounts:login' %}" class="btn btn-primary-gradient">
+            <i class="bi bi-box-arrow-in-right me-2"></i>
+            Vai al Login
+        </a>
     </div>
 </div>
-{% endblock %}
+{% endblock content %}
 
 
 

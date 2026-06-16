@@ -2,24 +2,18 @@
 import csv
 import logging
 from datetime import timedelta
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect, get_object_or_404
+from django.utils import timezone
+from datetime import date
 
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import redirect
-from django.shortcuts import get_object_or_404
-from django.contrib.auth.decorators import login_required
-from families.models import FamilyMember
-from django.contrib.auth import get_user_model
-from django.shortcuts import render, redirect
+from children.forms import ChildSupportForm
+from children.models import ChildSupport
+from families.forms import SpouseSupportForm  # Assicurati che questo form esista
+from .utils import get_family_of_user  # o il tuo metodo per ottenere la famiglia
+
 from django.contrib import messages
-from families.models import Invitation
-from families.services.invitation_service import accept_invitation
-from families.services.email_service import (
-    send_invitation_email,
-    build_invitation_context
-)
-import logging
-from django.contrib import messages
-from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Sum, Count
@@ -27,7 +21,6 @@ from django.http import HttpResponse, JsonResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.template.loader import render_to_string
 from django.utils import timezone
-from django.template.loader import render_to_string
 from weasyprint import HTML
 
 # App locali
@@ -49,15 +42,13 @@ from families.services.invitation_service import (
 )
 from families.utils import (
     calculate_setup_progress,
-    get_active_family,
-    can_lawyer_add_family,
     generate_family_name,
     get_target_role,
     get_lawyer_limits,
     get_family_of_user
 )
 
-logger = logging.getLogger(__name__)
+
 
 
 @login_required
@@ -295,16 +286,23 @@ def family_dashboard(request):  # ← Assicurati che prenda 'request'
     else:
         role_label = ""
 
+    from core.services.dashboard_service import get_upcoming_events, get_pending_documents
+    upcoming_events = get_upcoming_events(family, limit=5)
+    pending_documents = get_pending_documents(family, limit=5)
+
     context = {
         "family": family,
-        # ✅ AGGIUNGI QUESTI DUE PER IL BADGE DINAMICO
+        # ✅ BADGE DINAMICO
         "active_family": family,
         "active_family_membership": active_membership,
-        # ✅ Mantieni anche le variabili semplificate per il template
+        # ✅ variabili semplificate per il template
         "active_family_name": family.name,
         "active_role_label": role_label,
         "active_is_parent_a": active_membership.role == "parent_a" if active_membership else False,
         "active_is_lawyer_a": active_membership.role == "lawyer_a" if active_membership else False,
+        # ✅ Dati per i widget
+        "upcoming_events": upcoming_events,
+        "pending_documents": pending_documents,
     }
     return render(request, "families/family_dashboard.html", context)
 
@@ -380,6 +378,28 @@ def setup_view(request):
 
     # ✅ active_children solo se family esiste
     active_children = family.children.filter(is_active=True).order_by("birth_date", "name") if family else []
+    for child in active_children:
+        # 1. Ottieni il valore, gestendo il caso in cui sia None o una stringa
+        pct_a_raw = getattr(child, 'contribution_pct_parent_a', None)
+
+        try:
+            pct_a = float(pct_a_raw) if pct_a_raw is not None else 50.0
+        except (ValueError, TypeError):
+            pct_a = 50.0  # Fallback di sicurezza
+
+        # 2. Calcola la percentuale B e arrotonda a 1 decimale per estetica (evita 49.9999%)
+        child.pct_a_display = round(pct_a, 1)
+        child.pct_b_display = round(100.0 - pct_a, 1)
+
+    # ✅ Recupera l'accordo di mantenimento attivo (per mostrare il feedback nel setup)
+    current_support = None
+    if family:
+        from children.models import ChildSupport
+        current_support = ChildSupport.objects.filter(
+            family=family,
+            support_type='child',
+            is_active=True
+        ).order_by('-start_date').first()
 
     context = {
         "form_user": form_user,
@@ -397,6 +417,7 @@ def setup_view(request):
         "setup_total_fields": len(important_fields),
         "setup_completed_labels": labels,
         "setup_progress_message": progress_message,
+        "current_support": current_support,
     }
 
     # ✅ CORRETTO: usa is_professional per decidere il template
@@ -404,6 +425,53 @@ def setup_view(request):
     return render(request, template, context)
 
 
+@login_required
+def family_settings_view(request):
+    """
+    Vista in sola lettura delle impostazioni della famiglia.
+    Accessibile solo a professionisti (avvocati, mediatori, consulenti).
+    """
+    family_id = request.GET.get('family_id')
+    if not family_id:
+        messages.error(request, "⚠️ Famiglia non specificata")
+        return redirect('families:professional_dashboard')
+
+    family = get_object_or_404(Family, id=family_id)
+
+    # Verifica che l'utente sia un professionista assegnato a questa famiglia
+    membership = FamilyMember.objects.filter(
+        family=family,
+        user=request.user,
+        role__in=['lawyer_a', 'lawyer_b', 'mediator', 'consultant']
+    ).first()
+
+    if not membership:
+        messages.error(request, "⚠️ Non hai i permessi per accedere a questa famiglia")
+        return redirect('families:professional_dashboard')
+
+    # Recupera i dati della famiglia
+    children = family.children.filter(is_active=True).order_by('birth_date', 'name')
+    parents = family.members.filter(role__in=['parent_a', 'parent_b']).select_related('user')
+
+    # Recupera l'accordo di mantenimento attivo
+    from children.models import ChildSupport
+    current_support = ChildSupport.objects.filter(
+        family=family,
+        support_type='child',
+        is_active=True
+    ).order_by('-start_date').first()
+
+    context = {
+        'family': family,
+        'membership': membership,
+        'children': children,
+        'parents': parents,
+        'current_support': current_support,
+        'is_professional': True,  # Flag per il template
+        'read_only': True,  # Modalità sola lettura
+    }
+
+    return render(request, 'families/lawyer/family_settings.html', context)
 
 @login_required
 def family_summary(request):
@@ -488,7 +556,52 @@ def family_summary(request):
     return render(request, 'families/summary.html', context)
 
 
+@login_required
+def spousal_support_view(request):
+    """Gestione del mantenimento al coniuge (livello Famiglia)"""
+    family = get_family_of_user(request.user, request=request)
+    if not family:
+        return redirect("families:setup")
 
+    if request.method == "POST":
+        form = SpouseSupportForm(request.POST)
+        if form.is_valid():
+            # 1. Disattiva eventuali mantenimenti coniuge precedenti
+            ChildSupport.objects.filter(
+                family=family,
+                support_type='spouse',
+                is_active=True
+            ).update(is_active=False)
+
+            # 2. Crea il nuovo record
+            ChildSupport.objects.create(
+                family=family,
+                child=None,  # ✅ Nessuno figlio
+                support_type='spouse',  # ✅ Tipologia corretta
+                amount=form.cleaned_data['amount'],
+                start_date=form.cleaned_data['start_date'],
+                is_active=True,
+                version=1
+            )
+            messages.success(request, "✅ Mantenimento al coniuge aggiornato con successo.")
+            return redirect('families:family_dashboard')  # O il nome della tua url della dashboard
+    else:
+        # Pre-compila con l'ultimo importo attivo
+        current = ChildSupport.objects.filter(
+            family=family,
+            support_type='spouse',
+            is_active=True
+        ).order_by('-start_date').first()
+
+        initial_data = {'amount': current.amount, 'start_date': current.start_date} if current else {}
+        form = SpouseSupportForm(initial=initial_data)
+
+        # ✅ QUI DEVE ESSERE SCRITTO ESATTAMENTE COSÌ:
+    return render(request, "families/spousal_support.html", {
+        "form": form,
+        "family": family,
+        "current_support": current
+    })
 
 
 
@@ -690,8 +803,8 @@ def accept_invite_view(request, token):
 
             # Redirect in base al ruolo generico
             if request.user.profile.role in ['lawyer', 'mediator', 'consultant']:
-                return redirect('families:professional_dashboard')
-            return redirect('families:family_dashboard')
+                return redirect('lawyer_home')
+            return redirect('home')
         except Exception as e:
             messages.error(request, f"⚠️ Errore nell'accettazione: {e}")
             return redirect('home')
@@ -771,6 +884,9 @@ def dashboard_view(request):
     balance = calculate_family_balance(family)
     children = family.children.filter(is_active=True)
     total_expenses = sum(e.amount for e in expenses)
+    current_spousal_support = ChildSupport.objects.filter(
+        family=family, support_type='spouse', is_active=True
+    ).order_by('-start_date').first()
 
     context = {
         "family": family,
@@ -781,6 +897,7 @@ def dashboard_view(request):
             family=family, user=user
         ).select_related('user').first(),
         # ... resto del tuo context ...
+        "current_spousal_support" : current_spousal_support,
         "children": children,
         "expenses": expenses,
         "expenses_count": family.expenses.count(),
@@ -795,6 +912,76 @@ def dashboard_view(request):
 
     return render(request, "families/family_dashboard.html", context)
 
+
+@login_required
+def support_agreement_view(request):
+    """Gestione dell'accordo di mantenimento (solo per genitori)"""
+    family = get_family_of_user(request.user, request=request)
+    if not family:
+        return redirect('families:setup')
+
+    # 🔒 Sicurezza: Solo i genitori possono modificare
+    membership = FamilyMember.objects.filter(family=family, user=request.user).first()
+    if membership and membership.role in ['lawyer_a', 'lawyer_b', 'mediator', 'consultant']:
+        messages.error(request, "⚠️ Solo i genitori possono modificare gli accordi di mantenimento.")
+        return redirect('families:family_dashboard')
+
+    # Recupera l'accordo attivo per pre-compilare il form
+    current_support = ChildSupport.objects.filter(
+        family=family,
+        support_type='child',
+        is_active=True
+    ).order_by('-start_date').first()
+
+    if request.method == "POST":
+        form = ChildSupportForm(request.POST)
+        if form.is_valid():
+            # 1. Disattiva i precedenti accordi di mantenimento figli
+            ChildSupport.objects.filter(
+                family=family,
+                support_type='child',
+                is_active=True
+            ).update(is_active=False)
+
+            # 2. Crea il nuovo record MANUALMENTE (poiché è un forms.Form)
+            ChildSupport.objects.create(
+                family=family,
+                support_type='child',
+                amount=form.cleaned_data['amount'],
+                start_date=form.cleaned_data['start_date'],
+                # ✅ Aggiungi questi solo se li hai inseriti nel tuo forms.Form
+                payer_role=form.cleaned_data.get('payer_role', 'parent_a'),
+                split_pct_parent_a=form.cleaned_data.get('split_pct_parent_a', 50.0),
+                is_active=True,
+                version=1
+            )
+
+            messages.success(request, "✅ Accordo di mantenimento aggiornato con successo!")
+            return redirect('families:setup')  # Torna al setup
+    else:
+        # Pre-compilazione del form se esiste un accordo attivo
+        initial_data = {}
+        if current_support:
+            initial_data = {
+                'amount': current_support.amount,
+                'start_date': current_support.start_date,
+            }
+            # Aggiungi questi solo se il tuo form li include
+            if hasattr(current_support, 'payer_role'):
+                initial_data['payer_role'] = current_support.payer_role
+            if hasattr(current_support, 'split_pct_parent_a'):
+                initial_data['split_pct_parent_a'] = current_support.split_pct_parent_a
+
+        form = ChildSupportForm(initial=initial_data)
+
+    context = {
+        'form': form,
+        'family': family,
+        'current_support': current_support
+    }
+
+    # ✅ Assicurati che il percorso del template sia corretto
+    return render(request, 'families/support_agreement_form.html', context)
 
 @login_required
 def create_support_agreement_view(request):
@@ -1016,7 +1203,7 @@ def lawyer_dashboard_view(request):
     }
     return render(request, "families/professional_dashboard.html", context) # 'families/lawyer/lawyer_dashboard.html', context)
 
-
+from families.services.dashboard_service import get_professional_cross_summary
 @login_required
 def professional_dashboard(request):
     """Dashboard per Avvocati, Mediatori e Consulenti con gestione multi-famiglia"""
@@ -1025,6 +1212,7 @@ def professional_dashboard(request):
     profile = getattr(user, 'userprofile', None) or getattr(user, 'profile', None)
     if not profile:
         return redirect('families:setup')
+
 
     role_raw = profile.role
     role_str = str(role_raw).strip().lower() if role_raw else ''
@@ -1098,9 +1286,26 @@ def professional_dashboard(request):
             'children_count': children_count,
             'children_names': children_names,
         })
+    # ✅ NUOVO: Recupera riepilogo trasversale raggruppato e widget specifici
+    from families.services.dashboard_service import (
+        get_professional_cross_summary,
+        get_mediator_active_agreements,
+        get_consultant_active_assignments
+    )
+    cross_summary = get_professional_cross_summary(user)
+    # Dati specifici per ruolo
+    mediator_agreements = []
+    consultant_assignments = []
 
+    if role_base == 'mediator':
+        mediator_agreements = get_mediator_active_agreements(user)
+    elif role_base == 'consultant':
+        consultant_assignments = get_consultant_active_assignments(user)
 
     context = {
+        'cross_summary': cross_summary,
+        'mediator_agreements': mediator_agreements,  # ✅ Solo per mediatori
+        'consultant_assignments': consultant_assignments,  # ✅ Solo per consulenti
         'families_data': families_data,
         'active_family': active_family,
         'active_family_membership': active_family_membership,
@@ -1119,7 +1324,40 @@ def professional_dashboard(request):
     return render(request, 'families/professional_dashboard.html', context)
 
 
-# families/views.py
+@login_required
+def professional_pending_events_view(request):
+    """
+    Pagina dedicata per professionisti: mostra tutti gli eventi, documenti
+    e accordi in sospeso, raggruppati per famiglia.
+    """
+    user = request.user
+    profile = getattr(user, 'profile', None)
+
+    if not profile:
+        messages.error(request, "⚠️ Accesso riservato ai professionisti.")
+        return redirect('families:professional_dashboard')
+
+    role_raw = profile.role
+    role_str = str(role_raw).strip().lower() if role_raw else ''
+    role_base = role_str.replace('_a', '').replace('_b', '')
+
+    # Ora il controllo funziona per 'lawyer', 'mediator', 'consultant'
+    if role_base not in ['lawyer', 'mediator', 'consultant']:
+        messages.error(request, "⚠️ Accesso riservato ai professionisti.")
+        return redirect('families:family_dashboard')
+
+    from families.services.dashboard_service import get_professional_cross_summary
+
+    # Recupera i dati raggruppati (ora include anche il family_id)
+    cross_summary = get_professional_cross_summary(user, days_ahead=60)
+
+    context = {
+        'cross_summary': cross_summary,
+        'total_families_with_activity': len(cross_summary),
+        'total_items': sum(len(items) for items in cross_summary.values())
+    }
+
+    return render(request, 'families/professional_pending_events.html', context)
 
 
 @login_required

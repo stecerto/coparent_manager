@@ -1,5 +1,14 @@
 # expenses/views.py
-# expenses/views.py
+from decimal import Decimal
+from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect
+from django.contrib import messages
+from django.db.models import Sum, Q
+from families.utils import get_family_of_user
+from core.plans import PLAN_LEVELS
+from children.models import ChildProfile
+from .models import Expense
+
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -16,6 +25,7 @@ from documents.models import Document
 from families.utils import get_family_of_user
 from families.models import FamilyMember
 from expenses.forms import ExpenseForm
+from notifications.services import create_notification
 from .models import Expense, ExpenseCategory
 from expenses.pdf_utils import generate_expense_report_pdf
 from expenses.services.expences_service import create_expense, update_expense, approve_expense
@@ -49,6 +59,18 @@ def expenses_dashboard(request):
         total=Sum("amount")
     ).order_by("expense_type__display_name")
 
+    # Conta spese pendenti (non ancora approvate/pagate)
+    pending_count = Expense.objects.filter(
+        family=family,
+        is_active=True
+    ).filter(
+        # Spesa in stato "pending" (non ancora processata)
+        Q(status='pending') |
+        # OPPURE spesa "accepted" ma manca almeno un'approvazione
+        Q(status='accepted', approved_by_parent_a__isnull=True) |
+        Q(status='accepted', approved_by_parent_b__isnull=True)
+    ).count()
+
     # ✅ CONTESTO PIANO (obbligatorio per sbloccare il calendario)
     profile = getattr(request.user, 'profile', None)
     plan = getattr(profile, 'plan', 'starter') if profile else 'starter'
@@ -59,6 +81,7 @@ def expenses_dashboard(request):
         "total_expenses": total_expenses,
         "parent_a_total": parent_a_total,
         "parent_b_total": parent_b_total,
+        'pending_expenses_count': pending_count,
         "category_summary": category_summary,
         "page_title": page_title,
         "is_pro_or_higher": is_pro_or_higher,  # ✅ PASSA SEMPRE QUESTO
@@ -116,6 +139,10 @@ def add_expense(request):
         messages.error(request, "⚠️ Solo i genitori possono inserire spese")
         return redirect("expenses:expenses_list")
 
+    # ✅ NUOVO: Leggi il parametro ?next= per il redirect alla chat
+    # Lo cerchiamo sia in GET (quando l'utente arriva dalla chat) che in POST (per preservarlo nel form)
+    next_url = request.GET.get('next') or request.POST.get('next')
+
     if request.method == "POST":
         form = ExpenseForm(request.POST, request.FILES, user=request.user)
         if form.is_valid():
@@ -134,6 +161,33 @@ def add_expense(request):
 
             approve_expense(expense, request.user, membership.role)
 
+            import logging
+            logger = logging.getLogger(__name__)
+
+            # Determina il ruolo dell'altro genitore
+            other_parent_role = RoleChoices.PARENT_B if str(membership.role).lower() in ['parent_a',
+                                                                                         'parent'] else RoleChoices.PARENT_A
+
+            # Cerca l'altro genitore nella famiglia
+            other_parent = FamilyMember.objects.filter(family=family, role=other_parent_role).select_related(
+                'user').first()
+
+            if other_parent and other_parent.user != request.user:
+                try:
+                    category_name = expense.expense_type.display_name if expense.expense_type else "Spesa"
+                    create_notification(
+                        user=other_parent.user,
+                        notification_type="expense_pending",
+                        title=f"🆕 Nuova spesa da approvare",
+                        message=f"{request.user.first_name or request.user.email} ha inserito una nuova spesa di €{expense.amount} per '{category_name}'.",
+                        target_url=f"/expenses/list/",
+                        target_model="Expense",
+                        target_id=expense.id,
+                        metadata={"amount": str(expense.amount), "category": category_name}
+                    )
+                except Exception as e:
+                    logger.error(f"Errore invio notifica spesa a {other_parent.user.email}: {e}")
+
             for f in request.FILES.getlist('payment_proof'):
                 Document.objects.create(
                     family=family, owner=request.user, uploaded_by=request.user,
@@ -143,11 +197,24 @@ def add_expense(request):
                 )
 
             messages.success(request, "✅ Spesa inserita (v1). In attesa dell'altro genitore.")
+
+            # ✅ NUOVO: Redirect intelligente verso la chat (se presente)
+            if next_url:
+                # Costruisci l'URL di ritorno aggiungendo ?new_expense_id=...
+                separator = '&' if '?' in next_url else '?'
+                return redirect(f"{next_url}{separator}new_expense_id={expense.id}")
+
+            # Fallback: redirect normale alla dashboard spese
             return redirect("expenses:expenses_dashboard")
     else:
         form = ExpenseForm(user=request.user)
 
-    return render(request, "expenses/expenses_form.html", {"form": form, "title": "Aggiungi Spesa"})
+    # ✅ NUOVO: Passa next_url al template per il campo hidden
+    return render(request, "expenses/expenses_form.html", {
+        "form": form,
+        "title": "Aggiungi Spesa",
+        "next_url": next_url or ''
+    })
 
 
 @login_required
@@ -250,8 +317,8 @@ def update_expense_status(request):
             message=f"La tua spesa di €{expense.amount} è stata {new_status} da {request.user.first_name or request.user.email}.",
             target_url=f"/expenses/list/",
             target_model="Expense",
-            target_id=expense.id,
-            send_email=True
+            target_id=expense.id
+            #send_email=True
         )
 
         return JsonResponse({"success": True, "new_status": new_status})
@@ -454,16 +521,6 @@ def expense_day_detail(request, date):
     return render(request, "expenses/day_detail.html", {"expenses": expenses, "date": date})
 
 
-# expenses/views.py
-from decimal import Decimal
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect
-from django.contrib import messages
-from django.db.models import Sum, Q
-from families.utils import get_family_of_user
-from core.plans import PLAN_LEVELS
-from children.models import ChildProfile
-from .models import Expense
 
 
 @login_required
@@ -481,14 +538,13 @@ def expenses_riepilogo_spese(request):
     plan = getattr(profile, 'plan', 'starter') if profile else 'starter'
     is_pro_or_higher = PLAN_LEVELS.get(plan, 1) >= 2
 
-    # 3️⃣ Query spese (sempre necessarie)
+    # 3️⃣ ✅ FIX: Query spese per CRONOLOGIA (TUTTI gli stati, non solo accepted)
     expenses_qs = Expense.objects.filter(
         family=family,
-        is_active=True,
-        status="accepted"
+        is_active=True
     ).select_related("expense_type", "created_by", "child").order_by("-expense_date")
 
-    # 4️⃣ Totali e lista per tabella
+    # 4️⃣ Totali e lista per tabella (tutte le spese)
     total_expenses = expenses_qs.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
     expenses_list = list(expenses_qs[:50])  # Limita a 50 per performance
 
@@ -498,8 +554,8 @@ def expenses_riepilogo_spese(request):
     parent_b_total = Decimal("0.00")
 
     if is_pro_or_higher:
-        # ✅ FILTRO CRUCIALE: solo spese "accepted" per grafici e calcoli
-        # Le spese pending/rejected restano visibili nella tabella, ma non influenzano le statistiche
+        # ✅ ✅ FIX CRUCIALE: Query SEPARATA per calcoli (solo accepted)
+        # Le spese pending/rejected NON influenzano le statistiche
         accepted_expenses = expenses_qs.filter(status="accepted")
 
         # 📊 Breakdown per categoria (solo accepted)
@@ -525,7 +581,7 @@ def expenses_riepilogo_spese(request):
     children = ChildProfile.objects.filter(family=family, is_active=True)
 
     for child in children:
-        # Spese condivise per questo figlio
+        # ✅ FIX: Calcola spese condivise su TUTTE le spese (non solo accepted)
         child_expenses = expenses_qs.filter(child=child).aggregate(
             total=Sum("amount")
         )["total"] or Decimal("0.00")
@@ -549,13 +605,13 @@ def expenses_riepilogo_spese(request):
             "split_b": split_b,
         }
 
-    # 7️⃣ Media spese (per KPI)
+    # 7️⃣ Media spese (per KPI) - calcolata su TUTTE le spese
     average_expense = total_expenses / len(expenses_list) if expenses_list else Decimal("0.00")
 
     # 8️⃣ Context finale
     context = {
         "family": family,
-        "expenses": expenses_list,  # ✅ Lista per tabella cronologia
+        "expenses": expenses_list,  # ✅ Ora contiene TUTTE le spese (pending, accepted, rejected, paid)
         "total_expenses": total_expenses,
         "average_expense": average_expense,  # ✅ Per KPI "Media per Spesa"
         "maintenance_info": maintenance_info,  # ✅ Per tabella mantenimento figli
@@ -574,6 +630,7 @@ def expenses_riepilogo_spese(request):
 # ========================================================================
 def filter_expenses_with_metadata(request, queryset, family):
     from .forms import ExpenseFilterForm
+
     form = ExpenseFilterForm(request.GET or None, family=family)
     data = {}
     title_parts = []
@@ -588,12 +645,14 @@ def filter_expenses_with_metadata(request, queryset, family):
         if data.get("status"):
             queryset = queryset.filter(status=data["status"])
             label = dict(Expense.STATUS_CHOICES).get(data["status"])
-            if label: title_parts.append(label)
+            if label:
+                title_parts.append(label)
 
         if data.get("expense_type"):
             queryset = queryset.filter(expense_type=data["expense_type"])
             label = data["expense_type"].display_name
-            if label: title_parts.insert(0, f"Spese filtrate per: {label.lower()}")
+            if label:
+                title_parts.insert(0, f"Spese filtrate per: {label.lower()}")
 
         if data.get("date_from"):
             queryset = queryset.filter(expense_date__gte=data["date_from"])

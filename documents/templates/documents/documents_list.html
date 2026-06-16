@@ -1,90 +1,123 @@
 {% extends "base.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
+
+{% block title %}📁 Gestione Documenti - CoParent Manager{% endblock %}
+
 {% block content %}
-
-
-<div class="card p-3 mb-2 shadow custom-card text-center">
-
-        {% if role == "lawyer_a" or role == "lawyer_b" %}
-            <h2>Documenti del mio assistito {{ family.name|default:"Famiglia" }}</h2>
-        {% else %}
-            <h2>I miei documenti privati {{ family.name|default:"Famiglia" }}</h2>
-        {% endif %}
-</div>
-
-{% if is_pro_or_higher %}
 <div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <h2 class="fw-bold mb-0">📁 Gestione Documentale</h2>
+
+    <!-- 📌 HEADER CONTESTUALE -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div>
+            <h1 class="h3 fw-bold mb-0">
+                <i class="bi bi-folder2-open text-primary me-2"></i>Gestione Documentale
+            </h1>
+            <p class="text-muted mb-0 small">
+                {% if role == "lawyer_a" or role == "lawyer_b" %}
+                    Documenti dell'assistito: <strong>{{ family.name|default:"Famiglia" }}</strong>
+                {% else %}
+                    Documenti privati e condivisi per la famiglia: <strong>{{ family.name|default:"Famiglia" }}</strong>
+                {% endif %}
+            </p>
+        </div>
         <div class="d-flex gap-2">
-            <a href="{% url 'documents:documents_list' %}" class="btn btn-outline-secondary">← Torna alla lista</a>
-            <a href="{% url 'documents:documents_upload' %}" class="btn btn-success">➕ Carica Privato</a>
-            <a href="{% url 'documents:documents_upload_shared' %}" class="btn btn-primary">🔗 Carica Condiviso</a>
+            <a href="{% url 'documents:documents_upload' %}" class="btn btn-outline-success btn-sm">
+                ➕ Carica Privato
+            </a>
+            <a href="{% url 'documents:documents_upload_shared' %}" class="btn btn-outline-primary btn-sm">
+                🔗 Carica Condiviso
+            </a>
         </div>
     </div>
 
-    <!-- Checklist Documenti -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-header fw-bold">📋 Checklist Documenti {{ checklist.current_year }}</div>
-        <div class="card-body">
+    {% if is_pro_or_higher %}
+
+    <!-- 📋 CHECKLIST DOCUMENTALE -->
+    <div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
+        <div class="card-header bg-white border-bottom border-start border-1 border-info d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+            <span class="fs-4 text-info me-2">📋</span>
+            <h5 class="mb-0 fw-bold">Checklist Documentale {{ checklist.current_year }}</h5>
+        </div>
+        <div class="card-body p-4">
             <div class="row g-3">
                 <div class="col-md-6">
-                    <h6>💰 Buste paga</h6>
-                    <p>Caricate: <strong>{{ checklist.payslips_uploaded }}/3</strong></p>
-                    {% if checklist.payslips_missing > 0 %}
-                        <span class="badge bg-danger">Mancano {{ checklist.payslips_missing }}</span>
-                    {% else %}
-                        <span class="badge bg-success">✓ Complete</span>
-                    {% endif %}
+                    <div class="p-3 bg-light rounded-3 border-start border-1 border-warning h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold mb-0">💰 Buste paga</h6>
+                            {% if checklist.payslips_missing > 0 %}
+                                <span class="badge bg-danger">Mancano {{ checklist.payslips_missing }}</span>
+                            {% else %}
+                                <span class="badge bg-success">✓ Complete</span>
+                            {% endif %}
+                        </div>
+                        <small class="text-muted">Caricate: <strong>{{ checklist.payslips_uploaded }}/3</strong></small>
+                    </div>
                 </div>
                 <div class="col-md-6">
-                    <h6>📑 Dichiarazione redditi {{ checklist.required_tax_year }}</h6>
-                    {% if checklist.tax_uploaded %}
-                        <span class="badge bg-success">✓ Presente</span>
-                    {% else %}
-                        <span class="badge bg-warning text-dark">⚠️ Mancante</span>
-                    {% endif %}
+                    <div class="p-3 bg-light rounded-3 border-start border-1 border-success h-100">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <h6 class="fw-bold mb-0">📑 Dichiarazione redditi {{ checklist.required_tax_year }}</h6>
+                            {% if checklist.tax_uploaded %}
+                                <span class="badge bg-success">✓ Presente</span>
+                            {% else %}
+                                <span class="badge bg-warning text-dark">⚠️ Mancante</span>
+                            {% endif %}
+                        </div>
+                        <small class="text-muted">Stato: {% if checklist.tax_uploaded %}Caricato{% else %}In attesa{% endif %}</small>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Documenti Privati -->
-    <h4 class="mt-4 mb-3 fw-bold">🔒 Documenti Privati</h4>
-    <ul class="list-group mb-4 shadow-sm">
-        {% for doc in private_docs %}
-            <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <span>
-                    {{ doc.title }}
-                    <span class="badge bg-secondary ms-2">v{{ doc.version }}</span>
-                    <span class="badge bg-info ms-1">{{ doc.get_status_display }}</span>
-                </span>
-                <div class="d-flex gap-1">
-                    {% if not doc.is_signed_by_user %}
-                        <a href="{% url 'documents:sign' doc.id %}" class="btn btn-sm btn-dark">✍️ Firma</a>
-                    {% else %}
-                        <span class="text-success small me-2 align-self-center">✔ Firmato</span>
-                    {% endif %}
-                    {% if doc.file %}
-                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#previewPrivateModal{{ doc.id }}">👁️ Preview</button>
-                    {% endif %}
-                    <a href="{% url 'documents:documents_download' doc.id %}" class="btn btn-sm btn-success">📥</a>
-                    <a href="{% url 'documents:documents_versions' doc.id %}" class="btn btn-sm btn-warning">📜</a>
-                    <a href="{% url 'documents:documents_detail' doc.id %}" class="btn btn-sm btn-outline-secondary">ℹ️</a>
+    <!-- 🔒 DOCUMENTI PRIVATI -->
+    <div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
+        <div class="card-header bg-white border-bottom border-start border-1 border-secondary d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+            <span class="fs-4 text-secondary me-2">🔒</span>
+            <h5 class="mb-0 fw-bold">Documenti Privati</h5>
+            <span class="badge bg-secondary ms-auto">{{ private_docs|length }} file</span>
+        </div>
+        <div class="list-group list-group-flush">
+            {% for doc in private_docs %}
+            <div class="list-group-item p-3 border-bottom">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="fs-4">📄</span>
+                        <div>
+                            <h6 class="mb-0 fw-bold">{{ doc.title }}</h6>
+                            <div class="d-flex gap-2 mt-1">
+                                <span class="badge bg-light text-dark border">v{{ doc.version }}</span>
+                                <span class="badge bg-info">{{ doc.get_status_display }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        {% if not doc.is_signed_by_user %}
+                            <a href="{% url 'documents:sign' doc.id %}" class="btn btn-sm btn-dark" title="Firma digitale">✍️</a>
+                        {% else %}
+                            <span class="text-success small align-self-center" title="Già firmato">✔</span>
+                        {% endif %}
+                        {% if doc.file %}
+                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#previewPrivateModal{{ doc.id }}" title="Anteprima">👁️</button>
+                        {% endif %}
+                        <a href="{% url 'documents:documents_download' doc.id %}" class="btn btn-sm btn-outline-success" title="Scarica">📥</a>
+                        <a href="{% url 'documents:documents_versions' doc.id %}" class="btn btn-sm btn-outline-warning" title="Cronologia versioni">📜</a>
+                        <a href="{% url 'documents:documents_detail' doc.id %}" class="btn btn-sm btn-outline-secondary" title="Dettagli">ℹ️</a>
+                    </div>
                 </div>
-            </li>
+            </div>
             <!-- Modale Preview Privato -->
             <div class="modal fade" id="previewPrivateModal{{ doc.id }}" tabindex="-1">
                 <div class="modal-dialog modal-xl">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title">{{ doc.title }} - v{{ doc.version }}</h5>
+                            <h5 class="modal-title">{{ doc.title }} <span class="badge bg-secondary ms-2">v{{ doc.version }}</span></h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body p-0">
                             {% if doc.file %}
-                                <iframe src="{{ doc.file.url }}" width="100%" height="700px" style="border:none;"></iframe>
+                                <iframe src="{% url 'documents:document_preview' doc.id %}" width="100%" style="height: 75vh; border:none;"></iframe>
                             {% else %}
                                 <div class="p-5 text-center text-muted">⚠️ File non disponibile</div>
                             {% endif %}
@@ -92,46 +125,62 @@
                     </div>
                 </div>
             </div>
-        {% empty %}
-            <li class="list-group-item text-muted text-center py-4">Nessun documento privato caricato</li>
-        {% endfor %}
-    </ul>
+            {% empty %}
+            <div class="p-4 text-center text-muted">
+                <span class="fs-1 d-block mb-2">📭</span>
+                Nessun documento privato caricato
+            </div>
+            {% endfor %}
+        </div>
+    </div>
 
-    <!-- Documenti Condivisi -->
-    <h4 class="mb-3 fw-bold">👨‍👩‍👧 Documenti Condivisi</h4>
-    <ul class="list-group shadow-sm">
-        {% for doc in shared_docs %}
-            <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
-                <span>
-                    {{ doc.title }}
-                    <span class="badge bg-secondary ms-2">v{{ doc.version }}</span>
-                    <span class="badge bg-info ms-1">{{ doc.get_status_display }}</span>
-                </span>
-                <div class="d-flex gap-1">
-                    {% if not doc.is_signed_by_user %}
-                        <a href="{% url 'documents:sign' doc.id %}" class="btn btn-sm btn-dark">✍️ Firma</a>
-                    {% else %}
-                        <span class="text-success small me-2 align-self-center">✔ Firmato</span>
-                    {% endif %}
-                    {% if doc.file %}
-                        <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#previewSharedModal{{ doc.id }}">👁️ Preview</button>
-                    {% endif %}
-                    <a href="{% url 'documents:documents_download' doc.id %}" class="btn btn-sm btn-success">📥</a>
-                    <a href="{% url 'documents:documents_versions' doc.id %}" class="btn btn-sm btn-warning">📜</a>
-                    <a href="{% url 'documents:documents_detail' doc.id %}" class="btn btn-sm btn-outline-secondary">ℹ️</a>
+    <!-- 👨‍👩‍👧 DOCUMENTI CONDIVISI -->
+    <div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
+        <div class="card-header bg-white border-bottom border-start border-1 border-primary d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+            <span class="fs-4 text-primary me-2">👨‍👩‍👧</span>
+            <h5 class="mb-0 fw-bold">Documenti Condivisi</h5>
+            <span class="badge bg-primary ms-auto">{{ shared_docs|length }} file</span>
+        </div>
+        <div class="list-group list-group-flush">
+            {% for doc in shared_docs %}
+            <div class="list-group-item p-3 border-bottom">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-3">
+                        <span class="fs-4">🔗</span>
+                        <div>
+                            <h6 class="mb-0 fw-bold">{{ doc.title }}</h6>
+                            <div class="d-flex gap-2 mt-1">
+                                <span class="badge bg-light text-dark border">v{{ doc.version }}</span>
+                                <span class="badge bg-info">{{ doc.get_status_display }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        {% if not doc.is_signed_by_user %}
+                            <a href="{% url 'documents:sign' doc.id %}" class="btn btn-sm btn-dark" title="Firma digitale">✍️</a>
+                        {% else %}
+                            <span class="text-success small align-self-center" title="Già firmato">✔</span>
+                        {% endif %}
+                        {% if doc.file %}
+                            <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#previewSharedModal{{ doc.id }}" title="Anteprima">👁️</button>
+                        {% endif %}
+                        <a href="{% url 'documents:documents_download' doc.id %}" class="btn btn-sm btn-outline-success" title="Scarica">📥</a>
+                        <a href="{% url 'documents:documents_versions' doc.id %}" class="btn btn-sm btn-outline-warning" title="Cronologia versioni">📜</a>
+                        <a href="{% url 'documents:documents_detail' doc.id %}" class="btn btn-sm btn-outline-secondary" title="Dettagli">ℹ️</a>
+                    </div>
                 </div>
-            </li>
+            </div>
             <!-- Modale Preview Condiviso -->
             <div class="modal fade" id="previewSharedModal{{ doc.id }}" tabindex="-1">
                 <div class="modal-dialog modal-xl">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h5 class="modal-title">{{ doc.title }} - v{{ doc.version }}</h5>
+                            <h5 class="modal-title">{{ doc.title }} <span class="badge bg-secondary ms-2">v{{ doc.version }}</span></h5>
                             <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                         </div>
                         <div class="modal-body p-0">
                             {% if doc.file %}
-                                <iframe src="{{ doc.file.url }}" width="100%" height="700px" style="border:none;"></iframe>
+                                <iframe src="{% url 'documents:document_preview' doc.id %}" width="100%" style="height: 75vh; border:none;"></iframe>
                             {% else %}
                                 <div class="p-5 text-center text-muted">⚠️ File non disponibile</div>
                             {% endif %}
@@ -139,19 +188,29 @@
                     </div>
                 </div>
             </div>
-        {% empty %}
-            <li class="list-group-item text-muted text-center py-4">Nessun documento condiviso</li>
-        {% endfor %}
-    </ul>
-</div>
-{% else %}
-<div class="container py-5 text-center">
-    <div class="card shadow-sm border-0 p-5 mx-auto" style="max-width:600px;">
-        <span class="fs-1">🔒</span>
-        <h3 class="fw-bold mt-3">Gestione Documentale Avanzata</h3>
-        <p class="text-muted">Checklist fiscali, versioning, firme digitali e fascicolo familiare sono riservati ai piani <strong>Pro</strong> ed <strong>Enterprise</strong>.</p>
-        <a href="{% url 'pricing' %}" class="btn btn-primary btn-lg mt-2">Confronta i piani →</a>
+            {% empty %}
+            <div class="p-4 text-center text-muted">
+                <span class="fs-1 d-block mb-2">🔗</span>
+                Nessun documento condiviso
+            </div>
+            {% endfor %}
+        </div>
     </div>
+
+    {% else %}
+
+    <!-- 🔒 SEZIONE PIANO FREE/STARTER -->
+    <div class="card shadow-sm border-0 p-5 mx-auto text-center" style="max-width: 600px; border-radius: 12px;">
+        <span class="fs-1 text-muted mb-3 d-block">🔒</span>
+        <h3 class="fw-bold mb-2">Gestione Documentale Avanzata</h3>
+        <p class="text-muted mb-4">
+            Checklist fiscali, versioning automatico, firme digitali e fascicolo familiare completo sono riservati ai piani <strong>Pro</strong> ed <strong>Enterprise</strong>.
+        </p>
+        <a href="{% url 'pricing' %}" class="btn btn-primary btn-lg px-4">
+            Confronta i piani →
+        </a>
+    </div>
+
+    {% endif %}
 </div>
-{% endif %}
 {% endblock %}

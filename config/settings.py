@@ -11,6 +11,8 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 import os
 from pathlib import Path
+
+from celery.schedules import crontab
 from decouple import config
 from dotenv import load_dotenv
 load_dotenv()
@@ -68,6 +70,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'core.middleware.SubscriptionMiddleware',
 ]
 
 ROOT_URLCONF = 'config.urls'
@@ -88,6 +91,7 @@ TEMPLATES = [
                 'families.context_processors.family_context',
                 'core.context_processors.breadcrumbs',
                 'core.context_processors.subscription_context',
+                'core.context_processors.dashboard_context',
             ],
         },
     },
@@ -234,6 +238,13 @@ else:
                 'level': 'DEBUG',
                 'propagate': False,
             },
+            'loggers': {
+                'families': {  # Cattura tutti i log che iniziano con 'families.'
+                    'handlers': ['file'],
+                    'level': 'INFO',
+                    'propagate': True,
+                },
+            },
         },
     }
 # Internationalization
@@ -310,29 +321,22 @@ CELERY_TASK_ALWAYS_EAGER = True
 CELERY_BEAT_SCHEDULE = {
     'send-event-reminders-every-5-minutes': {
         'task': 'calendar_app.tasks.send_event_reminder',
-        'schedule': 300.0,  # ogni 5 minuti
-        'options': {'expires': 240},  # evita accavallamenti se il worker è lento
+        'schedule': crontab(minute='*/20'),  # ogni 20 minuti
+        'options': {'expires': 1200},  # evita accavallamenti se il worker è lento
+    },
+    'check-document-expirations-daily': {
+        'task': 'notifications.tasks.check_document_expirations',
+        'schedule': crontab(hour=8, minute=0), # Ogni giorno alle 08:00
+    },
+    'check-pending-agreements-daily': {
+        'task': 'notifications.tasks.check_pending_agreements',
+        'schedule': crontab(hour=9, minute=0), # Ogni giorno alle 09:00
+    },
+    'check-imminent-events-hourly': {
+        'task': 'notifications.tasks.check_imminent_events',
+        'schedule': crontab(minute=0), # Ogni ora, al minuto 0
     },
 }
 PRIVACY_VERSION = "1.0"  # Incrementa a "1.1", "2.0" quando aggiorni la policy
 ENCRYPTION_KEY=os.environ.get("ENCRYPTION_KEY")
 
-# settings.py (esempio base di logging per produzione)
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'file': {
-            'level': 'INFO',
-            'class': 'logging.FileHandler',
-            'filename': 'debug.log', # Assicurati che questa cartella sia scrivibile
-        },
-    },
-    'loggers': {
-        'families': {  # Cattura tutti i log che iniziano con 'families.'
-            'handlers': ['file'],
-            'level': 'INFO',
-            'propagate': True,
-        },
-    },
-}

@@ -321,3 +321,15 @@ class ChildSupportAgreementForm(forms.ModelForm):
         if value is not None and (value < 0 or value > 100):
             raise forms.ValidationError("La percentuale deve essere tra 0 e 100.")
         return value
+
+class SpouseSupportForm(forms.Form):
+    """Form dedicato per il mantenimento al coniuge (senza figli)"""
+    amount = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        label="Importo mensile (€)"
+    )
+    start_date = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date"}),
+        label="Data di inizio"
+    )

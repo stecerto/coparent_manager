@@ -1,0 +1,20 @@
+{% for chat in available_chats %}
+    <a href="{{ chat.url }}"
+       class="sidebar-chat-item d-flex align-items-start p-2 p-md-3 text-decoration-none {% if chat.is_active %}active-chat{% endif %} {% if chat.is_private %}chat-private-item{% endif %}"
+        <!-- data-bs-dismiss="offcanvas"> -->
+        onclick="closeSidebarAndNavigate(this)">
+        {% if chat.is_private %}
+            <span class="chat-lock-icon">🔒</span>
+        {% else %}
+            <span class="fs-4 me-2 me-md-3 mt-1">{{ chat.icon }}</span>
+        {% endif %}
+
+        <div class="flex-grow-1 text-wrap">
+            <h6 class="mb-0 small fw-bold" style="line-height: 1.3; word-wrap: break-word;">
+                {{ chat.name }}
+            </h6>
+        </div>
+    </a>
+{% empty %}
+    <div class="p-3 text-muted small text-center">Nessuna chat disponibile.</div>
+{% endfor %}

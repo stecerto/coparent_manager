@@ -17,4 +17,5 @@ urlpatterns = [
     path("dossier/", views.family_dossier_view, name="dossier"),
     path("storage/", views.storage_usage_view, name="storage_usage"),
     path("dossier/pdf/", views.dossier_export_pdf, name="dossier_pdf"),
+    path('document/<int:doc_id>/review-sentence/', views.sentence_data_review_view, name='sentence_data_review'),
 ]

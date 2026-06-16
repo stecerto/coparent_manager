@@ -2,162 +2,275 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block title %}Family Bilance Dashboard Spese{% endblock title %}
+{% block title %}📊 Dashboard Spese - CoParent Manager{% endblock title %}
 
-{%block content %}
+{% block content %}
+<div class="container py-4">
 
-
-<div class="card p-3 mb-2 shadow custom-card text-center">
-    <h2>📊 Dashboard Spese</h2>
-</div>
-
-
-<div class="col-md-12">
-
-
-    <div class="card p-3 mb-2 shadow custom-card">
-        {% csrf_token %}
-        <!--{{ form|crispy }}
-         Totale -->
-        <p><strong>Totale spese:</strong> {{ total_expenses }} €</p>
-
-        <!-- Bottone aggiunta -->
+    <!-- Header Dashboard -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h2 class="fw-bold mb-1">📊 Dashboard Spese</h2>
+            <p class="text-muted mb-0">Gestione e monitoraggio delle spese familiari</p>
+        </div>
         <div class="d-flex gap-2">
-            <a href="{% url 'expenses:add_expense' %}" class="btn btn-success btn-style mb-2">
-                ➕ Aggiungi Spesa
+            <a href="{% url 'expenses:expenses_list' %}" class="btn btn-outline-secondary">
+                📄 Lista Completa
             </a>
-            <a href="{% url 'expenses:expenses_list' %}" class="btn btn-success btn-style mb-2">
-                📄 Vedi tutte le spese
+            <a href="{% url 'expenses:add_expense' %}" class="btn btn-success">
+                ➕ Nuova Spesa
             </a>
-            <a href="{% url 'expenses:expenses_riepilogo_spese' %}" class="btn btn-success btn-style mb-2">
-                Riepilogo Spese
-            </a>
-            <a href="{% url 'expenses:download_expense_pdf' %}" class="btn btn-success btn-style mb-2">
-            📄 Scarica Report PDF
-            </a>
+        </div>
+    </div>
+
+    <!-- Card Riepilogo Rapido -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-3">
+            <div class="card shadow custom-card h-100 border-start border-4 border-success">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted small mb-1">Totale Spese</p>
+                            <h3 class="fw-bold mb-0 text-success">€ {{ total_expenses|floatformat:2 }}</h3>
+                        </div>
+                        <span class="fs-1 text-success opacity-25">💰</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow custom-card h-100 border-start border-4 border-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted small mb-1">Quote Genitore A</p>
+                            <h3 class="fw-bold mb-0 text-primary">€ {{ parent_a_total|floatformat:2 }}</h3>
+                        </div>
+                        <span class="fs-1 text-primary opacity-25">👤</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow custom-card h-100 border-start border-4 border-danger">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted small mb-1">Quote Genitore B</p>
+                            <h3 class="fw-bold mb-0 text-danger">€ {{ parent_b_total|floatformat:2 }}</h3>
+                        </div>
+                        <span class="fs-1 text-danger opacity-25">👤</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-3">
+            <div class="card shadow custom-card h-100 border-start border-4 border-warning">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted small mb-1">Spese Pendenti</p>
+                            <h3 class="fw-bold mb-0 text-warning">{{ pending_expenses_count|default:"0" }}</h3>
+                        </div>
+                        <span class="fs-1 text-warning opacity-25">⏳</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Azioni Rapide -->
+    <div class="card shadow custom-card h-100 border-start border-4 border-primary mb-4">
+        <div class="card-header bg-white fw-bold d-flex align-items-center gap-2">
+            <span class="fs-4">⚡</span>
+            <span>Azioni Rapide</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <a href="{% url 'expenses:add_expense' %}" class="btn btn-success w-100 py-3">
+                        <div class="fs-3 mb-2">➕</div>
+                        <div class="fw-bold">Aggiungi Spesa</div>
+                        <small class="d-block text-white-50">Registra nuova spesa</small>
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="{% url 'expenses:expenses_list' %}" class="btn btn-outline-primary w-100 py-3">
+                        <div class="fs-3 mb-2">📄</div>
+                        <div class="fw-bold">Lista Spese</div>
+                        <small class="d-block text-muted">Visualizza tutte</small>
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="{% url 'expenses:expenses_riepilogo_spese' %}" class="btn btn-outline-secondary w-100 py-3">
+                        <div class="fs-3 mb-2">📊</div>
+                        <div class="fw-bold">Riepilogo</div>
+                        <small class="d-block text-muted">Report dettagliato</small>
+                    </a>
+                </div>
+                <div class="col-md-3">
+                    <a href="{% url 'expenses:download_expense_pdf' %}" class="btn btn-outline-danger w-100 py-3">
+                        <div class="fs-3 mb-2">📥</div>
+                        <div class="fw-bold">Scarica PDF</div>
+                        <small class="d-block text-muted">Report completo</small>
+                    </a>
+                </div>
+            </div>
+
             {% if is_pro_or_higher %}
-                <a href="{% url 'expenses:expenses_analytics' %}" class="btn btn-outline-primary btn-sm">
-                    📊 Analisi Avanzata
+            <div class="mt-3 pt-3 border-top">
+                <a href="{% url 'expenses:expenses_analytics' %}" class="btn btn-primary w-100">
+                    📈 Analisi Avanzata (Pro)
                 </a>
+            </div>
             {% endif %}
-
         </div>
     </div>
 
-    <div class="card p-3 mb-2 shadow custom-card">
-        <div class="row justify-content-center">
-
-        <!-- CATEGORY -->
-        <!-- ✅ GRAFICI: Visibili SOLO per piano Pro+ -->
-        {% if is_pro_or_higher %}
-        <div class="row g-4 mb-4">
-            <!-- Grafico a Torta: Categorie -->
-            <div class="col-md-6">
-                <div class="card shadow-sm h-100">
-                    <div class="card-header bg-white fw-bold">📊 Spese per Categoria</div>
-                    <div class="card-body">
-                        <canvas id="categoryChart"></canvas>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Grafico a Barre: Quote Genitori -->
-            <div class="col-md-6">
-                <div class="card shadow-sm h-100">
-                    <div class="card-header bg-white fw-bold">⚖️ Ripartizione Quote</div>
-                    <div class="card-body">
-                        <canvas id="splitChart"></canvas>
-                    </div>
-                </div>
-            </div>
+    <!-- Grafici (Solo Pro+) -->
+    {% if is_pro_or_higher %}
+    <div class="card shadow custom-card h-100 border-start border-4 border-primary mb-4">
+        <div class="card-header bg-white fw-bold d-flex align-items-center gap-2">
+            <span class="fs-4">📊</span>
+            <span>Analisi Visiva</span>
+            <span class="badge bg-purple ms-auto" style="background-color: #6f42c1;">Pro</span>
         </div>
-
-    <!-- ✅ Script Chart.js: Eseguito SOLO se Pro+ -->
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-    // ✅ Controllo sicurezza: se non è Pro+, esci subito
-    {% if not is_pro_or_higher %}return;{% endif %}
-
-    // ... il tuo codice Chart.js esistente ...
-
-    // Esempio: Grafico Categorie
-    const ctxCat = document.getElementById('categoryChart');
-    if (ctxCat) {
-        new Chart(ctxCat, {
-            type: 'doughnut',
-            data: {
-                labels: [{% for c in category_summary %}"{{ c.expense_type__display_name }}",{% endfor %}],
-                datasets: [{
-                    data: [{% for c in category_summary %}{{ c.total|floatformat:2 }},{% endfor %}],
-                    backgroundColor: [{% for c in category_summary %}'{{ c.expense_type__color }}',{% endfor %}]
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-    }
-
-    // Esempio: Grafico Quote
-    const ctxSplit = document.getElementById('splitChart');
-    if (ctxSplit) {
-        new Chart(ctxSplit, {
-            type: 'bar',
-            data: {
-                labels: ['Genitore A', 'Genitore B'],
-                datasets: [{
-                    label: 'Totale Quote (€)',
-                    data: [{{ parent_a_total|floatformat:2 }}, {{ parent_b_total|floatformat:2 }}],
-                    backgroundColor: ['#0d6efd', '#dc3545']
-                }]
-            },
-            options: { responsive: true, maintainAspectRatio: false }
-        });
-    }
-});
-</script>
-        {% else %}
-            <!-- ✅ MESSAGGIO UPGRADE per utenti Starter -->
-            <div class="alert alert-info border-0 shadow-sm mb-4">
-                <div class="d-flex align-items-center gap-3">
-                    <span class="fs-4">📈</span>
-                    <div class="flex-grow-1">
-                        <h6 class="mb-1 fw-bold">Grafici e Analisi Avanzate</h6>
-                        <p class="mb-0 small text-muted">Passa al piano <strong>Pro</strong> per visualizzare report visivi, trend mensili e analisi comparative.</p>
+        <div class="card-body">
+            <div class="row g-4">
+                <!-- Grafico Categorie -->
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-light fw-bold">🏷️ Spese per Categoria</div>
+                        <div class="card-body" style="height: 300px;">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
                     </div>
-                    <a href="{% url 'pricing' %}" class="btn btn-sm btn-primary text-nowrap">Scopri i piani →</a>
+                </div>
+
+                <!-- Grafico Quote -->
+                <div class="col-md-6">
+                    <div class="card border-0 shadow-sm h-100">
+                        <div class="card-header bg-light fw-bold">⚖️ Ripartizione Quote</div>
+                        <div class="card-body" style="height: 300px;">
+                            <canvas id="splitChart"></canvas>
+                        </div>
+                    </div>
                 </div>
             </div>
-        {% endif %}
-
         </div>
     </div>
-</div>
-        <!-- PDF -->
 
-        <!-- <hr style="border: 1px solid #ccc; width: 50%; margin: 20px auto;"> -->
+    <!-- Script Chart.js -->
+    <script>
+    document.addEventListener('DOMContentLoaded', () => {
+        {% if not is_pro_or_higher %}return;{% endif %}
 
+        // Grafico Categorie
+        const ctxCat = document.getElementById('categoryChart');
+        if (ctxCat) {
+            new Chart(ctxCat, {
+                type: 'doughnut',
+                data: {
+                    labels: [{% for c in category_summary %}"{{ c.expense_type__display_name }}",{% endfor %}],
+                    datasets: [{
+                        data: [{% for c in category_summary %}{{ c.total|floatformat:2 }},{% endfor %}],
+                        backgroundColor: [{% for c in category_summary %}'{{ c.expense_type__color }}',{% endfor %}]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
+            });
+        }
 
-    <div class="card p-3 mb-2 shadow custom-card">
-        <h4>📅 Calendario spese</h4>
+        // Grafico Quote
+        const ctxSplit = document.getElementById('splitChart');
+        if (ctxSplit) {
+            new Chart(ctxSplit, {
+                type: 'bar',
+                data: {
+                    labels: ['Genitore A', 'Genitore B'],
+                    datasets: [{
+                        label: 'Totale Quote (€)',
+                        data: [{{ parent_a_total|floatformat:2 }}, {{ parent_b_total|floatformat:2 }}],
+                        backgroundColor: ['#0d6efd', '#dc3545']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        }
+    });
+    </script>
 
-        <div id="calendar" class="mb-4"
-             style="max-width: 100%; margin-bottom:20px;">
-
+    {% else %}
+    <!-- Messaggio Upgrade per Starter -->
+    <div class="card shadow custom-card h-100 border-start border-4 border-primary mb-4">
+        <div class="card-body">
+            <div class="d-flex align-items-center gap-3">
+                <span class="fs-1">📈</span>
+                <div class="flex-grow-1">
+                    <h5 class="fw-bold mb-1">Grafici e Analisi Avanzate</h5>
+                    <p class="mb-0 text-muted">Passa al piano <strong>Pro</strong> per visualizzare report visivi, trend mensili e analisi comparative delle spese familiari.</p>
+                </div>
+                <a href="{% url 'pricing' %}" class="btn btn-primary text-nowrap">
+                    Scopri i piani →
+                </a>
+            </div>
         </div>
     </div>
-    <!-- MODAL SPESE GIORNO -->
+    {% endif %}
+
+    <!-- Calendario Spese -->
+    <div class="card shadow custom-card h-100 border-start border-4 border-primary mb-4">
+        <div class="card-header bg-white fw-bold d-flex align-items-center gap-2">
+            <span class="fs-4">📅</span>
+            <span>Calendario Spese</span>
+        </div>
+        <div class="card-body">
+            <div id="calendar" style="min-height: 600px;"></div>
+        </div>
+    </div>
+
+    <!-- Modale Spese Giorno -->
     <div id="dayModal" class="custom-modal" style="display:none;">
         <div class="custom-modal-content">
             <span id="closeModal" class="close-btn">&times;</span>
-
-            <h5>Spese del giorno</h5>
-
+            <h5 class="fw-bold mb-3">📊 Spese del Giorno</h5>
             <div id="modalContent">
-                Caricamento...
+                <div class="text-center py-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Caricamento...</span>
+                    </div>
+                    <p class="mt-2 text-muted">Caricamento spese...</p>
+                </div>
             </div>
         </div>
     </div>
 
-{% endblock content%}
+</div>
+{% endblock content %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -168,17 +281,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const modal = document.getElementById("dayModal");
         const content = document.querySelector(".custom-modal-content");
 
-        // ✅ chiusura con X (robusta)
+        // Chiusura con X
         if (e.target.closest("#closeModal")) {
             modal.style.display = "none";
         }
 
-        // ✅ chiusura cliccando fuori dal contenuto
+        // Chiusura cliccando fuori
         if (modal.style.display === "flex" && !content.contains(e.target)) {
             modal.style.display = "none";
         }
     });
 </script>
-
-{% endblock  %}
-
+{% endblock %}

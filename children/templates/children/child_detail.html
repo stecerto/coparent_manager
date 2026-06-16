@@ -1,77 +1,277 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}👶 {{ child.name }} {{ child.surname }} - CoParent Manager{% endblock %}
+
 {% block content %}
+<div class="container py-4">
 
-
-<div class="card shadow-sm mb-4">
-    <div class="card-header text-center">
-        <h2>{{ child.name }}</h2>
+    <!-- Header con Breadcrumb e Azioni -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div class="d-flex align-items-center">
+            <a href="{% url 'children:children_list' %}" class="btn btn-outline-secondary btn-sm me-3 shadow-sm">
+                <i class="bi bi-arrow-left"></i> Lista
+            </a>
+            <div>
+                <h1 class="h3 fw-bold mb-0">
+                    <i class="bi bi-person-fill text-primary me-2"></i>{{ child.name }} {{ child.surname }}
+                </h1>
+                <p class="text-muted mb-0 small">Dettagli anagrafici e storico mantenimento</p>
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'children:child_edit' child.id %}" class="btn btn-outline-primary btn-lg">
+                <i class="bi bi-pencil-square me-2"></i>Modifica
+            </a>
+            <a href="{% url 'children:child_pdf' child.id %}" class="btn btn-success btn-lg shadow-sm">
+                <i class="bi bi-file-earmark-pdf me-2"></i>Scarica PDF
+            </a>
+            <a href="{% url 'children:child_confirm_delete' child.id %}" class="btn btn-outline-danger btn-lg">
+                <i class="bi bi-archive me-2"></i>Archivia
+            </a>
+        </div>
     </div>
-    <div class="card-body">
-        <div class="card p-3 mb-2 shadow custom-card">
-            <div style="max-width:600px; margin:auto; padding:20px;">
 
+    <div class="row g-4">
 
-                <div class="card p-3 mb-4">
+        <!-- Colonna Sinistra: Info Principali -->
+        <div class="col-lg-4">
 
-                    <h5>💰 Mantenimento attuale</h5>
-
-                    {% if current_support %}
-                        <p><strong>{{ current_support.amount }} €</strong></p>
-                    {% else %}
-                        <p>Non definito</p>
-                    {% endif %}
-
+            <!-- Card Anagrafica -->
+            <div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
+                <div class="card-header bg-white border-bottom border-start border-2 border-primary d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                    <i class="bi bi-person-badge fs-3 text-primary me-3"></i>
+                    <h5 class="mb-0 fw-bold">Dati Anagrafici</h5>
                 </div>
-
-
-                <div class="card p-3">
-
-                    <h5>📜 Storico mantenimento</h5>
-
-                    <ul class="list-group">
-                        {% for support in supports_history %}
-                            <li class="list-group-item">
-                                {{ support.amount }} €
-                                (dal {{ support.start_date }}
-                                {% if support.end_date %}
-                                    al {{ support.end_date }}
-                                {% else %}
-                                    - attuale
-                                {% endif %})
-                            </li>
-                        {% empty %}
-                            <li class="list-group-item">Nessun dato</li>
-                        {% endfor %}
+                <div class="card-body p-4">
+                    <ul class="list-unstyled mb-0">
+                        <li class="mb-3 pb-3 border-bottom">
+                            <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 0.75rem;">Nome completo</small>
+                            <div class="d-flex align-items-center mt-1">
+                                <i class="bi bi-person-fill text-secondary me-2"></i>
+                                <strong class="fs-5">{{ child.name }} {{ child.surname }}</strong>
+                            </div>
+                        </li>
+                        <li class="mb-3 pb-3 border-bottom">
+                            <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 0.75rem;">Data di nascita</small>
+                            <div class="d-flex align-items-center mt-1">
+                                <i class="bi bi-calendar-event text-secondary me-2"></i>
+                                <strong>{{ child.birth_date|date:"d/m/Y" }}</strong>
+                            </div>
+                        </li>
+                        <li class="mb-3 pb-3 border-bottom">
+                            <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 0.75rem;">Età</small>
+                            <div class="d-flex align-items-center mt-1">
+                                <i class="bi bi-balloon-fill text-secondary me-2"></i>
+                                <strong class="fs-4 text-primary">{{ child.age }} anni</strong>
+                            </div>
+                        </li>
+                        <li class="mb-0">
+                            <small class="text-muted text-uppercase fw-semibold d-block" style="font-size: 0.75rem;">Tipo affidamento</small>
+                            <div class="d-flex align-items-center mt-1">
+                                <i class="bi bi-house-heart-fill text-secondary me-2"></i>
+                                <strong>{{ child.get_custody_type_display }}</strong>
+                            </div>
+                        </li>
                     </ul>
-                    <a href="{% url 'child_pdf' child.id %}" class="btn btn-primary">
-                        📄 Scarica PDF
-                    </a>
                 </div>
             </div>
+
+            <!-- Card Mantenimento Attuale -->
+            <div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
+                <div class="card-header bg-white border-bottom border-start border-2 border-success d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                    <i class="bi bi-cash-stack fs-3 text-success me-3"></i>
+                    <h5 class="mb-0 fw-bold">Mantenimento Attuale</h5>
+                </div>
+                <div class="card-body p-4 text-center">
+                    {% if current_support %}
+                        <div class="mb-3">
+                            <small class="text-muted text-uppercase fw-semibold d-block mb-2" style="font-size: 0.75rem;">Importo mensile</small>
+                            <h2 class="fw-bold text-success mb-0 display-5">€ {{ current_support.amount|floatformat:2 }}</h2>
+                        </div>
+                        <div class="bg-light p-3 rounded-3 border-start border-2 border-success">
+                            <small class="text-muted d-block mb-1">Periodo di validità</small>
+                            <strong class="d-block">
+                                Dal {{ current_support.start_date|date:"d/m/Y" }}
+                                {% if current_support.end_date %}
+                                    al {{ current_support.end_date|date:"d/m/Y" }}
+                                {% else %}
+                                    <span class="badge bg-success ms-2">Attivo</span>
+                                {% endif %}
+                            </strong>
+                        </div>
+                    {% else %}
+                        <div class="text-center py-4">
+                            <i class="bi bi-cash-stack fs-1 d-block mb-3 text-muted"></i>
+                            <p class="text-muted mb-2 fw-semibold">Mantenimento non definito</p>
+                            <small class="text-muted">Imposta un importo manuale o carica una sentenza</small>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Card Ripartizione Spese -->
+            <div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
+                <div class="card-header bg-white border-bottom border-start border-2 border-info d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                    <i class="bi bi-pie-chart-fill fs-3 text-info me-3"></i>
+                    <h5 class="mb-0 fw-bold">Ripartizione Spese</h5>
+                </div>
+                <div class="card-body p-4">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <small class="text-muted d-block">Genitore A</small>
+                            <strong class="fs-4 text-primary">{{ child.effective_split_pct_parent_a|floatformat:0 }}%</strong>
+                        </div>
+                        <div class="text-end">
+                            <small class="text-muted d-block">Genitore B</small>
+                            <strong class="fs-4 text-secondary">{{ child.effective_split_pct_parent_b|floatformat:0 }}%</strong>
+                        </div>
+                    </div>
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar bg-primary" role="progressbar" style="width: {{ child.effective_split_pct_parent_a|floatformat:0 }}%" aria-valuenow="{{ child.effective_split_pct_parent_a|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        <div class="progress-bar bg-secondary" role="progressbar" style="width: {{ child.effective_split_pct_parent_b|floatformat:0 }}%" aria-valuenow="{{ child.effective_split_pct_parent_b|floatformat:0 }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Colonna Destra: Storico e Grafico -->
+        <div class="col-lg-8">
+
+            <!-- Card Storico Mantenimento -->
+            <div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
+                <div class="card-header bg-white border-bottom border-start border-2 border-info d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                    <i class="bi bi-clock-history fs-3 text-info me-3"></i>
+                    <h5 class="mb-0 fw-bold">Storico Mantenimento</h5>
+                </div>
+                <div class="card-body p-4">
+                    {% if supports_history %}
+                        <div class="list-group list-group-flush">
+                            {% for support in supports_history %}
+                                <div class="list-group-item border-0 px-0 py-3 d-flex justify-content-between align-items-center {% if not forloop.last %}border-bottom{% endif %}">
+                                    <div class="d-flex align-items-center">
+                                        <div class="bg-light rounded-circle d-flex align-items-center justify-content-center me-3" style="width: 48px; height: 48px;">
+                                            <i class="bi bi-cash-stack fs-4 text-success"></i>
+                                        </div>
+                                        <div>
+                                            <strong class="fs-4 text-success d-block">€ {{ support.amount|floatformat:2 }}</strong>
+                                            <small class="text-muted">
+                                                Dal {{ support.start_date|date:"d/m/Y" }}
+                                                {% if support.end_date %}
+                                                    al {{ support.end_date|date:"d/m/Y" }}
+                                                {% else %}
+                                                    <span class="badge bg-success ms-2">Attuale</span>
+                                                {% endif %}
+                                            </small>
+                                        </div>
+                                    </div>
+                                    {% if forloop.first %}
+                                        <span class="badge bg-primary fs-6 px-3 py-2">
+                                            <i class="bi bi-star-fill me-1"></i>Più recente
+                                        </span>
+                                    {% endif %}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="bi bi-clock-history fs-1 d-block mb-3 text-muted"></i>
+                            <p class="text-muted mb-0 fw-semibold">Nessuno storico disponibile</p>
+                            <small class="text-muted">Il grafico mostrerà l'andamento nel tempo</small>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Card Grafico -->
+            <div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
+                <div class="card-header bg-white border-bottom border-start border-2 border-warning d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                    <i class="bi bi-graph-up fs-3 text-warning me-3"></i>
+                    <h5 class="mb-0 fw-bold">Andamento Mantenimento</h5>
+                </div>
+                <div class="card-body p-4">
+                    <canvas id="supportChart" style="max-height: 400px;"></canvas>
+                </div>
+            </div>
+
         </div>
     </div>
 </div>
-{% extra_js %}
+{% endblock %}
 
-
-<canvas id="supportChart"></canvas>
-
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-    const data = JSON.parse('{{ support_data|escapejs }}');
+document.addEventListener('DOMContentLoaded', function() {
+    const supportData = '{{ support_data|escapejs }}';
 
-    const labels = data.map(d => d.date);
-    const values = data.map(d => d.amount);
+    if (supportData && supportData !== '[]' && supportData !== 'None') {
+        try {
+            const data = JSON.parse(supportData);
 
-    new Chart(document.getElementById("supportChart"), {
-        type: "line",
-        data: {
-            labels: labels,
-            datasets: [{
-                label: "Mantenimento (€)",
-                data: values
-            }]
+            if (data && data.length > 0) {
+                const labels = data.map(d => {
+                    const date = new Date(d.date);
+                    return date.toLocaleDateString('it-IT', { month: 'short', year: 'numeric' });
+                });
+                const values = data.map(d => d.amount);
+
+                const ctx = document.getElementById("supportChart");
+                if (ctx) {
+                    new Chart(ctx, {
+                        type: "line",
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: "Mantenimento (€)",
+                                data: values,
+                                borderColor: "#198754",
+                                backgroundColor: "rgba(25, 135, 84, 0.1)",
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.4,
+                                pointBackgroundColor: "#198754",
+                                pointBorderColor: "#fff",
+                                pointBorderWidth: 2,
+                                pointRadius: 5,
+                                pointHoverRadius: 7
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            plugins: {
+                                legend: {
+                                    display: true,
+                                    position: 'top'
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return '€ ' + context.parsed.y.toFixed(2);
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                y: {
+                                    beginAtZero: true,
+                                    ticks: {
+                                        callback: function(value) {
+                                            return '€ ' + value.toFixed(2);
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+        } catch (e) {
+            console.error('Errore parsing dati grafico:', e);
         }
-    });
+    }
+});
 </script>
-{% endblock extra_js %}
 {% endblock %}

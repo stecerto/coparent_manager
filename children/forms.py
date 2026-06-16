@@ -5,7 +5,7 @@ from django import forms
 from django.forms import inlineformset_factory
 
 from families.models import Family
-from .models import ChildProfile
+from .models import ChildProfile, ChildSupport
 
 
 class ChildForm(forms.ModelForm):
@@ -88,10 +88,13 @@ ChildFormSet = inlineformset_factory(
     can_delete=True,
 )
 
-
-from django import forms
-
 class ChildSupportForm(forms.Form):
-    amount = forms.DecimalField(max_digits=10, decimal_places=2)
-    start_date = forms.DateField(widget=forms.DateInput(attrs={"type": "date"}))
+    class Meta:
+        model = ChildSupport
+        fields = ['amount', 'start_date', 'end_date', 'payer_role']
+        widgets = {
+            'start_date': forms.DateInput(attrs={'type': 'date'}),
+            'end_date': forms.DateInput(attrs={'type': 'date'}),
+        }
+
 

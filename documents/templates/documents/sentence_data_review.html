@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Revisione Dati Sentenza - CoParent Manager{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <nav aria-label="breadcrumb" class="mb-4">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'documents:documents_list' %}">Documenti</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Revisione Dati Sentenza</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <!-- Colonna Sinistra: Anteprima e Info -->
+        <div class="col-lg-4 mb-4">
+            <div class="card shadow-sm border-primary">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">📜 Documento Caricato</h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="display-1 mb-3">📄</div>
+                    <h6 class="fw-bold">{{ document.title }}</h6>
+                    <p class="text-muted small">Caricato il {{ document.created_at|date:"d/m/Y H:i" }}</p>
+                    <a href="{% url 'documents:document_preview' document.id %}" target="_blank" class="btn btn-outline-primary btn-sm w-100 mb-2">
+                        👁️ Anteprima PDF
+                    </a>
+                    <div class="alert alert-info small mb-0">
+                        <strong>💡 Consiglio:</strong> Tieni aperta l'anteprima in una nuova scheda per verificare i dati mentre compili il form.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Colonna Destra: Form di Revisione -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">🤖 Dati Estratti Automaticamente (Verifica e Correggi)</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="{% url 'documents:sentence_data_review' document.id %}">
+                        {% csrf_token %}
+                        
+                        <div class="row g-3">
+                            <!-- Numero R.G. -->
+                            <div class="col-md-6">
+                                <label for="rg_number" class="form-label fw-bold">Numero R.G. (Registro Generale)</label>
+                                <input type="text" class="form-control" id="rg_number" name="rg_number" value="{{ rg_number }}" placeholder="Es: 1234/2023">
+                            </div>
+
+                            <!-- Data Sentenza -->
+                            <div class="col-md-6">
+                                <label for="ruling_date" class="form-label fw-bold">Data Sentenza</label>
+                                <input type="text" class="form-control" id="ruling_date" name="ruling_date" value="{{ ruling_date }}" placeholder="Es: 15/01/2024">
+                            </div>
+
+                            <!-- Mantenimento -->
+                            <div class="col-md-6">
+                                <label for="maintenance_amount" class="form-label fw-bold">Importo Mantenimento Mensile (€)</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">€</span>
+                                    <input type="number" step="0.01" class="form-control" id="maintenance_amount" name="maintenance_amount" value="{{ maintenance_amount }}" placeholder="Es: 500.00">
+                                </div>
+                            </div>
+
+                            <!-- Affidamento -->
+                            <div class="col-md-6">
+                                <label for="custody_type" class="form-label fw-bold">Tipo di Affidamento</label>
+                                <select class="form-select" id="custody_type" name="custody_type">
+                                    <option value="">-- Seleziona --</option>
+                                    <option value="Condiviso" {% if custody_type == "Condiviso" %}selected{% endif %}>Condiviso</option>
+                                    <option value="Esclusivo" {% if custody_type == "Esclusivo" %}selected{% endif %}>Esclusivo</option>
+                                    <option value="Alternato" {% if custody_type == "Alternato" %}selected{% endif %}>Alternato</option>
+                                    <option value="Non specificato" {% if not custody_type or custody_type == "Non specificato" %}selected{% endif %}>Non specificato / Altro</option>
+                                </select>
+                            </div>
+
+                            <!-- Casa Familiare -->
+                            <div class="col-md-6">
+                                <label for="house_assigned_to" class="form-label fw-bold">Casa Familiare Assegnata a</label>
+                                <input type="text" class="form-control" id="house_assigned_to" name="house_assigned_to" value="{{ house_assigned_to }}" placeholder="Es: Genitore A / Madre / Padre">
+                            </div>
+
+                            <!-- Veicoli -->
+                            <div class="col-md-6">
+                                <label for="vehicle_assignment" class="form-label fw-bold">Veicoli Assegnati a</label>
+                                <input type="text" class="form-control" id="vehicle_assignment" name="vehicle_assignment" value="{{ vehicle_assignment }}" placeholder="Es: Genitore B / Nessuno">
+                            </div>
+
+                            <!-- Quote Genitoriali -->
+                            <div class="col-12">
+                                <label for="parent_quotas" class="form-label fw-bold">Quote di Mantenimento / Spese (%)</label>
+                                <input type="text" class="form-control" id="parent_quotas" name="parent_quotas" value="{{ parent_quotas }}" placeholder="Es: Genitore A 60%, Genitore B 40%">
+                                <div class="form-text">Inserisci manualmente le percentuali se l'estrazione automatica non è stata precisa.</div>
+                            </div>
+                        </div>
+
+                        <div class="d-flex justify-content-between mt-4 pt-3 border-top">
+                            <a href="{% url 'documents:documents_list' %}" class="btn btn-outline-secondary">
+                                ← Annulla e torna alla lista
+                            </a>
+                            <button type="submit" class="btn btn-success px-4">
+                                ✅ Conferma e Salva Dati
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

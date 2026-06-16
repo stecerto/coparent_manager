@@ -1,0 +1,261 @@
+{% extends "base.html" %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% load calendar_tags %}
+
+{% block title %}📋 Lista Eventi - CoParent Manager{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h2 class="fw-bold mb-1">📋 Lista Eventi</h2>
+            <p class="text-muted mb-0">Tutti gli eventi della famiglia <strong>{{ family.name }}</strong></p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'calendar:calendar_view' %}" class="btn btn-outline-secondary">
+                🗓️ Calendario
+            </a>
+            <a href="{% url 'calendar:event_create' %}" class="btn btn-success">
+                ➕ Nuovo Evento
+            </a>
+        </div>
+    </div>
+
+    <!-- Card Riepilogo Rapido -->
+    <div class="row g-3 mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm mb-0 border-start border-2 border-primary">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted small mb-1">Eventi in Pagina</p>
+                            <h3 class="fw-bold mb-0 text-primary">{{ page_obj|length }}</h3>
+                        </div>
+                        <span class="fs-1 text-primary opacity-25">📊</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card shadow-sm mb-0 border-start border-2 border-success">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <p class="text-muted small mb-1">Filtro Attivo</p>
+                            <h6 class="fw-bold mb-0 text-success">
+                                {% if request.GET.event_type %}
+                                    {% for value, label in event_types %}
+                                        {% if value == request.GET.event_type %}
+                                            {{ label }}
+                                        {% endif %}
+                                    {% endfor %}
+                                {% else %}
+                                    Tutti gli eventi
+                                {% endif %}
+                            </h6>
+                        </div>
+                        <span class="fs-1 text-success opacity-25">🔍</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filtri -->
+    <div class="card shadow-sm mb-4 border-start border-2 border-info">
+        <div class="card-header bg-white fw-bold d-flex align-items-center gap-2">
+            <span class="fs-4">🔍</span>
+            <span>Filtra Eventi</span>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label fw-bold small">🏷️ Tipo Evento</label>
+                    <select name="event_type" class="form-select" onchange="this.form.submit()">
+                        <option value="">Tutti i tipi</option>
+                        {% for value, label in event_types %}
+                            <option value="{{ value }}" {% if request.GET.event_type == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold small">📅 Da</label>
+                    <input type="date" name="date_from" class="form-control"
+                           value="{{ request.GET.date_from }}" onchange="this.form.submit()">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label fw-bold small">📅 A</label>
+                    <input type="date" name="date_to" class="form-control"
+                           value="{{ request.GET.date_to }}" onchange="this.form.submit()">
+                </div>
+                <div class="col-md-2">
+                    <a href="{% url 'calendar:events_list' %}" class="btn btn-outline-secondary w-100">
+                        🔄 Reset
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Lista Eventi -->
+    <div class="card shadow-sm mb-4 border-start border-2 border-primary">
+        <div class="card-header bg-white fw-bold d-flex align-items-center gap-2">
+            <span class="fs-4">📋</span>
+            <span>Eventi Trovati</span>
+            <span class="badge bg-primary ms-auto">{{ events|length }}</span>
+        </div>
+        <div class="card-body p-0">
+
+            {# ✅ CORRETTO: events è l'oggetto Page di Django, usiamo .object_list per verificare se ci sono dati #}
+            {% if events.object_list %}
+                <div class="list-group list-group-flush">
+                    {% for event in events %}
+                        <div class="list-group-item list-group-item-action p-4"
+                             style="border-left: 4px solid {{ event.event_type|event_color }} !important;">
+                            <div class="d-flex w-100 justify-content-between align-items-start gap-3">
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-items-center gap-2 mb-2 flex-wrap">
+                                        <h5 class="mb-0 fw-bold">{{ event.title }}</h5>
+                                        <span class="badge" style="background-color: {{ event.event_type|event_color }};">
+                                            {{ event.get_event_type_display }}
+                                        </span>
+                                        {% if event.is_auto_generated %}
+                                            <span class="badge bg-info text-dark">🔄 Auto</span>
+                                        {% endif %}
+                                    </div>
+
+                                    {% if event.description %}
+                                        <p class="mb-2 text-muted small">{{ event.description|truncatechars:150 }}</p>
+                                    {% endif %}
+
+                                    <div class="d-flex gap-4 flex-wrap small text-muted">
+                                        <span class="d-flex align-items-center gap-1">
+                                            <span class="fs-5">🕐</span>
+                                            <strong>{{ event.start_time|date:"d/m/Y H:i" }}</strong>
+                                            <span>→</span>
+                                            <span>{{ event.end_time|date:"H:i" }}</span>
+                                        </span>
+
+                                        {% if event.children.all %}
+                                            <span class="d-flex align-items-center gap-1">
+                                                <span class="fs-5">👶</span>
+                                                <span>
+                                                    {% for child in event.children.all %}
+                                                        {{ child.name }}{% if not forloop.last %}, {% endif %}
+                                                    {% endfor %}
+                                                </span>
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <div class="d-flex gap-2 flex-shrink-0">
+                                    <a href="{% url 'calendar:event_detail' event.id %}"
+                                       class="btn btn-sm btn-outline-info" title="Visualizza">
+                                        👁️
+                                    </a>
+                                    <a href="{% url 'calendar:event_edit' event.id %}"
+                                       class="btn btn-sm btn-outline-primary" title="Modifica">
+                                        ✏️
+                                    </a>
+                                    <form method="post" action="{% url 'calendar:event_delete' event.id %}"
+                                          class="d-inline" onsubmit="return confirm('Eliminare questo evento?')">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger" title="Elimina">
+                                            🗑️
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <!-- ✅ PAGINAZIONE (usando l'oggetto Page 'events') -->
+                {% if events.has_other_pages %}
+                <nav aria-label="Navigazione pagine" class="p-3 border-top">
+                    <ul class="pagination justify-content-center mb-0">
+                        {% if events.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if request.GET.event_type %}event_type={{ request.GET.event_type }}&{% endif %}{% if request.GET.date_from %}date_from={{ request.GET.date_from }}&{% endif %}{% if request.GET.date_to %}date_to={{ request.GET.date_to }}&{% endif %}page={{ events.previous_page_number }}">
+                                    ← Prec
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">← Prec</span>
+                            </li>
+                        {% endif %}
+
+                        {% for num in events.paginator.page_range %}
+                            {% if events.number == num %}
+                                <li class="page-item active">
+                                    <span class="page-link">{{ num }}</span>
+                                </li>
+                            {% elif num > events.number|add:'-3' and num < events.number|add:'3' %}
+                                <li class="page-item">
+                                    <a class="page-link" href="?{% if request.GET.event_type %}event_type={{ request.GET.event_type }}&{% endif %}{% if request.GET.date_from %}date_from={{ request.GET.date_from }}&{% endif %}{% if request.GET.date_to %}date_to={{ request.GET.date_to }}&{% endif %}page={{ num }}">
+                                        {{ num }}
+                                    </a>
+                                </li>
+                            {% endif %}
+                        {% endfor %}
+
+                        {% if events.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?{% if request.GET.event_type %}event_type={{ request.GET.event_type }}&{% endif %}{% if request.GET.date_from %}date_from={{ request.GET.date_from }}&{% endif %}{% if request.GET.date_to %}date_to={{ request.GET.date_to }}&{% endif %}page={{ events.next_page_number }}">
+                                    Succ →
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">Succ →</span>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+                {% endif %}
+
+            {% else %}
+                <div class="text-center py-5">
+                    <span class="fs-1 d-block mb-3">📭</span>
+                    <p class="text-muted mb-3">Nessun evento trovato con i filtri attuali</p>
+                    <a href="{% url 'calendar:events_list' %}" class="btn btn-outline-secondary me-2">
+                        🔄 Resetta Filtri
+                    </a>
+                    <a href="{% url 'calendar:event_create' %}" class="btn btn-success">
+                        ➕ Crea un nuovo evento
+                    </a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Legenda Colori -->
+    <div class="card shadow-sm mb-4 border-start border-2 border-warning">
+        <div class="card-header bg-white fw-bold d-flex align-items-center gap-2">
+            <span class="fs-4">🎨</span>
+            <span>Legenda Colori Categorie</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+                {% for value, label in event_types %}
+                    <div class="col-md-3 col-sm-6">
+                        <div class="d-flex align-items-center gap-2 p-2 rounded" style="background-color: {{ value|event_color }}20;">
+                            <span class="badge" style="background-color: {{ value|event_color }}; min-width: 24px;">&nbsp;</span>
+                            <small class="fw-bold">{{ label }}</small>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

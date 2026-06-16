@@ -1,74 +1,169 @@
 {% extends "base.html" %}
-{% block title %}📄 {{ document.title }}{% endblock %}
+{% load static %}
+
+{% block title %}📄 {{ document.title }} - CoParent Manager{% endblock %}
 
 {% block content %}
-{% if is_pro_or_higher %}
 <div class="container py-4">
-    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
-        <h2 class="fw-bold mb-0">{{ document.title }}</h2>
-        <span class="badge bg-info fs-6">{{ document.get_status_display }}</span>
+
+    {% if is_pro_or_higher %}
+
+    <!-- 📌 HEADER CONTESTUALE -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-3">
+        <div class="d-flex align-items-center">
+            <a href="{% url 'documents:documents_list' %}" class="btn btn-outline-secondary btn-sm me-3 shadow-sm">
+                <i class="bi bi-arrow-left"></i> Lista
+            </a>
+            <div>
+                <h1 class="h3 fw-bold mb-0">
+                    <i class="bi bi-file-earmark-text text-primary me-2"></i>{{ document.title }}
+                </h1>
+                <p class="text-muted mb-0 small">
+                    Versione {{ document.versions }} • Caricato il {{ document.created_at|date:"d/m/Y H:i" }}
+                </p>
+            </div>
+        </div>
+        <div>
+            <span class="badge fs-6 px-3 py-2
+                {% if document.status == 'draft' %}bg-secondary
+                {% elif document.status == 'review' %}bg-warning text-dark
+                {% elif document.status == 'approved' %}bg-info
+                {% elif document.status == 'signed' %}bg-success
+                {% elif document.status == 'locked' %}bg-danger
+                {% else %}bg-light text-dark border{% endif %}">
+                {{ document.get_status_display }}
+            </span>
+        </div>
     </div>
 
     <div class="row g-4">
-        <!-- Anteprima -->
+
+        <!-- 👁️ ANTEPRIMA DOCUMENTO -->
         <div class="col-lg-8">
-            <div class="card shadow-sm h-100">
-                <div class="card-header d-flex justify-content-between align-items-center bg-light">
-                    <span>👁️ Anteprima Documento</span>
+            <div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
+                <div class="card-header bg-white border-bottom border-start border-1 border-info d-flex justify-content-between align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-eye fs-3 text-info me-3"></i>
+                        <h5 class="mb-0 fw-bold">Anteprima Documento</h5>
+                    </div>
                     {% if document.file %}
-                        <a href="{{ document.file.url }}" target="_blank" class="btn btn-sm btn-outline-primary">↗️ Apri in nuova scheda</a>
+                        <a href="{% url 'documents:document_preview' document.id %}" target="_blank" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-box-arrow-up-right me-1"></i>Nuova scheda
+                        </a>
                     {% endif %}
                 </div>
                 <div class="card-body p-0">
                     {% if document.file %}
-                        <iframe src="{{ document.file.url }}" width="100%" height="700px" style="border:none; background:#f8f9fa;" loading="lazy"></iframe>
+                        <iframe src="{% url 'documents:document_preview' document.id %}" width="100%" style="height: 75vh; border:none; background:#f8f9fa;" loading="lazy"></iframe>
                     {% else %}
-                        <div class="p-5 text-center text-muted">⚠️ File non disponibile per l'anteprima</div>
+                        <div class="p-5 text-center text-muted">
+                            <i class="bi bi-file-earmark-x fs-1 d-block mb-3"></i>
+                            <p class="mb-0 fw-semibold">File non disponibile per l'anteprima</p>
+                            <small class="text-muted">Il documento potrebbe essere stato rimosso o non è ancora stato caricato</small>
+                        </div>
                     {% endif %}
                 </div>
             </div>
         </div>
 
-        <!-- Sidebar -->
+        <!-- 📋 SIDEBAR -->
         <div class="col-lg-4">
-            <div class="card shadow-sm mb-3">
-                <div class="card-header fw-bold">⚙️ Azioni</div>
-                <div class="card-body d-grid gap-2">
+
+            <!-- ⚙️ AZIONI -->
+            <div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
+                <div class="card-header bg-white border-bottom border-start border-1 border-primary d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                    <i class="bi bi-gear fs-3 text-primary me-3"></i>
+                    <h5 class="mb-0 fw-bold">Azioni</h5>
+                </div>
+                <div class="card-body p-4 d-grid gap-2">
                     {% if document.status != "signed" %}
-                        <a href="{% url 'documents:sign' document.id %}" class="btn btn-dark w-100">✍️ Firma documento</a>
+                        <a href="{% url 'documents:sign' document.id %}" class="btn btn-dark btn-lg">
+                            <i class="bi bi-pen-fill me-2"></i>Firma documento
+                        </a>
                     {% else %}
-                        <div class="alert alert-success text-center mb-0">✔ Documento firmato</div>
+                        <div class="alert alert-success border-0 shadow-sm mb-0 d-flex align-items-center">
+                            <i class="bi bi-check-circle-fill fs-4 me-3"></i>
+                            <div>
+                                <strong class="d-block">Documento firmato</strong>
+                                <small class="text-muted">La firma è stata registrata</small>
+                            </div>
+                        </div>
                     {% endif %}
                     {% if document.status != "approved" %}
-                        <a href="{% url 'documents:approve' document.id %}" class="btn btn-primary w-100">✅ Approva documento</a>
+                        <a href="{% url 'documents:approve' document.id %}" class="btn btn-primary btn-lg">
+                            <i class="bi bi-check2-circle me-2"></i>Approva documento
+                        </a>
                     {% endif %}
                 </div>
             </div>
 
-            <div class="card shadow-sm mb-3">
-                <div class="card-header fw-bold">🖊️ Firme Apposte</div>
+            <!-- 🖊️ FIRME APPORTE -->
+            <div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
+                <div class="card-header bg-white border-bottom border-start border-1 border-success d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                    <i class="bi bi-pen fs-3 text-success me-3"></i>
+                    <h5 class="mb-0 fw-bold">Firme Apposte</h5>
+                    {% if signatures %}
+                        <span class="badge bg-success ms-auto">{{ signatures|length }}</span>
+                    {% endif %}
+                </div>
                 <div class="card-body p-0">
                     {% if signatures %}
-                        <ul class="list-group list-group-flush">
+                        <div class="list-group list-group-flush">
                             {% for sig in signatures %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    <span>{{ sig.user.first_name|default:sig.user.username }} <small class="text-muted">({{ sig.get_role_display }})</small></span>
-                                    <small class="text-muted">{{ sig.signed_at|date:"d/m H:i" }}</small>
-                                </li>
+                                <div class="list-group-item d-flex justify-content-between align-items-center py-3 px-4 border-bottom">
+                                    <div class="d-flex align-items-center gap-3">
+                                        <div class="bg-light rounded-circle d-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                            <i class="bi bi-person-fill text-success"></i>
+                                        </div>
+                                        <div>
+                                            <strong class="d-block">{{ sig.user.first_name|default:sig.user.username }}</strong>
+                                            <small class="text-muted">{{ sig.get_role_display }}</small>
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">
+                                        <i class="bi bi-clock me-1"></i>{{ sig.signed_at|date:"d/m H:i" }}
+                                    </small>
+                                </div>
                             {% endfor %}
-                        </ul>
+                        </div>
                     {% else %}
-                        <div class="p-3 text-muted text-center">Nessuna firma ancora presente</div>
+                        <div class="p-4 text-center text-muted">
+                            <i class="bi bi-pen fs-1 d-block mb-2"></i>
+                            <p class="mb-0 small">Nessuna firma ancora presente</p>
+                        </div>
                     {% endif %}
                 </div>
             </div>
 
-            <a href="{% url 'documents:documents_versions' document.id %}" class="btn btn-outline-secondary w-100">📜 Vedi Storico Versioni</a>
-            <a href="{% url 'documents:documents_list' %}" class="btn btn-outline-dark w-100 mt-2">← Torna alla Lista</a>
+            <!-- 🔗 LINK UTILI -->
+            <div class="card shadow-sm border-0" style="border-radius: 12px;">
+                <div class="card-body p-4 d-grid gap-2">
+                    <a href="{% url 'documents:documents_versions' document.id %}" class="btn btn-outline-warning btn-lg">
+                        <i class="bi bi-clock-history me-2"></i>Storico Versioni
+                    </a>
+                    <a href="{% url 'documents:documents_list' %}" class="btn btn-outline-secondary">
+                        <i class="bi bi-arrow-left me-2"></i>Torna alla Lista
+                    </a>
+                </div>
+            </div>
+
         </div>
     </div>
+
+    {% else %}
+
+    <!-- 🔒 SEZIONE PIANO FREE/STARTER -->
+    <div class="card shadow-sm border-0 p-5 mx-auto text-center" style="max-width: 600px; border-radius: 12px;">
+        <i class="bi bi-lock-fill fs-1 text-muted mb-3 d-block"></i>
+        <h3 class="fw-bold mb-2">Dettaglio Documento</h3>
+        <p class="text-muted mb-4">
+            Anteprima, firme digitali e workflow legale sono riservati ai piani <strong>Pro</strong> ed <strong>Enterprise</strong>.
+        </p>
+        <a href="{% url 'pricing' %}" class="btn btn-primary btn-lg px-4">
+            Confronta i piani →
+        </a>
+    </div>
+
+    {% endif %}
 </div>
-{% else %}
-    {% include "includes/upgrade_placeholder.html" with title="Dettaglio Documento" feature="anteprima, firme e workflow legale" %}
-{% endif %}
 {% endblock %}

@@ -1,45 +1,244 @@
 {% extends "base.html" %}
+{% load static %}
+
+{% block title %}Reinvio Attivazione - CoParent Manager{% endblock title %}
+
+{% block extra_css %}
+<style>
+    /* 🎨 BACKGROUND GRADIENT (Coerente con Login/Register) */
+    .activation-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem 0;
+    }
+
+    /* 🎴 CARD */
+    .activation-card {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        padding: 2.5rem;
+        max-width: 450px;
+        width: 100%;
+        animation: slideUp 0.5s ease;
+    }
+
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 🎯 LOGO */
+    .activation-icon {
+        width: 80px;
+        height: 80px;
+        background: #ffffff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.15);
+        padding: 15px;
+    }
+
+    .activation-icon img {
+        max-width: 80px;
+        height: auto;
+        object-fit: contain;
+    }
+
+    /* 📝 TITOLI */
+    .activation-title {
+        text-align: center;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 0.5rem;
+        font-size: 1.8rem;
+    }
+
+    .activation-subtitle {
+        text-align: center;
+        color: #718096;
+        margin-bottom: 2rem;
+        font-size: 0.95rem;
+    }
+
+    /* 🔤 INPUT FIELDS */
+    .form-floating > .form-control {
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1rem 1rem 1rem 3rem;
+        height: auto;
+        transition: all 0.3s ease;
+    }
+
+    .form-floating > .form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
+    }
+
+    .form-floating > label {
+        padding-left: 3rem;
+        color: #718096;
+    }
+
+    .input-icon {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #a0aec0;
+        font-size: 1.2rem;
+        z-index: 5;
+    }
+
+    /* 🔘 PULSANTE */
+    .btn-activation {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        border-radius: 12px;
+        padding: 0.9rem;
+        font-weight: 600;
+        font-size: 1.05rem;
+        color: white;
+        width: 100%;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-activation:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+
+    .btn-activation:active {
+        transform: translateY(0);
+    }
+
+    /* 🔗 LINK */
+    .activation-link {
+        color: #667eea;
+        text-decoration: none;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .activation-link:hover {
+        color: #764ba2;
+        text-decoration: underline;
+    }
+
+    /* 📦 SEPARATORE */
+    .activation-separator {
+        display: flex;
+        align-items: center;
+        text-align: center;
+        color: #a0aec0;
+        margin: 1.5rem 0;
+    }
+
+    .activation-separator::before,
+    .activation-separator::after {
+        content: '';
+        flex: 1;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .activation-separator span {
+        padding: 0 1rem;
+        font-size: 0.85rem;
+        font-weight: 500;
+    }
+
+    /* 💡 INFO BOX */
+    .info-box {
+        background: #ebf8ff;
+        border-left: 4px solid #4299e1;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+        font-size: 0.9rem;
+        color: #2b6cb0;
+    }
+
+    .info-box i {
+        font-size: 1.2rem;
+        margin-right: 0.5rem;
+    }
+
+    /* 📱 RESPONSIVE */
+    @media (max-width: 576px) {
+        .activation-card {
+            padding: 2rem 1.5rem;
+        }
+
+        .activation-title {
+            font-size: 1.5rem;
+        }
+    }
+</style>
+{% endblock extra_css %}
+
 {% block content %}
-<div class="container mt-5">
-    <div class="row justify-content-center">
-        <div class="col-md-6">
-            <div class="card shadow">
-                <div class="card-body p-4">
-                    <h4 class="text-center mb-4">🔁 Link di attivazione scaduto?</h4>
-                    
-                    <p class="text-muted text-center mb-4">
-                        Inserisci la tua email per ricevere un nuovo link di attivazione.
-                    </p>
-                    
-                    <form method="POST">
-                        {% csrf_token %}
-                        <div class="mb-3">
-                            <label for="email" class="form-label">La tua email</label>
-                            <input 
-                                type="email" 
-                                class="form-control" 
-                                id="email" 
-                                name="email" 
-                                placeholder="nome@esempio.com"
-                                required
-                                autofocus
-                            >
-                        </div>
-                        <button type="submit" class="btn btn-primary w-100">
-                            📩 Invia nuovo link
-                        </button>
-                    </form>
-                    
-                    <hr class="my-4">
-                    
-                    <div class="text-center">
-                        <a href="{% url 'accounts:login' %}" class="text-decoration-none">
-                            ← Torna al login
-                        </a>
-                    </div>
-                </div>
+<div class="activation-container">
+    <div class="activation-card">
+        <!-- 🎯 LOGO -->
+        <div class="activation-icon">
+            <img src="{% static 'images/logo-coparent.svg' %}" alt="CoParent Manager Logo">
+        </div>
+
+        <!-- 📝 TITOLO -->
+        <h2 class="activation-title">Link Scaduto?</h2>
+        <p class="activation-subtitle">Nessun problema! Ti inviamo un nuovo link di attivazione</p>
+
+        <!-- 💡 INFO BOX -->
+        <div class="info-box">
+            <i class="bi bi-info-circle-fill"></i>
+            <strong>Non hai ricevuto l'email?</strong><br>
+            <small>Controlla anche nella cartella spam o posta indesiderata. Se non la trovi, richiedi un nuovo link qui sotto.</small>
+        </div>
+
+        <!-- 📝 FORM -->
+        <form method="POST" novalidate>
+            {% csrf_token %}
+
+            <!-- Email -->
+            <div class="form-floating mb-3 position-relative">
+                <i class="bi bi-envelope-fill input-icon"></i>
+                <input type="email"
+                       class="form-control"
+                       id="email"
+                       name="email"
+                       placeholder="nome@email.com"
+                       required
+                       autofocus>
+                <label for="email">La tua email</label>
             </div>
+
+            <!-- 🔘 PULSANTE -->
+            <button type="submit" class="btn btn-activation">
+                <i class="bi bi-send-fill me-2"></i>
+                Invia Nuovo Link
+            </button>
+        </form>
+
+        <!-- 📦 SEPARATORE -->
+        <div class="activation-separator">
+            <span>OPPURE</span>
+        </div>
+
+        <!-- 🔗 LINK LOGIN -->
+        <div class="text-center">
+            <a href="{% url 'accounts:login' %}" class="btn btn-outline-secondary w-100" style="border-radius: 12px; padding: 0.7rem;">
+                <i class="bi bi-box-arrow-in-left me-2"></i>
+                Torna al Login
+            </a>
         </div>
     </div>
 </div>
-{% endblock %}
+{% endblock content %}

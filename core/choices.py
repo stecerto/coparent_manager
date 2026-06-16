@@ -14,8 +14,28 @@ class RoleChoices(models.TextChoices):
     LAWYER_A = 'lawyer_a', 'Avvocato A (del Genitore A)'
     LAWYER_B = 'lawyer_b', 'Avvocato B (del Genitore B)'
 
+    @classmethod
+    def normalize_role(cls, role):
+        """Normalizza il ruolo rimuovendo suffissi _a/_b"""
+        if not role:
+            return ''
+        role_str = str(role).strip().lower()
+        # Gestisce sia stringhe che enum
+        if hasattr(role_str, 'value'):
+            role_str = role_str.value
+        return role_str.replace('_a', '').replace('_b', '')
 
+    @classmethod
+    def is_lawyer(cls, role):
+        return cls.normalize_role(role) == cls.LAWYER
 
+    @classmethod
+    def is_mediator(cls, role):
+        return cls.normalize_role(role) == cls.MEDIATOR
+
+    @classmethod
+    def is_consultant(cls, role):
+        return cls.normalize_role(role) == cls.CONSULTANT
 
     @classmethod
     def is_professional(cls, role):
@@ -58,3 +78,28 @@ class RoleChoices(models.TextChoices):
 
         allowed = permissions.get(inviter_role, set())
         return [c for c in cls.choices if c[0] in (allowed - occupied_roles)]
+
+    @classmethod
+    def get_available_roles(cls, inviter_role: str, occupied_roles: set) -> list:
+        """
+        Restituisce i ruoli che un utente può invitare, escludendo quelli già occupati.
+        """
+        # Mappa: chi può invitare chi
+        permissions = {
+            cls.PARENT_A: {cls.PARENT_B, cls.LAWYER_A, cls.LAWYER_B, cls.MEDIATOR, cls.CONSULTANT},
+            cls.PARENT_B: {cls.PARENT_A, cls.LAWYER_A, cls.LAWYER_B, cls.MEDIATOR, cls.CONSULTANT},
+            cls.LAWYER_A: {cls.LAWYER_B, cls.MEDIATOR, cls.CONSULTANT},
+            cls.LAWYER_B: {cls.LAWYER_A, cls.MEDIATOR, cls.CONSULTANT},
+            cls.MEDIATOR: set(cls.choices),  # Può invitare tutti
+            cls.CONSULTANT: set(cls.choices),
+        }
+
+        allowed = permissions.get(inviter_role, set())
+        return [c for c in cls.choices if c[0] in (allowed - occupied_roles)]
+
+
+# ✅ NUOVO: Scelte per il tipo di incarico del consulente
+class AssignmentTypeChoices(models.TextChoices):
+    INDIVIDUAL = 'individual', 'Individuale (su richiesta di un singolo genitore)'
+    FAMILY = 'family', 'Familiare (accordo congiunto tra i genitori)'
+    CTU = 'ctu', 'CTU (Consulente Tecnico d\'Ufficio - Nomina Tribunale)'

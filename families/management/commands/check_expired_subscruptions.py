@@ -24,6 +24,18 @@ class Command(BaseCommand):
             sub.save()
             logger.info(f"⚠️ {sub.user.email} entrato in periodo di grazia (scadenza: {sub.grace_period_end})")
 
+        # ✅ NUOVO: Attiva piani pending alla scadenza
+        pending_activations = PaymentSubscription.objects.filter(
+            pending_plan__isnull=False,
+            subscription_end__lt=now,
+            status__in=['active', 'grace_period']
+        )
+
+        for sub in pending_activations:
+            old_plan = sub.current_plan
+            sub.activate_pending_plan()
+            logger.info(f"✅ {sub.user.email} - Piano cambiato: {old_plan} → {sub.current_plan}")
+
         # 2. Trova abbonamenti oltre il periodo di grazia
         suspended = PaymentSubscription.objects.filter(
             status__in=['active', 'grace_period'],

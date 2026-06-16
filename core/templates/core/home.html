@@ -37,15 +37,11 @@
                         </ul>
                     </div>
                     <div class="card-footer text-center bg-light">
-                        {% if user.profile.role in "lawyer_a,lawyer_b" %}
-                            <a href="{% url 'families:professional_dashboard' %}" class="btn btn-primary btn-style">
-                                📊 Pannello Avvocato
-                            </a>
-                        {% else %}
-                            <a href="{% url 'families:family_dashboard' %}" class="btn btn-success btn-style">
-                                🚀 Pannello Famiglia
-                            </a>
-                        {% endif %}
+                        <a href="{% url 'families:family_dashboard' %}"
+                           class="btn btn-success btn-style {% if user.profile.is_blocked %}disabled-sub{% endif %}"
+                           {% if user.profile.is_blocked %}title="⚠️ Funzione bloccata: rinnova l'abbonamento per accedere"{% endif %}>
+                           🚀 Pannello Famiglia
+                        </a>
                     </div>
                 </div>
             </div>
@@ -70,12 +66,14 @@
                         <div class="d-grid gap-2">
                             <a href="{% url 'accounts:login' %}" class="btn btn-success btn-style">🔑 Accedi</a>
                             <a href="{% url 'accounts:register' %}" class="btn btn-outline-primary">📝 Registrati</a>
+                            <a href="{% url 'accounts:password_reset' %}" class="btn btn-outline-primary">📝 Non ricordi la password</a>
                         </div>
                     </form>
                     {% else %}
                     <div class="d-grid gap-2">
                         <a href="{% url 'accounts:login' %}" class="btn btn-success btn-style">🔑 Accedi</a>
                         <a href="{% url 'accounts:register' %}" class="btn btn-outline-primary">📝 Registrati</a>
+                        <a href="{% url 'accounts:password_reset' %}" class="btn btn-outline-primary">📝 Non ricordi la password</a>
                     </div>
                     {% endif %}
                 </div>

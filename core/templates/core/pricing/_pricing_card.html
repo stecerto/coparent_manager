@@ -1,0 +1,52 @@
+<!-- core/templates/core/pricing/_pricing_card.html -->
+<div class="col-md-4 col-lg-3">
+    <div class="card h-100 shadow-sm {% if plan.recommended %}border-success{% else %}border{% endif %}">
+
+        {% if plan.recommended %}
+            <div class="card-header bg-success text-white text-center fw-bold">⭐ PIÙ SCELTO</div>
+        {% endif %}
+
+        <div class="card-body text-center d-flex flex-column">
+            <h5 class="card-title">{{ plan.title }}</h5>
+
+            {% if plan.is_custom %}
+                <h2 class="display-6 fw-bold">Custom</h2>
+                <p class="text-muted">{{ plan.limit }}</p>
+            {% else %}
+                <h2 class="display-6 fw-bold">{{ plan.monthly_formatted }}<span class="fs-6 text-muted">/mese</span></h2>
+                <p class="text-muted small">Dopo i 14 giorni di prova</p>
+                <p class="text-muted">{{ plan.limit }}</p>
+            {% endif %}
+
+            <!-- ✅ CICLO CORRETTO SULLE FEATURES SPECIFICHE DEL RUOLO -->
+            <ul class="list-unstyled text-start mb-4 small flex-grow-1">
+                {% for feature in plan.features %}
+                    <li class="mb-2">
+                        {% if feature.active %}
+                            <span class="text-success">✅</span> {{ feature.name }}
+                        {% else %}
+                            <span class="text-danger">❌</span> <span class="text-muted">{{ feature.name }}</span>
+                        {% endif %}
+                    </li>
+                {% endfor %}
+            </ul>
+
+            <!-- ✅ PULSANTE INTELLIGENTE -->
+            {% if plan.is_custom %}
+                <a href="mailto:info@coparentmanager.it" class="btn btn-outline-dark w-100 mt-auto">Parla con noi</a>
+            {% elif user.is_authenticated %}
+                {% if plan.is_current %}
+                    <button class="btn btn-secondary w-100 mt-auto" disabled>Piano Attuale</button>
+                {% else %}
+                    <a href="{% url 'payment' %}?plan={{ plan.id }}" class="btn {% if plan.recommended %}btn-success{% else %}btn-outline-primary{% endif %} w-100 mt-auto">
+                        Passa a {{ plan.title }}
+                    </a>
+                {% endif %}
+            {% else %}
+                <a href="{% url 'accounts:register' %}?role={{ role }}&plan={{ plan.id }}" class="btn {% if plan.recommended %}btn-success{% else %}btn-outline-primary{% endif %} w-100 mt-auto">
+                    🎁 Prova 14 giorni gratis
+                </a>
+            {% endif %}
+        </div>
+    </div>
+</div>

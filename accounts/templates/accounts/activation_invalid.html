@@ -1,100 +1,310 @@
 {% extends "base.html" %}
+{% load static %}
 
-{% block title %}Invito non valido{% endblock %}
+{% block title %}Invito - CoParent Manager{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* 🎨 BACKGROUND GRADIENT (Coerente con Login/Register) */
+    .invitation-container {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 2rem 0;
+    }
+
+    /* 🎴 CARD */
+    .invitation-card {
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        padding: 2.5rem;
+        max-width: 500px;
+        width: 100%;
+        animation: slideUp 0.5s ease;
+    }
+
+    @keyframes slideUp {
+        from { opacity: 0; transform: translateY(30px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 🎯 LOGO */
+    .invitation-logo {
+        width: 80px;
+        height: 80px;
+        background: #ffffff;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.15);
+        padding: 15px;
+    }
+
+    .invitation-logo img {
+        max-width: 80px;
+        height: auto;
+        object-fit: contain;
+    }
+
+    /* 🎨 ICONE STATO (cerchi colorati con emoji) */
+    .status-icon {
+        width: 90px;
+        height: 90px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 1.5rem;
+        font-size: 2.5rem;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+
+    .status-icon.success {
+        background: linear-gradient(135deg, #48bb78 0%, #38a169 100%);
+        color: white;
+    }
+    .status-icon.warning {
+        background: linear-gradient(135deg, #f6ad55 0%, #ed8936 100%);
+        color: white;
+    }
+    .status-icon.danger {
+        background: linear-gradient(135deg, #fc8181 0%, #e53e3e 100%);
+        color: white;
+    }
+    .status-icon.info {
+        background: linear-gradient(135deg, #63b3ed 0%, #3182ce 100%);
+        color: white;
+    }
+
+    /* 📝 TITOLI */
+    .invitation-title {
+        text-align: center;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 0.75rem;
+        font-size: 1.8rem;
+    }
+
+    .invitation-subtitle {
+        text-align: center;
+        color: #718096;
+        margin-bottom: 1.5rem;
+        font-size: 0.95rem;
+    }
+
+    /* 💡 INFO BOX */
+    .info-box {
+        background: #ebf8ff;
+        border-left: 4px solid #4299e1;
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        margin: 1.5rem 0;
+        font-size: 0.9rem;
+        color: #2b6cb0;
+    }
+
+    .info-box strong {
+        color: #2c5282;
+    }
+
+    /* 🔘 PULSANTI */
+    .btn-primary-gradient {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        border-radius: 12px;
+        padding: 0.9rem;
+        font-weight: 600;
+        font-size: 1.05rem;
+        color: white;
+        width: 100%;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    }
+
+    .btn-primary-gradient:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+
+    .btn-secondary-custom {
+        border: 2px solid #e2e8f0;
+        background: white;
+        color: #4a5568;
+        border-radius: 12px;
+        padding: 0.75rem;
+        font-weight: 500;
+        width: 100%;
+        transition: all 0.2s ease;
+    }
+
+    .btn-secondary-custom:hover {
+        border-color: #667eea;
+        color: #667eea;
+        background: #f7fafc;
+    }
+
+    .btn-outline-custom {
+        border: 2px solid #cbd5e0;
+        background: transparent;
+        color: #4a5568;
+        border-radius: 12px;
+        padding: 0.75rem;
+        font-weight: 500;
+        width: 100%;
+        transition: all 0.2s ease;
+    }
+
+    .btn-outline-custom:hover {
+        border-color: #667eea;
+        color: #667eea;
+    }
+
+    /* 📦 GRUPPO PULSANTI */
+    .btn-group-custom {
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
+        margin-top: 1.5rem;
+    }
+
+    /* 📱 RESPONSIVE */
+    @media (max-width: 576px) {
+        .invitation-card {
+            padding: 2rem 1.5rem;
+        }
+        .invitation-title {
+            font-size: 1.5rem;
+        }
+        .status-icon {
+            width: 75px;
+            height: 75px;
+            font-size: 2rem;
+        }
+    }
+</style>
+{% endblock extra_css %}
 
 {% block content %}
-<div class="container py-5 text-center">
-    <div class="card shadow-sm mx-auto" style="max-width: 500px;">
-        <div class="card-body py-5">
+<div class="invitation-container">
+    <div class="invitation-card">
+        <!-- 🎯 LOGO -->
+        <div class="invitation-logo">
+            <img src="{% static 'images/logo-coparent.svg' %}" alt="CoParent Manager Logo">
+        </div>
 
-            {# ✅ CASO 1: Invito già accettato #}
-            {% if invitation and invitation.status == 'accepted' %}
-                <div class="display-1 text-success mb-3">✅</div>
-                <h3 class="mb-3">Hai già accettato questo invito!</h3>
-                <p class="text-muted mb-4">
-                    Il tuo account è attivo e sei già membro della famiglia
-                    <strong>{{ invitation.family.name }}</strong>.
-                </p>
-                <div class="d-grid gap-2">
-                    <a href="{% url 'accounts:login' %}" class="btn btn-primary btn-lg">
-                        🔑 Accedi al tuo account
-                    </a>
-                    <a href="{% url 'home' %}" class="btn btn-outline-secondary">
-                        🏠 Torna alla Home
-                    </a>
-                </div>
+        {# ✅ CASO 1: Invito già accettato #}
+        {% if invitation and invitation.status == 'accepted' %}
+            <div class="status-icon success">
+                <i class="bi bi-check-lg"></i>
+            </div>
+            <h2 class="invitation-title">Hai già accettato!</h2>
+            <p class="invitation-subtitle">
+                Il tuo account è attivo e sei già membro della famiglia
+                <strong>{{ invitation.family.name }}</strong>.
+            </p>
+            <div class="btn-group-custom">
+                <a href="{% url 'accounts:login' %}" class="btn btn-primary-gradient">
+                    <i class="bi bi-box-arrow-in-right me-2"></i>
+                    Accedi al tuo account
+                </a>
+                <a href="{% url 'home' %}" class="btn btn-secondary-custom">
+                    <i class="bi bi-house-door me-2"></i>
+                    Torna alla Home
+                </a>
+            </div>
 
-            {# ✅ CASO 2: Invito scaduto #}
-            {% elif reason == "expired" %}
-                <div class="display-4 text-danger mb-3">⏰</div>
-                <h3 class="mb-3">Invito Scaduto</h3>
-                <p class="text-muted mb-4">
-                    L'invito per <strong>{{ invitation.email }}</strong> è scaduto.
-                </p>
-                <div class="alert alert-info text-start">
-                    <small>
-                        <strong>💡 Come procedere:</strong><br>
+        {# ✅ CASO 2: Invito scaduto #}
+        {% elif reason == "expired" %}
+            <div class="status-icon warning">
+                <i class="bi bi-clock-history"></i>
+            </div>
+            <h2 class="invitation-title">Invito Scaduto</h2>
+            <p class="invitation-subtitle">
+                L'invito per <strong>{{ invitation.email }}</strong> è scaduto e non è più valido.
+            </p>
+            <div class="info-box">
+                <strong><i class="bi bi-lightbulb-fill me-1"></i> Come procedere:</strong><br>
+                <small class="d-block mt-1">
+                    Contatta <strong>{{ invitation.invited_by.get_full_name|default:invitation.invited_by.email }}</strong>
+                    per farti reinviare l'invito dalla sua dashboard.
+                </small>
+            </div>
+            <div class="btn-group-custom">
+                <a href="{% url 'home' %}" class="btn btn-primary-gradient">
+                    <i class="bi bi-house-door me-2"></i>
+                    Torna alla Home
+                </a>
+                <a href="{% url 'accounts:register' %}" class="btn btn-outline-custom">
+                    <i class="bi bi-person-plus me-2"></i>
+                    Registrati con un'altra email
+                </a>
+            </div>
+
+        {# ✅ CASO 3: Invito non valido / già usato #}
+        {% elif reason == "invalid" %}
+            <div class="status-icon danger">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+            </div>
+            <h2 class="invitation-title">Invito Non Valido</h2>
+            <p class="invitation-subtitle">
+                {% if invitation %}
+                    L'invito per <strong>{{ invitation.email }}</strong> non è valido o è stato già utilizzato.
+                {% else %}
+                    Questo link di invito non è valido o non esiste più.
+                {% endif %}
+            </p>
+            {% if invitation and invitation.invited_by %}
+                <div class="info-box">
+                    <strong><i class="bi bi-lightbulb-fill me-1"></i> Suggerimento:</strong><br>
+                    <small class="d-block mt-1">
                         Contatta <strong>{{ invitation.invited_by.get_full_name|default:invitation.invited_by.email }}</strong>
-                        per farti reinviare l'invito dalla sua dashboard.
+                        per farti reinviare l'invito.
                     </small>
                 </div>
-                <div class="d-grid gap-2">
-                    <a href="{% url 'home' %}" class="btn btn-primary">🏠 Torna alla Home</a>
-                    <a href="{% url 'accounts:register' %}" class="btn btn-outline-secondary">
-                        📝 Registrati con un'altra email
-                    </a>
-                </div>
-
-            {# ✅ CASO 3: Invito non valido / già usato #}
-            {% elif reason == "invalid" %}
-                <div class="display-4 text-danger mb-3">⚠️</div>
-                <h3 class="mb-3">Invito Non Valido</h3>
-                <p class="text-muted mb-4">
-                    {% if invitation %}
-                        L'invito per <strong>{{ invitation.email }}</strong> non è valido o è stato già utilizzato.
-                    {% else %}
-                        Questo link di invito non è valido o non esiste più.
-                    {% endif %}
-                </p>
-                <div class="d-grid gap-2">
-                    <a href="{% url 'home' %}" class="btn btn-primary">🏠 Torna alla Home</a>
-                    <a href="{% url 'accounts:register' %}" class="btn btn-outline-secondary">
-                        📝 Registrati con un'altra email
-                    </a>
-                    <a href="{% url 'accounts:resend_activation' %}" class="btn btn-outline-primary mb-3">
-                        🔁 Richiedi nuovo link di attivazione
-                    </a>
-                </div>
-                {% if invitation and invitation.invited_by %}
-                    <div class="alert alert-info mt-4 text-start">
-                        <small>
-                            <strong>💡 Suggerimento:</strong><br>
-                            Contatta <strong>{{ invitation.invited_by.get_full_name|default:invitation.invited_by.email }}</strong>
-                            per farti reinviare l'invito.
-                        </small>
-                    </div>
-                {% endif %}
-
-            {# ✅ CASO 4: Errore generico #}
-            {% else %}
-                <div class="display-4 text-danger mb-3">❌</div>
-                <h3 class="mb-3">Errore</h3>
-                <p class="text-muted mb-4">Si è verificato un errore con questo link di invito.</p>
-                <div class="d-grid gap-2">
-                    <a href="{% url 'home' %}" class="btn btn-primary">🏠 Torna alla Home</a>
-                </div>
             {% endif %}
+            <div class="btn-group-custom">
+                <a href="{% url 'home' %}" class="btn btn-primary-gradient">
+                    <i class="bi bi-house-door me-2"></i>
+                    Torna alla Home
+                </a>
+                <a href="{% url 'accounts:register' %}" class="btn btn-outline-custom">
+                    <i class="bi bi-person-plus me-2"></i>
+                    Registrati con un'altra email
+                </a>
+                <a href="{% url 'accounts:resend_activation' %}" class="btn btn-outline-custom">
+                    <i class="bi bi-arrow-repeat me-2"></i>
+                    Richiedi nuovo link di attivazione
+                </a>
+            </div>
 
-        </div>
+        {# ✅ CASO 4: Errore generico #}
+        {% else %}
+            <div class="status-icon danger">
+                <i class="bi bi-x-lg"></i>
+            </div>
+            <h2 class="invitation-title">Si è verificato un errore</h2>
+            <p class="invitation-subtitle">
+                Non siamo riusciti a elaborare questo link di invito. Potrebbe essere corrotto o non più valido.
+            </p>
+            <div class="info-box">
+                <strong><i class="bi bi-info-circle-fill me-1"></i> Cosa fare:</strong><br>
+                <small class="d-block mt-1">
+                    Se il problema persiste, contatta il supporto o richiedi un nuovo invito al membro della famiglia che ti ha invitato.
+                </small>
+            </div>
+            <div class="btn-group-custom">
+                <a href="{% url 'home' %}" class="btn btn-primary-gradient">
+                    <i class="bi bi-house-door me-2"></i>
+                    Torna alla Home
+                </a>
+            </div>
+        {% endif %}
     </div>
 </div>
-{% endblock %}
-
-
-
-
-
-
-
-
-
+{% endblock content %}

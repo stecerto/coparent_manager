@@ -15,27 +15,28 @@
         {% endif %}
     </div>
 
-    <div class="list-group shadow-sm">
+        <div class="list-group shadow-sm">
         {% for notif in notifications %}
-        <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-start {% if not notif.is_read %}border-start border-4 border-primary bg-light{% endif %}">
+        <div class="list-group-item list-group-item-action d-flex justify-content-between align-items-start {% if not notif.is_read %}border-start border-1 border-{{ notif.color_class }} bg-light{% endif %}">
             <div class="ms-2 me-auto">
                 <div class="fw-bold d-flex align-items-center gap-2">
-                    {% if not notif.is_read %}🔵{% else %}⚪{% endif %}
+                    {% if not notif.is_read %}<span class="text-{{ notif.color_class }}">●</span>{% else %}<span class="text-muted">○</span>{% endif %}
+                    <span class="fs-5">{{ notif.icon }}</span>
                     {{ notif.title }}
-                    <span class="badge bg-secondary ms-1">{{ notif.get_notification_type_display }}</span>
+                    <span class="badge bg-{{ notif.color_class }} ms-1">{{ notif.get_notification_type_display }}</span>
                 </div>
                 <p class="mb-1 text-muted small">{{ notif.message|truncatechars:120 }}</p>
                 <small class="text-muted">{{ notif.created_at|timesince }} fa</small>
-                
+
                 {% if notif.target_url %}
                 <a href="{{ notif.target_url }}" class="btn btn-link btn-sm p-0 mt-1 text-decoration-none">🔗 Vai al dettaglio</a>
                 {% endif %}
             </div>
-            
+
             {% if not notif.is_read %}
             <form action="{% url 'notifications:mark_as_read' notif.id %}" method="POST" class="d-inline ms-2">
                 {% csrf_token %}
-                <button type="submit" class="btn btn-outline-primary btn-sm">Segna come letta</button>
+                <button type="submit" class="btn btn-outline-{{ notif.color_class }} btn-sm">Segna come letta</button>
             </form>
             {% endif %}
         </div>
