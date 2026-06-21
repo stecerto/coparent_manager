@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+{% load custom_filters %}
+
+{% block title %}💰 Modifica Mantenimento - {{ child.name }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+
+            <!-- Header -->
+            <div class="d-flex align-items-center mb-4">
+                <a href="{% url 'families:family_settings' %}?family_id={{ family.id }}" class="btn btn-outline-secondary btn-sm me-3 shadow-sm">
+                    <i class="bi bi-arrow-left"></i> Indietro
+                </a>
+                <div>
+                    <h1 class="h3 fw-bold mb-0">💰 Modifica Mantenimento</h1>
+                    <p class="text-muted mb-0 small">Figlio: <strong>{{ child.name }} {{ child.surname }}</strong></p>
+                </div>
+            </div>
+
+            <!-- Card Form -->
+            <div class="card shadow-sm border-0" style="border-radius: 12px;">
+                <div class="card-header bg-white border-bottom border-start border-1 border-primary d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                    <i class="bi bi-cash-coin fs-3 text-primary me-3"></i>
+                    <h5 class="mb-0 fw-bold">Mantenimento Figlio</h5>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" enctype="multipart/form-data">
+                        {% csrf_token %}
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-uppercase text-muted">Importo Mensile (€)</label>
+                            <input type="number" name="amount" class="form-control" step="0.01" min="0"
+                                   value="{{ current_support.amount|default:'' }}" required>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-uppercase text-muted">Data di Decorrenza</label>
+                            <input type="date" name="start_date" class="form-control"
+                                   value="{{ current_support.start_date|date:'Y-m-d' }}" required>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-uppercase text-muted">Data Fine (opzionale)</label>
+                            <input type="date" name="end_date" class="form-control"
+                                   value="{{ current_support.end_date|date:'Y-m-d'|default:'' }}">
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-uppercase text-muted">💸 Chi versa il mantenimento</label>
+                            <select name="payer_role" class="form-select" required>
+                                <option value="parent_a" {% if current_support.payer_role == 'parent_a' %}selected{% endif %}>
+                                    {{ family|parent_display_name:"parent_a" }} → {{ family|parent_display_name:"parent_b" }}
+                                </option>
+                                <option value="parent_b" {% if current_support.payer_role == 'parent_b' %}selected{% endif %}>
+                                    {{ family|parent_display_name:"parent_b" }} → {{ family|parent_display_name:"parent_a" }}
+                                </option>
+                            </select>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-uppercase text-muted">Ripartizione % Genitore A</label>
+                            <input type="number" name="split_pct_parent_a" class="form-control" step="0.01" min="0" max="100"
+                                   value="{{ current_support.split_pct_parent_a|default:'50.00' }}" required>
+                            <small class="form-text text-muted">
+                                La percentuale rimanente ({{ 100|add:"-current_support.split_pct_parent_a|default:50" }}%) sarà a carico del Genitore B
+                            </small>
+                        </div>
+
+                        <!-- ✅ SEZIONE SENTENZA (OBBLIGATORIA) -->
+                        <div class="alert alert-warning mb-4">
+                            <h6 class="alert-heading">
+                                <i class="bi bi-file-earmark-text me-2"></i>
+                                <strong>Sentenza Obbligatoria</strong>
+                            </h6>
+                            <p class="mb-2 small">
+                                Per modificare il mantenimento è necessario caricare la sentenza che autorizza la modifica.
+                                La sentenza sarà accessibile anche ai genitori.
+                            </p>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">📄 Numero Sentenza</label>
+                            <input type="text" name="decree_number" class="form-control"
+                                   placeholder="Es: Sentenza n. 123/2026" required>
+                            <small class="form-text text-muted">
+                                Numero o riferimento della sentenza
+                            </small>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">📅 Data Sentenza</label>
+                            <input type="date" name="decree_date" class="form-control" required>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">📎 Carica File Sentenza</label>
+                            <input type="file" name="decree_file" class="form-control" accept=".pdf,.jpg,.jpeg,.png" required>
+                            <small class="form-text text-muted">
+                                Formati accettati: PDF, JPG, PNG (max 10MB)
+                            </small>
+                        </div>
+
+                        <!-- Info certificazione automatica -->
+                        <div class="alert alert-info mb-4">
+                            <i class="bi bi-patch-check-fill me-2"></i>
+                            <strong>Certificazione Automatica</strong>
+                            <p class="mb-0 small mt-2">
+                                Caricando la sentenza, il mantenimento verrà automaticamente certificato da te.
+                                I genitori potranno visualizzare la sentenza ma non modificare il mantenimento.
+                            </p>
+                        </div>
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-check-circle me-2"></i>Salva e Certifica
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

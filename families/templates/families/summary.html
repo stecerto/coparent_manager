@@ -102,40 +102,39 @@
         </div>
         {% endif %}
 
-        <!-- 👤 CARD 3: ALTRO GENITORE (Visibile solo ai Genitori) -->
-        {% if user_role in RoleChoices.parent_roles and other_parent and other_parent.user %}
-        <div class="col-12">
-            <div class="card shadow-sm border-0" style="border-radius: 12px;">
+        <!-- 👤 CARD 3: ALTRO GENITORE (Visibile solo ai Genitori)-->
+        {% if user_role not in RoleChoices.lawyer_roles %}
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 h-100" style="border-radius: 12px;">
                 <div class="card-header bg-white border-bottom border-start border-1 border-success d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
-                    <i class="bi bi-people fs-3 text-success me-3"></i>
-                    <h5 class="mb-0 fw-bold">
-                        {% if user_role == RoleChoices.PARENT_A %}{{ RoleChoices.PARENT_B.label }}{% else %}{{ RoleChoices.PARENT_A.label }}{% endif %}
-                    </h5>
+                    <i class="bi bi-person-check fs-3 text-success me-3"></i>
+                    <h5 class="mb-0 fw-bold">{{ RoleChoices.PARENT_A.label }}</h5>
                 </div>
                 <div class="card-body p-4">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.75rem;">Nome e Cognome</small>
-                            <div class="d-flex align-items-center mt-1">
-                                <i class="bi bi-person text-secondary me-2"></i>
-                                <strong>{{ other_parent.user.first_name|default:"-" }} {{ other_parent.user.last_name|default:"-" }}</strong>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.75rem;">Email</small>
-                            <div class="d-flex align-items-center mt-1">
-                                <i class="bi bi-envelope text-secondary me-2"></i>
-                                <strong>{{ other_parent.user.email|default:"-" }}</strong>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <small class="text-muted text-uppercase fw-semibold" style="font-size: 0.75rem;">Telefono</small>
-                            <div class="d-flex align-items-center mt-1">
-                                <i class="bi bi-telephone text-secondary me-2"></i>
-                                <strong>{{ other_parent.user.profile.phone|default:"Non inserito" }}</strong>
-                            </div>
-                        </div>
-                    </div>
+                    {% if parent_a and parent_a.user %}
+                        <p class="mb-2"><i class="bi bi-person me-2 text-muted"></i>{{ parent_a.user.first_name|default:"-" }} {{ parent_a.user.last_name|default:"-" }}</p>
+                        <p class="mb-2"><i class="bi bi-envelope me-2 text-muted"></i>{{ parent_a.user.email|default:"-" }}</p>
+                        <p class="mb-0"><i class="bi bi-telephone me-2 text-muted"></i>{{ parent_a.user.profile.phone|default:"Non inserito" }}</p>
+                    {% else %}
+                        <p class="text-muted fst-italic mb-0"><i class="bi bi-info-circle me-2"></i>Non ancora registrato</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 h-100" style="border-radius: 12px;">
+                <div class="card-header bg-white border-bottom border-start border-1 border-success d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                    <i class="bi bi-person-check fs-3 text-success me-3"></i>
+                    <h5 class="mb-0 fw-bold">{{ RoleChoices.PARENT_B.label }}</h5>
+                </div>
+                <div class="card-body p-4">
+                    {% if parent_b and parent_b.user %}
+                        <p class="mb-2"><i class="bi bi-person me-2 text-muted"></i>{{ parent_b.user.first_name|default:"-" }} {{ parent_b.user.last_name|default:"-" }}</p>
+                        <p class="mb-2"><i class="bi bi-envelope me-2 text-muted"></i>{{ parent_b.user.email|default:"-" }}</p>
+                        <p class="mb-0"><i class="bi bi-telephone me-2 text-muted"></i>{{ parent_b.user.profile.phone|default:"Non inserito" }}</p>
+                    {% else %}
+                        <p class="text-muted fst-italic mb-0"><i class="bi bi-info-circle me-2"></i>Non ancora registrato</p>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -204,6 +203,44 @@
                 </div>
             </div>
         {% endif %}
+
+        <!-- 🤝 CARD 4B: MEDIATORE -->
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 h-100" style="border-radius: 12px;">
+                <div class="card-header bg-white border-bottom border-start border-1 border-warning d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                    <i class="bi bi-people-fill fs-3 text-warning me-3"></i>
+                    <h5 class="mb-0 fw-bold">{{ RoleChoices.MEDIATOR.label }}</h5>
+                </div>
+                <div class="card-body p-4">
+                    {% if mediator_member and mediator_member.user %}
+                        <p class="mb-2"><i class="bi bi-person me-2 text-muted"></i>{{ mediator_member.user.first_name|default:"-" }} {{ mediator_member.user.last_name|default:"-" }}</p>
+                        <p class="mb-2"><i class="bi bi-envelope me-2 text-muted"></i>{{ mediator_member.user.email|default:"-" }}</p>
+                        <p class="mb-0"><i class="bi bi-telephone me-2 text-muted"></i>{{ mediator_member.user.profile.phone|default:"Non inserito" }}</p>
+                    {% else %}
+                        <p class="text-muted fst-italic mb-0"><i class="bi bi-info-circle me-2"></i>Non ancora assegnato</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- 📊 CARD 4C: CONSULENTE -->
+        <div class="col-md-6">
+            <div class="card shadow-sm border-0 h-100" style="border-radius: 12px;">
+                <div class="card-header bg-white border-bottom border-start border-1 border-secondary d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                    <i class="bi bi-briefcase-fill fs-3 text-secondary me-3"></i>
+                    <h5 class="mb-0 fw-bold">{{ RoleChoices.CONSULTANT.label }}</h5>
+                </div>
+                <div class="card-body p-4">
+                    {% if consultant_member and consultant_member.user %}
+                        <p class="mb-2"><i class="bi bi-person me-2 text-muted"></i>{{ consultant_member.user.first_name|default:"-" }} {{ consultant_member.user.last_name|default:"-" }}</p>
+                        <p class="mb-2"><i class="bi bi-envelope me-2 text-muted"></i>{{ consultant_member.user.email|default:"-" }}</p>
+                        <p class="mb-0"><i class="bi bi-telephone me-2 text-muted"></i>{{ consultant_member.user.profile.phone|default:"Non inserito" }}</p>
+                    {% else %}
+                        <p class="text-muted fst-italic mb-0"><i class="bi bi-info-circle me-2"></i>Non ancora assegnato</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
 
         <!-- 👶 CARD 5: FIGLI -->
         <div class="col-12">

@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}⚠️ Nessuna Famiglia{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm border-0 text-center" style="border-radius: 12px;">
+                <div class="card-body p-5">
+                    <div class="mb-4">
+                        <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size: 4rem;"></i>
+                    </div>
+                    
+                    <h3 class="fw-bold mb-3">⚠️ Nessuna Famiglia Configurata</h3>
+                    
+                    <p class="text-muted mb-4">
+                        Non hai ancora configurato una famiglia o non hai i permessi per accedere al calendario.
+                    </p>
+                    
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'families:setup' %}" class="btn btn-primary btn-lg">
+                            <i class="bi bi-gear-fill me-2"></i>Vai alle Impostazioni
+                        </a>
+                        <a href="{% url 'home' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-house me-2"></i>Torna alla Home
+                        </a>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="text-start">
+                        <h6 class="fw-bold mb-3">💡 Cosa puoi fare:</h6>
+                        <ul class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="bi bi-check-circle-fill text-success me-2"></i>
+                                <strong>Genitori:</strong> Crea una nuova famiglia dalle impostazioni
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-check-circle-fill text-success me-2"></i>
+                                <strong>Professionisti:</strong> Attendi l'invito da una famiglia
+                            </li>
+                            <li class="mb-0">
+                                <i class="bi bi-check-circle-fill text-success me-2"></i>
+                                <strong>Hai un invito?</strong> Controlla la tua email
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

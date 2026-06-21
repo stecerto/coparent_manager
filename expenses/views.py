@@ -49,8 +49,9 @@ def expenses_dashboard(request):
     total_expenses = expenses.aggregate(total=Sum("amount"))["total"] or Decimal("0.00")
     parent_a_total = Decimal("0.00")
     parent_b_total = Decimal("0.00")
+    # ✅ Escludi le ordinarie dal calcolo quote (non influenzano il mantenimento)
     for exp in expenses:
-        if exp.child:
+        if exp.child and exp.group_snapshot != "ordinarie":
             a, b = get_expense_shares(exp)
             parent_a_total += a
             parent_b_total += b
@@ -139,77 +140,169 @@ def add_expense(request):
         messages.error(request, "⚠️ Solo i genitori possono inserire spese")
         return redirect("expenses:expenses_list")
 
+    user_role = str(membership.role).lower()
+    is_parent = user_role in ['parent_a', 'parent_b']
+    is_spouse = user_role == 'spouse'
+
+    if not (is_parent or is_spouse):
+        messages.error(request, "⚠️ Solo i genitori e il coniuge possono inserire spese")
+        return redirect("expenses:expenses_list")
+
+        # ✅ VALIDAZIONE CONIUGE: può inserire solo se ha mantenimento attivo
+    if is_spouse:
+        from children.models import ChildSupport
+        from datetime import date
+
+        today = date.today()
+
+        # Controlla se ha mantenimento coniuge attivo
+        spouse_support = ChildSupport.objects.filter(
+            family=family,
+            support_type='spouse',
+            is_active=True,
+            start_date__lte=today
+        ).filter(
+            Q(end_date__isnull=True) | Q(end_date__gte=today)
+        ).first()
+
+        if not spouse_support:
+            messages.error(request, "⚠️ Non puoi inserire spese perché non hai un mantenimento attivo")
+            return redirect("expenses:expenses_list")
+
     # ✅ NUOVO: Leggi il parametro ?next= per il redirect alla chat
-    # Lo cerchiamo sia in GET (quando l'utente arriva dalla chat) che in POST (per preservarlo nel form)
     next_url = request.GET.get('next') or request.POST.get('next')
 
     if request.method == "POST":
         form = ExpenseForm(request.POST, request.FILES, user=request.user)
         if form.is_valid():
             cleaned = form.cleaned_data
+            child = cleaned.get("child")
+            expense_date = cleaned["expense_date"]
+
+            # ✅ VALIDAZIONE CONIUGE: controlla date mantenimento
+            if is_spouse:
+                from children.models import ChildSupport
+                from datetime import date
+
+                today = date.today()
+
+                if child:
+                    # Spesa per figlio: controlla mantenimento figlio
+                    child_support = ChildSupport.objects.filter(
+                        child=child,
+                        support_type='child',
+                        is_active=True,
+                        start_date__lte=today
+                    ).filter(
+                        Q(end_date__isnull=True) | Q(end_date__gte=today)
+                    ).first()
+
+                    if child_support and child_support.end_date and expense_date > child_support.end_date:
+                        messages.error(
+                            request,
+                            f"⚠️ Non puoi inserire spese per {child.name} dopo il {child_support.end_date.strftime('%d/%m/%Y')}"
+                        )
+                        return redirect("expenses:expenses_list")
+                else:
+                    # Spesa per coniuge: controlla mantenimento coniuge
+                    spouse_support = ChildSupport.objects.filter(
+                        family=family,
+                        support_type='spouse',
+                        is_active=True,
+                        start_date__lte=today
+                    ).filter(
+                        Q(end_date__isnull=True) | Q(end_date__gte=today)
+                    ).first()
+
+                    if spouse_support and spouse_support.end_date and expense_date > spouse_support.end_date:
+                        messages.error(
+                            request,
+                            f"⚠️ Non puoi inserire spese dopo il {spouse_support.end_date.strftime('%d/%m/%Y')}"
+                        )
+                        return redirect("expenses:expenses_list")
 
             expense = create_expense(
                 family=family,
                 user=request.user,
-                child=cleaned["child"],
+                child=child,
                 expense_type=cleaned["expense_type"],
                 amount=cleaned["amount"],
                 description=cleaned.get("description", ""),
-                expense_date=cleaned["expense_date"],
+                expense_date=expense_date,
                 membership=membership
             )
+            if expense.group_snapshot.lower() != "ordinarie" and expense.status != "paid":
+                approve_expense(expense, request.user, membership.role)
 
-            approve_expense(expense, request.user, membership.role)
+                import logging
+                logger = logging.getLogger(__name__)
 
-            import logging
-            logger = logging.getLogger(__name__)
+                # Determina il ruolo dell'altro genitore
+                other_parent_role = RoleChoices.PARENT_B if str(membership.role).lower() in ['parent_a',
+                                                                                             'parent'] else RoleChoices.PARENT_A
 
-            # Determina il ruolo dell'altro genitore
-            other_parent_role = RoleChoices.PARENT_B if str(membership.role).lower() in ['parent_a',
-                                                                                         'parent'] else RoleChoices.PARENT_A
+                # Cerca l'altro genitore nella famiglia
+                other_parent = FamilyMember.objects.filter(family=family, role=other_parent_role).select_related(
+                    'user').first()
 
-            # Cerca l'altro genitore nella famiglia
-            other_parent = FamilyMember.objects.filter(family=family, role=other_parent_role).select_related(
-                'user').first()
+                if other_parent and other_parent.user != request.user:
+                    try:
+                        category_name = expense.expense_type.display_name if expense.expense_type else "Spesa"
+                        create_notification(
+                            user=other_parent.user,
+                            notification_type="expense_pending",
+                            title=f"🆕 Nuova spesa da approvare",
+                            message=f"{request.user.first_name or request.user.email} ha inserito una nuova spesa di €{expense.amount} per '{category_name}'.",
+                            target_url=f"/expenses/list/",
+                            target_model="Expense",
+                            target_id=expense.id,
+                            metadata={"amount": str(expense.amount), "category": category_name}
+                        )
+                    except Exception as e:
+                        logger.error(f"Errore invio notifica spesa a {other_parent.user.email}: {e}")
 
-            if other_parent and other_parent.user != request.user:
-                try:
-                    category_name = expense.expense_type.display_name if expense.expense_type else "Spesa"
-                    create_notification(
-                        user=other_parent.user,
-                        notification_type="expense_pending",
-                        title=f"🆕 Nuova spesa da approvare",
-                        message=f"{request.user.first_name or request.user.email} ha inserito una nuova spesa di €{expense.amount} per '{category_name}'.",
-                        target_url=f"/expenses/list/",
-                        target_model="Expense",
-                        target_id=expense.id,
-                        metadata={"amount": str(expense.amount), "category": category_name}
+                # ✅ Messaggio diverso in base al tipo
+            if expense.group_snapshot.lower() == "ordinarie":
+                messages.success(request,
+                                 f"✅ Spesa ordinaria registrata e approvata automaticamente: €{expense.amount}")
+            else:
+                messages.success(request, f"✅ Spesa inserita (v1). In attesa dell'altro genitore.")
+
+            # ✅ CONIUGE: spese auto-approvate (non richiedono approvazione genitori)
+            if is_spouse:
+                # Auto-approva da entrambi i genitori
+                parent_a = FamilyMember.objects.filter(family=family, role='parent_a').first()
+                parent_b = FamilyMember.objects.filter(family=family, role='parent_b').first()
+
+                if parent_a:
+                    expense.approved_by_parent_a = parent_a.user
+                if parent_b:
+                    expense.approved_by_parent_b = parent_b.user
+
+                expense.status = 'paid'
+                expense.save(update_fields=['approved_by_parent_a', 'approved_by_parent_b', 'status'])
+
+                messages.success(request, "✅ Spesa registrata e approvata automaticamente")
+            else:
+                for f in request.FILES.getlist('payment_proof'):
+                    Document.objects.create(
+                        family=family, owner=request.user, uploaded_by=request.user,
+                        expense=expense, file=f,
+                        title=f"Prova_pagamento_v{expense.version}_{f.name[:50]}",
+                        category="payment_proof", scope="shared", status="approved", is_active=True
                     )
-                except Exception as e:
-                    logger.error(f"Errore invio notifica spesa a {other_parent.user.email}: {e}")
 
-            for f in request.FILES.getlist('payment_proof'):
-                Document.objects.create(
-                    family=family, owner=request.user, uploaded_by=request.user,
-                    expense=expense, file=f,
-                    title=f"Prova_pagamento_v{expense.version}_{f.name[:50]}",
-                    category="payment_proof", scope="shared", status="approved", is_active=True
-                )
-
-            messages.success(request, "✅ Spesa inserita (v1). In attesa dell'altro genitore.")
+                messages.success(request, "✅ Spesa inserita (v1). In attesa dell'altro genitore.")
 
             # ✅ NUOVO: Redirect intelligente verso la chat (se presente)
             if next_url:
-                # Costruisci l'URL di ritorno aggiungendo ?new_expense_id=...
                 separator = '&' if '?' in next_url else '?'
                 return redirect(f"{next_url}{separator}new_expense_id={expense.id}")
 
-            # Fallback: redirect normale alla dashboard spese
             return redirect("expenses:expenses_dashboard")
     else:
         form = ExpenseForm(user=request.user)
 
-    # ✅ NUOVO: Passa next_url al template per il campo hidden
     return render(request, "expenses/expenses_form.html", {
         "form": form,
         "title": "Aggiungi Spesa",
@@ -475,13 +568,15 @@ def download_expense_pdf(request):
 
     parent_a_total = Decimal("0.00")
     parent_b_total = Decimal("0.00")
+    # ✅ Escludi le ordinarie dal calcolo quote (non influenzano il mantenimento)
     for exp in expenses:
-        pct_raw = getattr(exp.child, 'contribution_pct_parent_a', None)
-        pct_a = Decimal(str(pct_raw)) if pct_raw is not None else Decimal('50.00')
-        share_a = exp.amount * (pct_a / Decimal('100'))
-        share_b = exp.amount * ((Decimal('100') - pct_a) / Decimal('100'))
-        parent_a_total += share_a
-        parent_b_total += share_b
+        if exp.group_snapshot != "ordinarie":
+            pct_raw = getattr(exp.child, 'contribution_pct_parent_a', None)
+            pct_a = Decimal(str(pct_raw)) if pct_raw is not None else Decimal('50.00')
+            share_a = exp.amount * (pct_a / Decimal('100'))
+            share_b = exp.amount * ((Decimal('100') - pct_a) / Decimal('100'))
+            parent_a_total += share_a
+            parent_b_total += share_b
 
     pdf_bytes = generate_expense_report_pdf(
         request, family, expenses[:100],
@@ -581,8 +676,10 @@ def expenses_riepilogo_spese(request):
     children = ChildProfile.objects.filter(family=family, is_active=True)
 
     for child in children:
-        # ✅ FIX: Calcola spese condivise su TUTTE le spese (non solo accepted)
-        child_expenses = expenses_qs.filter(child=child).aggregate(
+        # ✅ Escludi le ordinarie dal calcolo spese condivise (non influenzano il mantenimento)
+        child_expenses = expenses_qs.filter(child=child).exclude(
+            group_snapshot="ordinarie"
+        ).aggregate(
             total=Sum("amount")
         )["total"] or Decimal("0.00")
 
@@ -812,8 +909,9 @@ def expenses_analytics_view(request):
     parent_a_total = Decimal("0.00")
     parent_b_total = Decimal("0.00")
 
+    # ✅ Escludi le ordinarie dal calcolo quote (non influenzano il mantenimento)
     for exp in expenses_qs:
-        if exp.child and exp.child.split_percentage_a is not None:
+        if exp.child and exp.child.split_percentage_a is not None and exp.group_snapshot != "ordinarie":
             quota_a = exp.amount * (exp.child.split_percentage_a / Decimal("100"))
             quota_b = exp.amount - quota_a
             parent_a_total += quota_a

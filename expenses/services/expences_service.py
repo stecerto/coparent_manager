@@ -135,46 +135,73 @@ def _get_effective_split_pct(child, override_pct=None):
 def create_expense(family, user, child, expense_type, amount, description, expense_date, membership):
     if not expense_type:
         raise ValueError("expense_type obbligatorio")
+    # ✅ FIX: Confronto case-insensitive
+    group_label = expense_type.group.label
+    group_label_lower = group_label.lower()
 
     pct_a = _get_effective_split_pct(child, None)
 
     # ✅ LOGICA WORKFLOW DIVERSA IN BASE AL GRUPPO
     group_label = expense_type.group.label
-
-    if group_label == "straordinarie":
+    if group_label_lower == "ordinarie":
+        # ✅ ORDINARIE: Auto-approvate e subito pagate (bollino verde)
+        status = "paid"
+        print(f"✅ DEBUG: Spesa ordinaria → status = 'paid'")  # ✅ AGGIUNGI
+    elif group_label_lower == "straordinarie":
         # ✅ Straordinarie semplici: stato "accepted" immediato (no approvazione)
         status = "accepted"
-    elif group_label == "straordinarie_concordare":
+    elif group_label_lower == "straordinarie_concordare":
         # ✅ Straordinarie da concordare: stato "pending" (richiede approvazione)
         status = "pending"
     else:
-        # ✅ Ordinarie o altri: stato "pending" (default)
+        # ✅ Altri: stato "pending" (default)
         status = "pending"
 
-    return Expense.objects.create(
+    expense = Expense.objects.create(
         family=family,
         created_by=user,
         modified_by=user,
-
         child=child,
         expense_type=expense_type,
-
         amount=amount,
         description=description,
         expense_date=expense_date,
-
-        status=status,  # ✅ Stato dinamico
-
+        status=status,
         effective_split_pct_a=pct_a,
-
         category_name_snapshot=expense_type.display_name,
         category_color_snapshot=expense_type.color,
         group_snapshot=group_label,
-
         version=1,
         previous_version=None,
         is_active=True,
     )
+    print(f"🔍 DEBUG: Spesa creata con ID={expense.id}, status={expense.status}")  # ✅ AGGIUNGI
+
+    # ✅ Per le ordinarie, auto-approva da ENTRAMBI i genitori (correttamente!)
+    if group_label_lower == "ordinarie":
+        from families.models import FamilyMember
+
+        # Trova genitore A
+        parent_a_member = FamilyMember.objects.filter(
+            family=family,
+            role__in=['parent_a', 'parent']
+        ).select_related('user').first()
+
+        # Trova genitore B
+        parent_b_member = FamilyMember.objects.filter(
+            family=family,
+            role__in=['parent_b', 'parent']
+        ).select_related('user').first()
+
+        # Assegna correttamente i due approvatori distinti
+        if parent_a_member:
+            expense.approved_by_parent_a = parent_a_member.user
+        if parent_b_member:
+            expense.approved_by_parent_b = parent_b_member.user
+
+        expense.save(update_fields=["approved_by_parent_a", "approved_by_parent_b"])
+
+    return expense
 
 
 def update_expense(original, user, data, child, membership):

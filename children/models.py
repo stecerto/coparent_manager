@@ -58,6 +58,14 @@ class ChildProfile(models.Model):
         blank=True,
         help_text="Importo mensile se non è presente una sentenza attiva"
     )
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['family', 'name', 'surname', 'birth_date'],
+                condition=models.Q(is_active=True),
+                name='unique_active_child_per_family'
+            )
+        ]
 
     # children/models.py - SOSTITUISCI la property effective_maintenance_amount
     @property
@@ -254,6 +262,41 @@ class ChildSupport(models.Model):
     is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
+    # 📄 SENTENZA (obbligatoria per modifiche avvocato)
+    decree_file = models.FileField(
+        "Sentenza/Decreto",
+        upload_to="legal/decrees/child_support/",
+        null=True,
+        blank=True,
+        help_text="Carica la sentenza che autorizza la modifica del mantenimento"
+    )
+    decree_number = models.CharField(
+        "Numero Sentenza",
+        max_length=100,
+        blank=True,
+        help_text="Es: Sentenza n. 123/2026"
+    )
+    decree_date = models.DateField(
+        "Data Sentenza",
+        null=True,
+        blank=True,
+        help_text="Data di emissione della sentenza"
+    )
+    # 🔒 Certificazione (avvocato/mediatore)
+    certified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="certified_child_supports",
+        help_text="Avvocato o mediatore che ha certificato l'accordo"
+    )
+    certified_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def is_certified(self):
+        """Verifica se il mantenimento è certificato"""
+        return self.certified_by is not None
 
     def __str__(self):
         if self.support_type == 'spouse':

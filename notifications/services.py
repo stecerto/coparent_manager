@@ -26,13 +26,13 @@ def create_notification(
     from django.utils import timezone
     from datetime import timedelta
 
-    # ✅ Evita spam: non creare duplicati dello stesso tipo negli ultimi 5 min
+    # ✅ Aumenta a 1 ora per evitare duplicati
     recent = Notification.objects.filter(
         user=user,
         notification_type=notification_type,
         target_model=target_model,
         target_id=target_id,
-        created_at__gte=timezone.now() - timedelta(minutes=5)
+        created_at__gte=timezone.now() - timedelta(hours=1)
     ).exists()
 
     if recent:

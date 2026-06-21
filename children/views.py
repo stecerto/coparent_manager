@@ -19,7 +19,8 @@ from children.utils import calculate_expense_shares, get_child_split_pct
 from expenses.models import Expense
 from expenses.services.expences_service import calculate_monthly_net_balance
 from families.models import FamilyMember
-from .forms import ChildSupportForm, ChildForm
+
+from children.forms import ChildSupportForm, ChildForm
 from .notifications.services_notification import notify_other_parent
 from .services.child_service import update_child_support
 
@@ -33,13 +34,19 @@ def children_list(request):
     today = date.today()
     # ✅ Prefetcha relazioni per evitare query N+1
     children = list(family.children.filter(is_active=True).prefetch_related('supports', 'expenses'))
+    from children.models import ChildSupport
 
-    # 👫 RECUPERA MANTENIMENTO CONIUGE ATTIVO
-    current_spouse_support = ChildSupport.objects.filter(
-        child__family=family,  # ✅ Usa child__family perché ChildSupport non ha family diretto
-        support_type='spouse',
+    # ✅ MIGRATO A SpouseSupportAgreement
+    from families.models import SpouseSupportAgreement
+    current_spouse_support = SpouseSupportAgreement.objects.filter(
+        family=family,
         is_active=True
     ).order_by('-start_date').first()
+    # ✅ PASSA I DATI COME VARIABILI SEPARATE (non come attributi dell'oggetto)
+    spouse_support_amount = float(current_spouse_support.monthly_amount) if current_spouse_support else 0
+    spouse_support_start_date = current_spouse_support.start_date.strftime('%d/%m/%Y') if current_spouse_support else ''
+
+
 
     for child in children:
         # ✅ NUOVO: Calcola il saldo netto mensile
@@ -52,7 +59,31 @@ def children_list(request):
         child.receiver = balance_data['receiver']
         child.balance_message = balance_data['message']
 
-        expenses_qs = Expense.objects.filter(child=child, is_active=True, status="accepted")
+        # ✅ AGGIUNGI QUESTO: Recupera l'oggetto ChildSupport completo per il badge
+        from children.models import ChildSupport
+        child.current_support_detail = ChildSupport.objects.filter(
+            child=child,
+            support_type='child',
+            is_active=True,
+            start_date__lte=today
+        ).filter(
+            Q(end_date__isnull=True) | Q(end_date__gte=today)
+        ).order_by('-start_date').first()
+
+        child.current_support_detail = ChildSupport.objects.filter(
+            child=child,
+            support_type='child',
+            is_active=True,
+            start_date__lte=today
+        ).filter(
+            Q(end_date__isnull=True) | Q(end_date__gte=today)
+        ).order_by('-start_date').first()
+
+        # 💰 Mantenimento
+        # child.current_support = child.effective_maintenance_amount
+
+        # 📊 Quote di ripartizione (fallback a 50/50 se mancante)
+        #pct_a = float(child.contribution_pct_parent_a or 50.0)
         # 💰 Mantenimento
         #child.current_support = child.effective_maintenance_amount
 
@@ -104,14 +135,16 @@ def children_list(request):
         child.split_pct_a = get_child_split_pct(child)
         child.split_pct_b = 100.0 - child.split_pct_a
 
-
-
     context = {
         "children": children,
-        "current_spouse_support": current_spouse_support,  # ✅ Nuovo
+        "current_spouse_support": current_spouse_support,
+        "spouse_support_amount": spouse_support_amount,
+        "spouse_support_start_date": spouse_support_start_date,
+        "family": family,  # per il template tag
     }
 
     return render(request, "children/children_list.html", context)
+
 
 @login_required
 def child_detail(request, child_id):
@@ -179,16 +212,22 @@ def child_create_view(request):
             with transaction.atomic():
                 child = create_child(family, request.user, form.cleaned_data)
 
-                # ✅ FIX: Gestione sicura di amt (evita TypeError o crash su None)
                 amt = form.cleaned_data.get("manual_maintenance_amount")
                 if amt is not None:
                     try:
                         amt_decimal = Decimal(str(amt))
                         if amt_decimal > Decimal("0"):
-                            update_child_support(child, amt_decimal, date.today())
+                            # ✅ PASSA TUTTI I PARAMETRI
+                            update_child_support(
+                                child=child,
+                                new_amount=amt_decimal,
+                                start_date=date.today(),
+                                end_date=None,  # Nessun limite per ora
+                                payer_role='parent_a'  # Default
+                            )
                     except Exception as e:
                         import logging
-                        logging.getLogger(__name__).warning(f"⚠️ Salto mantenimento per errore conversione: {e}")
+                        logging.getLogger(__name__).warning(f"⚠️ Salto mantenimento: {e}")
 
             messages.success(request, f"✅ {child.name} aggiunto correttamente.")
             return redirect("children:children_list")
@@ -198,7 +237,6 @@ def child_create_view(request):
     return render(request, "children/child_form.html", {"form": form, "family": family})
 
 
-# children/views.py
 @login_required
 def child_update_view(request, pk):
     child_id = pk
@@ -207,6 +245,32 @@ def child_update_view(request, pk):
 
     # ✅ Salva valore PRE-modifica per storico
     old_pct = child.contribution_pct_parent_a
+
+    # ✅ VERIFICA SE ESISTE GIÀ UN MANTENIMENTO
+    from children.models import ChildSupport
+    existing_support = ChildSupport.objects.filter(
+        child=child,
+        support_type='child',
+        is_active=True
+    ).first()
+
+    # ✅ Controllo permessi - USA membership.role
+    membership = FamilyMember.objects.filter(family=family, user=request.user).first()
+
+    if not membership:
+        messages.error(request, "⚠️ Non sei membro di questa famiglia")
+        return redirect('children:children_list')
+
+    user_role = str(membership.role).lower()
+    is_professional = user_role in ['lawyer_a', 'lawyer_b', 'mediator', 'consultant']
+
+    # ✅ BLOCCO: Se esiste già mantenimento E utente è genitore → REDIRECT
+    if existing_support and not is_professional:
+        messages.warning(
+            request,
+            "⚠️ Il mantenimento è già stato configurato. Solo un avvocato può modificarlo caricando la sentenza."
+        )
+        return redirect('children:children_list')
 
     if request.method == "POST":
         form = ChildForm(request.POST, instance=child)
@@ -230,7 +294,21 @@ def child_update_view(request, pk):
             # 💰 Aggiorna mantenimento se modificato
             amt = form.cleaned_data.get("manual_maintenance_amount")
             if amt is not None and amt > Decimal("0"):
-                update_child_support(updated, amt, date.today())
+                # ✅ Determina payer_role (default parent_a se non specificato)
+                payer_role = request.POST.get('payer_role', 'parent_a')
+                # ✅ DEBUG: Verifica quante volte viene chiamata
+                print(f"\n🔍 CHIAMA update_child_support da child_update_view")
+                print(f"  Figlio: {updated.name}")
+                print(f"  Importo: €{amt}")
+                print(f"  Payer: {payer_role}")
+
+
+                update_child_support(
+                    updated,
+                    amt,
+                    date.today(),
+                    payer_role=payer_role  # ✅ PASSA payer_role
+                )
 
             messages.success(request, f"✅ Dati di {updated.name} aggiornati (v{updated.version})")
             return redirect("children:children_list")
@@ -242,7 +320,12 @@ def child_update_view(request, pk):
         if active_amt:
             form.initial["manual_maintenance_amount"] = active_amt
 
-    return render(request, "children/child_form.html", {"form": form, "child": child})
+    return render(request, "children/child_form.html", {
+        "form": form,
+        "child": child,
+        "existing_support": existing_support,  # ✅ Passa al template
+        "is_professional": is_professional,
+    })
 
 
 
@@ -286,7 +369,7 @@ def child_delete_view(request, pk):
 
     return render(request,"children/child_confirm_delete.html", {"child": child})
 
-
+'''
 def export_child_pdf(request, child_id):
     child = get_object_or_404(ChildProfile, id=child_id)
 
@@ -296,6 +379,7 @@ def export_child_pdf(request, child_id):
     file_path = generate_child_report(child, supports)
 
     return FileResponse(open(file_path, "rb"), as_attachment=True, filename=f"report_{child.name}.pdf")
+'''
 
 # children/views.py
 from django.contrib.auth.decorators import login_required

@@ -7,12 +7,17 @@ class RoleChoices(models.TextChoices):
     LAWYER = 'lawyer', 'Avvocato'
     MEDIATOR = 'mediator', 'Mediatore'
     CONSULTANT = 'consultant', 'Consulente'
+    SPOUSE = 'spouse', 'Coniuge'
 
     # ✅ RUOLI SPECIFICI (per FamilyMember, assegnati all'invito)
     PARENT_A = 'parent_a', 'Genitore A'
     PARENT_B = 'parent_b', 'Genitore B'
     LAWYER_A = 'lawyer_a', 'Avvocato A (del Genitore A)'
     LAWYER_B = 'lawyer_b', 'Avvocato B (del Genitore B)'
+
+    @classmethod
+    def is_spouse(cls, role):
+        return cls.normalize_role(role) == cls.SPOUSE
 
     @classmethod
     def normalize_role(cls, role):

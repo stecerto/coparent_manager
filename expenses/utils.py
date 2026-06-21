@@ -1,5 +1,4 @@
 # expenses/utils.py
-# expenses/utils.py
 from decimal import Decimal
 
 

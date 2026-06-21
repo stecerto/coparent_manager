@@ -1,51 +1,167 @@
 {% extends "base.html" %}
+{% load crispy_forms_tags %}
 {% load static %}
+{% load custom_filters %}
 
-{% block title %}👫 Mantenimento al Coniuge - {{ family.name }}{% endblock %}
+{% block title %}{{ title }} - {{ family.name }}{% endblock %}
 
 {% block content %}
 <div class="container py-4">
     <div class="row justify-content-center">
-        <div class="col-md-8 col-lg-6">
+        <div class="col-md-10 col-lg-8">
 
             <!-- Header -->
             <div class="d-flex align-items-center mb-4">
-                <a href="{% url 'families:family_dashboard' %}" class="btn btn-outline-secondary btn-sm me-3 shadow-sm">
-                    <i class="bi bi-arrow-left"></i> Dashboard
+                <a href="{% url 'families:spouse_support_list' %}" class="btn btn-outline-secondary btn-sm me-3 shadow-sm">
+                    <i class="bi bi-arrow-left"></i> Torna alla Lista
                 </a>
                 <div>
-                    <h1 class="h3 fw-bold mb-0">👫 Mantenimento al Coniuge</h1>
+                    <h1 class="h3 fw-bold mb-0">⚖️ {{ title }}</h1>
                     <p class="text-muted mb-0 small">Famiglia: <strong>{{ family.name }}</strong></p>
                 </div>
             </div>
 
             <!-- Card Form -->
-            <div class="card shadow-sm border-0" style="border-radius: 12px;">
+            <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
                 <div class="card-header bg-white border-bottom border-start border-1 border-info d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
-                    <i class="bi bi-cash-coin fs-3 text-info me-3"></i>
-                    <h5 class="mb-0 fw-bold">Imposta o Aggiorna Importo</h5>
+                    <i class="bi bi-gavel fs-3 text-info me-3"></i>
+                    <h5 class="mb-0 fw-bold">Dati della Sentenza</h5>
                 </div>
                 <div class="card-body p-4">
-                    <form method="POST">
+                    <form method="POST" enctype="multipart/form-data">
                         {% csrf_token %}
 
-                        <div class="mb-4">
-                            <label class="form-label fw-bold small text-uppercase text-muted">Importo Mensile (€)</label>
-                            {{ form.amount }}
+                        <!-- Sezione Sentenza (OBBLIGATORIA) -->
+                        <div class="card border-warning mb-4" style="border-radius: 12px;">
+                            <div class="card-header bg-warning bg-opacity-25 border-warning d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                                <i class="bi bi-file-earmark-text fs-3 text-warning me-3"></i>
+                                <h6 class="mb-0 fw-bold">Sentenza del Giudice</h6>
+                                <span class="badge bg-warning ms-auto">Obbligatoria</span>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold small text-uppercase text-muted">Numero Sentenza *</label>
+                                        <input type="text" name="decree_number" class="form-control"
+                                               value="{{ current_support.decree_number|default:'' }}"
+                                               placeholder="Es: Sentenza n. 123/2026" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold small text-uppercase text-muted">Data Sentenza *</label>
+                                        <input type="date" name="decree_date" class="form-control"
+                                               value="{{ current_support.decree_date|date:'Y-m-d' }}" required>
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label fw-bold small text-uppercase text-muted">File Sentenza (PDF) *</label>
+                                        <input type="file" name="decree_file" class="form-control" accept=".pdf" required>
+                                        {% if current_support and current_support.id and current_support.decree_file %}
+                                        <div class="mt-2 p-2 bg-light rounded border-1 border">
+                                            <small class="text-muted">
+                                                <i class="bi bi-paperclip"></i>
+                                                Sentenza attuale:
+                                                <a href="{% url 'families:view_spouse_decree' agreement.id %}" target="_blank" class="text-primary fw-semibold">
+                                                    {{ current_support.decree_file.name.split|last }}
+                                                </a>
+                                                <span class="text-muted">(carica la nuova sentenza per modificare)</span>
+                                            </small>
+                                        </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="alert alert-warning mt-3 mb-0 border-1 border" style="border-radius: 8px;">
+                                    <small>
+                                        <i class="bi bi-exclamation-triangle me-1"></i>
+                                        <strong>La sentenza è obbligatoria.</strong> Il mantenimento al coniuge viene stabilito dal giudice nella sentenza di separazione/divorzio.
+                                        Caricando la sentenza, questa verrà certificata e resa accessibile a tutti i membri della famiglia.
+                                    </small>
+                                </div>
+                            </div>
                         </div>
 
+                        <!-- Importo Mensile -->
                         <div class="mb-4">
-                            <label class="form-label fw-bold small text-uppercase text-muted">Data di Decorrenza</label>
-                            {{ form.start_date }}
+                            <label class="form-label fw-bold small text-uppercase text-muted">💰 Importo Mensile (€)</label>
+                            <input type="number" name="amount" class="form-control" step="0.01" min="0"
+       value="{{ current_support.monthly_amount|default:'' }}" required>
+                            <small class="form-text text-muted">
+                                Importo mensile stabilito dal giudice
+                            </small>
                         </div>
 
-                        <div class="d-grid gap-2">
-                            <button type="submit" class="btn btn-info text-white btn-lg">
-                                <i class="bi bi-check-circle me-2"></i>Salva Mantenimento
+                        <!-- Data Inizio e Fine -->
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small text-uppercase text-muted">📅 Data di Decorrenza</label>
+                                <input type="date" name="start_date" class="form-control"
+                                       value="{{ current_support.start_date|date:'Y-m-d' }}" required>
+                                <small class="form-text text-muted">
+                                    Data da cui decorre il mantenimento
+                                </small>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold small text-uppercase text-muted">📅 Data Fine (opzionale)</label>
+                                <input type="date" name="end_date" class="form-control"
+                                       value="{{ current_support.end_date|date:'Y-m-d' }}">
+                                <small class="form-text text-muted">
+                                    Lascia vuoto se a tempo indeterminato
+                                </small>
+                            </div>
+                        </div>
+
+                        <!-- Giorno di Pagamento -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-uppercase text-muted">🗓️ Giorno del Mese per Pagamento</label>
+                            <input type="number" name="payment_day" class="form-control" min="1" max="31"
+                                   value="{{ current_support.payment_day|default:5 }}" required>
+                            <small class="form-text text-muted">
+                                Giorno del mese in cui va effettuato il pagamento
+                            </small>
+                        </div>
+
+                        <!-- Chi versa il mantenimento -->
+                        <div class="mb-4">
+                            <label class="form-label fw-bold small text-uppercase text-muted">💸 Chi versa il mantenimento</label>
+                            <select name="payer_role" class="form-select" required>
+                                <option value="parent_a" {% if current_support.payer_role == 'parent_a' %}selected{% endif %}>
+                                    {{ family|parent_display_name:"parent_a" }} → {{ family|parent_display_name:"parent_b" }}
+                                </option>
+                                <option value="parent_b" {% if current_support.payer_role == 'parent_b' %}selected{% endif %}>
+                                    {{ family|parent_display_name:"parent_b" }} → {{ family|parent_display_name:"parent_a" }}
+                                </option>
+                            </select>
+                            <small class="form-text text-muted">
+                                Come stabilito dal giudice nella sentenza
+                            </small>
+                        </div>
+
+                        <!-- Pulsanti -->
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-info text-white btn-lg border-0">
+                                <i class="bi bi-patch-check-fill me-2"></i>
+                                {% if current_support.pk %}
+                                    Registra Nuova Sentenza
+                                {% else %}
+                                    Registra Sentenza
+                                {% endif %}
                             </button>
+                            <a href="{% url 'families:spouse_support_list' %}" class="btn btn-outline-secondary border-1">
+                                <i class="bi bi-x-circle me-2"></i>Annulla
+                            </a>
                         </div>
                     </form>
                 </div>
+            </div>
+
+            <!-- Info Box -->
+            <div class="alert alert-light border-1 border" style="border-radius: 8px;" role="alert">
+                <h6 class="alert-heading"><i class="bi bi-lightbulb me-2"></i>Come funziona</h6>
+                <ul class="mb-0 small">
+                    <li>Il mantenimento al coniuge viene stabilito dal <strong>giudice nella sentenza di separazione/divorzio</strong></li>
+                    <li>Solo l'avvocato può registrare la sentenza caricando il documento ufficiale</li>
+                    <li>La sentenza viene <strong>certificata automaticamente</strong> e resa accessibile a tutti i membri della famiglia</li>
+                    <li>Per modificare l'importo, è necessario caricare una <strong>nuova sentenza</strong> (es: revisione, modifica condizioni)</li>
+                    <li>Gli eventi calendario vengono generati automaticamente ogni mese</li>
+                </ul>
             </div>
 
         </div>

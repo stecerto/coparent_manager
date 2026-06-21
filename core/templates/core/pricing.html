@@ -17,7 +17,7 @@
                 <h3 class="mb-3">🚫 Account Sospeso</h3>
                 <p class="lead mb-3">Il tuo account è stato sospeso per mancato pagamento.</p>
                 <p class="mb-4">Rinnova l'abbonamento per riattivare immediatamente l'accesso a tutti i servizi.</p>
-                <a href="{% url 'payment' %}" class="btn btn-danger btn-lg px-5">
+                <a href="{% url 'core:payment' %}" class="btn btn-danger btn-lg px-5">
                     💳 Riattiva Ora
                 </a>
             </div>
@@ -28,7 +28,7 @@
                 <h3 class="mb-3">⏰ Abbonamento Scaduto</h3>
                 <p class="lead mb-3">Il tuo abbonamento è scaduto.</p>
                 <p class="mb-4">Rinnova ora per continuare a usare tutti i servizi senza interruzioni.</p>
-                <a href="{% url 'payment' %}" class="btn btn-warning btn-lg px-5">
+                <a href="{% url 'core:payment' %}" class="btn btn-warning btn-lg px-5">
                     💳 Rinnova Ora
                 </a>
             </div>
@@ -38,7 +38,7 @@
             <div class="alert alert-info text-center shadow">
                 <h4 class="mb-2">⏰ Scadenza imminente</h4>
                 <p class="mb-3">Il tuo abbonamento scade tra <strong>{{ user.profile.days_until_expiration }} giorni</strong>.</p>
-                <a href="{% url 'payment' %}" class="btn btn-info btn-sm">
+                <a href="{% url 'core:payment' %}" class="btn btn-info btn-sm">
                     Rinnova Ora
                 </a>
             </div>

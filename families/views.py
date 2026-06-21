@@ -1,41 +1,39 @@
 # families/views.py
 import csv
 import logging
+import os
 from datetime import timedelta
-from django.contrib import messages
-from django.contrib.auth.decorators import login_required
-from django.shortcuts import render, redirect, get_object_or_404
-from django.utils import timezone
-from datetime import date
 
-from children.forms import ChildSupportForm
-from children.models import ChildSupport
-from families.forms import SpouseSupportForm  # Assicurati che questo form esista
-from .utils import get_family_of_user  # o il tuo metodo per ottenere la famiglia
-
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db import transaction
 from django.db.models import Sum, Count
+from django.http import FileResponse
 from django.http import HttpResponse, JsonResponse, HttpResponseForbidden
 from django.shortcuts import render, redirect, get_object_or_404
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
 from weasyprint import HTML
 
-# App locali
 from accounts.forms import UserForm, UserProfileForm
 from accounts.models import User, UserProfile
 from calendar_app.services.calendar_service import get_family_events
 from chat.models import FamilyMessage
+from children.models import ChildSupport, ChildProfile
 from core.choices import RoleChoices
 from documents.models import AuditLog, Document
 from expenses.models import Expense, ExpenseCategory
 from families.decorators import role_required
-from families.forms import InvitationForm, ChildSupportAgreementForm
-from families.models import Family, Invitation, ChildSupportAgreement, FamilyMember
+from families.forms import InvitationForm
+from families.forms import SpouseSupportAgreementForm
+from families.forms import SpouseSupportForm  # Assicurati che questo form esista
+from families.models import Family, Invitation, FamilyMember
+from families.models import SpouseSupportAgreement
 from families.services.balance_service import calculate_family_balance
 from families.services.email_service import send_invitation_email, build_invitation_context
+from families.services.export_service import export_family_data
 from families.services.invitation_service import (
     build_whatsapp_link,
     accept_invitation
@@ -49,6 +47,27 @@ from families.utils import (
 )
 
 
+@login_required
+def export_family_data_view(request):
+    """Esporta tutti i dati della famiglia in ZIP"""
+    family = get_family_of_user(request.user, request=request)
+
+    if not family:
+        messages.error(request, "Nessuna famiglia trovata")
+        return redirect('home')
+
+    try:
+        zip_filename = export_family_data(family, request.user)
+        zip_path = os.path.join(settings.MEDIA_ROOT, 'exports', zip_filename)
+
+        messages.success(request, "✅ Export completato! Il download partirà a breve.")
+
+        response = FileResponse(open(zip_path, 'rb'), as_attachment=True, filename=zip_filename)
+        return response
+
+    except Exception as e:
+        messages.error(request, f"❌ Errore durante l'export: {str(e)}")
+        return redirect('families:setup')
 
 
 @login_required
@@ -428,8 +447,8 @@ def setup_view(request):
 @login_required
 def family_settings_view(request):
     """
-    Vista in sola lettura delle impostazioni della famiglia.
-    Accessibile solo a professionisti (avvocati, mediatori, consulenti).
+    Vista delle impostazioni della famiglia.
+    Accessibile a professionisti (avvocati, mediatori, consulenti) e genitori.
     """
     family_id = request.GET.get('family_id')
     if not family_id:
@@ -438,11 +457,11 @@ def family_settings_view(request):
 
     family = get_object_or_404(Family, id=family_id)
 
-    # Verifica che l'utente sia un professionista assegnato a questa famiglia
+    # Verifica che l'utente abbia accesso a questa famiglia
     membership = FamilyMember.objects.filter(
         family=family,
         user=request.user,
-        role__in=['lawyer_a', 'lawyer_b', 'mediator', 'consultant']
+        role__in=['lawyer_a', 'lawyer_b', 'mediator', 'consultant', 'parent_a', 'parent_b']
     ).first()
 
     if not membership:
@@ -451,27 +470,182 @@ def family_settings_view(request):
 
     # Recupera i dati della famiglia
     children = family.children.filter(is_active=True).order_by('birth_date', 'name')
+
+    # ✅ Calcola percentuali e mantenimento per ogni figlio
+    from children.models import ChildSupport
+    from datetime import date
+    from django.db.models import Q
+
+    today = date.today()
+
+    for child in children:
+        # Percentuali
+        pct_a = float(child.contribution_pct_parent_a or 50.0)
+        if pct_a > 100:
+            pct_a = 50.0
+        pct_b = 100.0 - pct_a
+
+        child.pct_a_display = round(pct_a, 1)
+        child.pct_b_display = round(pct_b, 1)
+
+        # ✅ Mantenimento specifico per questo figlio
+        child.active_support = ChildSupport.objects.filter(
+            child=child,
+            support_type='child',
+            is_active=True,
+            start_date__lte=today
+        ).filter(
+            Q(end_date__isnull=True) | Q(end_date__gte=today)
+        ).order_by('-start_date').first()
+
     parents = family.members.filter(role__in=['parent_a', 'parent_b']).select_related('user')
 
-    # Recupera l'accordo di mantenimento attivo
-    from children.models import ChildSupport
-    current_support = ChildSupport.objects.filter(
+    from families.models import SpouseSupportAgreement
+    spouse_support = SpouseSupportAgreement.objects.filter(
         family=family,
-        support_type='child',
-        is_active=True
+        is_active=True,
+        start_date__lte=today
+    ).filter(
+        Q(end_date__isnull=True) | Q(end_date__gte=today)
     ).order_by('-start_date').first()
+
+    # ✅ DEBUG
+    #if spouse_support:
+        #print(f"🔍 DEBUG: spouse_support.certified_by = {spouse_support.certified_by}")
 
     context = {
         'family': family,
         'membership': membership,
         'children': children,
         'parents': parents,
-        'current_support': current_support,
-        'is_professional': True,  # Flag per il template
-        'read_only': True,  # Modalità sola lettura
+        'spouse_support': spouse_support,  # ✅ NUOVO
+        'is_professional': membership.role in ['lawyer_a', 'lawyer_b', 'mediator', 'consultant'],
     }
 
     return render(request, 'families/lawyer/family_settings.html', context)
+
+
+@login_required
+def edit_child_support_view(request, child_id):
+    """Modifica mantenimento di un figlio (solo per avvocati)"""
+    from django.urls import reverse
+    from decimal import Decimal
+    from children.models import ChildSupport
+
+    family = get_family_of_user(request.user, request=request)
+    if not family:
+        messages.error(request, "⚠️ Nessuna famiglia trovata")
+        return redirect('families:setup')
+
+    child = get_object_or_404(ChildProfile, id=child_id, family=family, is_active=True)
+
+    # ✅ Verifica permessi: solo avvocati/mediatori
+    membership = FamilyMember.objects.filter(family=family, user=request.user).first()
+    if not membership:
+        messages.error(request, "⚠️ Non sei membro di questa famiglia")
+        return redirect('families:family_dashboard')
+
+    user_role = str(membership.role).lower()
+    is_professional = user_role in ['lawyer_a', 'lawyer_b', 'mediator', 'consultant']
+
+    if not is_professional:
+        messages.error(request, "⚠️ Solo gli avvocati possono modificare il mantenimento")
+        return redirect('families:family_settings')
+
+    # Recupera mantenimento attivo
+    current_support = ChildSupport.objects.filter(
+        child=child,
+        support_type='child',
+        is_active=True
+    ).order_by('-start_date').first()
+
+    if request.method == 'POST':
+        amount = request.POST.get('amount')
+        start_date = request.POST.get('start_date')
+        end_date = request.POST.get('end_date') or None
+        payer_role = request.POST.get('payer_role', 'parent_a')
+        split_pct = request.POST.get('split_pct_parent_a', 50.00)
+
+        # ✅ CAMPI SENTENZA (obbligatori)
+        decree_number = request.POST.get('decree_number', '').strip()
+        decree_date = request.POST.get('decree_date')
+        decree_file = request.FILES.get('decree_file')
+
+        # ✅ Validazione campi obbligatori
+        if not amount or not start_date:
+            messages.error(request, "⚠️ Importo e data inizio sono obbligatori")
+        elif not decree_number or not decree_date or not decree_file:
+            messages.error(request, "⚠️ È obbligatorio caricare la sentenza (numero, data e file)")
+        else:
+            # ✅ Chiudi mantenimento precedente
+            if current_support:
+                current_support.is_active = False
+                current_support.end_date = start_date
+                current_support.save(update_fields=['is_active', 'end_date'])
+
+            # ✅ Crea nuovo mantenimento
+            new_support = ChildSupport.objects.create(
+                child=child,
+                family=family,
+                support_type='child',
+                amount=Decimal(amount),
+                start_date=start_date,
+                end_date=end_date,
+                payer_role=payer_role,
+                split_pct_parent_a=Decimal(split_pct),
+                # ✅ SENTENZA
+                decree_number=decree_number,
+                decree_date=decree_date,
+                decree_file=decree_file,
+                is_active=True,
+                version=(current_support.version + 1) if current_support else 1,
+                previous_version=current_support,
+                # ✅ CERTIFICAZIONE AUTOMATICA (perché c'è la sentenza)
+                certified_by=request.user,
+                certified_at=timezone.now(),
+            )
+
+            messages.success(
+                request,
+                f"✅ Mantenimento aggiornato e certificato per {child.name} con sentenza {decree_number}"
+            )
+
+            return redirect(f"{reverse('families:family_settings')}?family_id={family.id}")
+
+    # ✅ ✅ ✅ FUORI dal blocco POST: gestisce sia GET che POST con errori
+    context = {
+        'child': child,
+        'current_support': current_support,
+        'family': family,
+        'is_professional': is_professional,
+    }
+
+    return render(request, 'families/edit_child_support.html', context)
+
+
+@login_required
+def view_decree_view(request, support_id):
+    """Visualizza sentenza mantenimento (accessibile a genitori e avvocati)"""
+    from children.models import ChildSupport
+
+    support = get_object_or_404(ChildSupport, id=support_id)
+    family = get_family_of_user(request.user, request=request)
+
+    # Verifica che l'utente abbia accesso alla famiglia
+    if support.family != family:
+        messages.error(request, "⚠️ Accesso negato")
+        return redirect('families:family_dashboard')
+
+    if not support.decree_file:
+        messages.error(request, "⚠️ Nessuna sentenza caricata")
+        return redirect('families:family_settings')
+
+    # Restituisci il file
+    from django.http import FileResponse
+    response = FileResponse(support.decree_file.open('rb'))
+    response['Content-Disposition'] = f'inline; filename="{support.decree_file.name.split("/")[-1]}"'
+    return response
+
 
 @login_required
 def family_summary(request):
@@ -507,11 +681,16 @@ def family_summary(request):
         ).exclude(user=user).select_related('user__profile').first()
         parent_a = FamilyMember.objects.filter(family=family, role=RoleChoices.PARENT_A).select_related(
             'user__profile').first()
-        parent_b = FamilyMember.objects.filter(family=family, role=RoleChoices.PARENT_B).select_related(
+        parent_b = FamilyMember.objects.filter(family=family, role__in=['parent_b', RoleChoices.PARENT_B]).select_related(
             'user__profile').first()
         lawyer_a_member = FamilyMember.objects.filter(family=family, role=RoleChoices.LAWYER_A).select_related(
             'user__profile').first()
         lawyer_b_member = FamilyMember.objects.filter(family=family, role=RoleChoices.LAWYER_B).select_related(
+            'user__profile').first()
+        # ✅ NUOVO: Recupera mediatore e consulente
+        mediator_member = FamilyMember.objects.filter(family=family, role=RoleChoices.MEDIATOR).select_related(
+            'user__profile').first()
+        consultant_member = FamilyMember.objects.filter(family=family, role=RoleChoices.CONSULTANT).select_related(
             'user__profile').first()
 
         # ✅ FIX ERRORE TEMPLATE: calcoliamo count nella view
@@ -532,6 +711,9 @@ def family_summary(request):
 
 
 
+    # Verifica tutti i membri della famiglia
+    all_members = FamilyMember.objects.filter(family=family).select_related('user')
+
 
     # ✅ CONTESTO PULITO PER IL TEMPLATE
     context = {
@@ -546,6 +728,8 @@ def family_summary(request):
         'parent_b': parent_b,
         'lawyer_a_member': lawyer_a_member,
         'lawyer_b_member': lawyer_b_member,
+        'mediator_member': mediator_member,
+        'consultant_member': consultant_member,
 
         # RoleChoices per i label
         'RoleChoices': RoleChoices,
@@ -558,49 +742,141 @@ def family_summary(request):
 
 @login_required
 def spousal_support_view(request):
-    """Gestione del mantenimento al coniuge (livello Famiglia)"""
+    """Gestione del mantenimento al coniuge - USA SpouseSupportAgreement"""
+    from families.models import SpouseSupportAgreement
+    from families.forms import SpouseSupportForm
+    from decimal import Decimal
+
     family = get_family_of_user(request.user, request=request)
     if not family:
         return redirect("families:setup")
 
+    # ✅ Verifica permessi: genitori O avvocati
+    membership = FamilyMember.objects.filter(family=family, user=request.user).first()
+
+    if not membership:
+        messages.error(request, "⚠️ Non hai i permessi per gestire il mantenimento")
+        return redirect('families:family_dashboard')
+
+    user_role = str(membership.role).lower()
+    is_professional = user_role in ['lawyer_a', 'lawyer_b', 'mediator', 'consultant']
+    is_parent = user_role in ['parent_a', 'parent_b']
+
+    if not (is_parent or is_professional):
+        messages.error(request, "⚠️ Non hai i permessi per gestire il mantenimento")
+        return redirect('families:family_dashboard')
+
+    # ✅ USA SpouseSupportAgreement (non ChildSupport)
+    current = SpouseSupportAgreement.objects.filter(
+        family=family,
+        is_active=True
+    ).order_by('-start_date').first()
+
+    # ✅ BLOCCO: Se certificato E utente è genitore → REDIRECT
+    if current and current.certified_by and not is_professional:
+        messages.warning(
+            request,
+            "⚠️ Questo mantenimento è certificato. Solo un avvocato può modificarlo caricando una nuova sentenza."
+        )
+        return redirect('families:family_dashboard')
+
     if request.method == "POST":
-        form = SpouseSupportForm(request.POST)
+        form = SpouseSupportForm(request.POST, request.FILES)
+
         if form.is_valid():
-            # 1. Disattiva eventuali mantenimenti coniuge precedenti
-            ChildSupport.objects.filter(
-                family=family,
-                support_type='spouse',
-                is_active=True
-            ).update(is_active=False)
+            print(f"✅ Form valido, dati: {form.cleaned_data}")
 
-            # 2. Crea il nuovo record
-            ChildSupport.objects.create(
-                family=family,
-                child=None,  # ✅ Nessuno figlio
-                support_type='spouse',  # ✅ Tipologia corretta
-                amount=form.cleaned_data['amount'],
-                start_date=form.cleaned_data['start_date'],
-                is_active=True,
-                version=1
-            )
-            messages.success(request, "✅ Mantenimento al coniuge aggiornato con successo.")
-            return redirect('families:family_dashboard')  # O il nome della tua url della dashboard
+            # ✅ Verifica che ci sia il file della sentenza
+            decree_file = form.cleaned_data.get('decree_file')
+            print(f"📎 decree_file: {decree_file}")
+
+            if not decree_file:
+                messages.error(request, "⚠️ È obbligatorio caricare il file della sentenza")
+                print("❌ Manca il file della sentenza")
+            else:
+                print("✅ File presente, procedo con la creazione")
+                # ✅ Se esiste un accordo precedente, disattivalo
+                if current:
+                    current.is_active = False
+                    current.save(update_fields=['is_active'])
+                    new_version = current.version + 1
+                else:
+                    new_version = 1
+
+                # ✅ Crea nuovo accordo con SpouseSupportAgreement
+                new_agreement = SpouseSupportAgreement.objects.create(
+                    family=family,
+                    monthly_amount=form.cleaned_data['amount'],  # ✅ amount del form → monthly_amount del modello
+                    #split_pct_parent_a=form.cleaned_data.get('split_pct_parent_a') or Decimal('50.00'),
+                    payment_day=form.cleaned_data['payment_day'],
+                    start_date=form.cleaned_data['start_date'],
+                    end_date=form.cleaned_data.get('end_date'),
+                    payer_role=form.cleaned_data['payer_role'],
+                    decree_number=form.cleaned_data['decree_number'],
+                    decree_date=form.cleaned_data['decree_date'],
+                    decree_file=decree_file,
+                    is_active=True,
+                    version=new_version,
+                    previous_version=current,
+                    # ✅ Certificazione automatica se professionista
+                    certified_by=request.user if is_professional else None,
+                    certified_at=timezone.now() if is_professional else None,
+                    modified_by=request.user,
+                )
+
+                if is_professional:
+                    messages.success(
+                        request,
+                        f"✅ Sentenza registrata e certificata: €{new_agreement.monthly_amount}/mese - {form.cleaned_data['decree_number']}"
+                    )
+                    from django.urls import reverse
+                    return redirect(f"{reverse('families:family_settings')}?family_id={family.id}")
+                else:
+                    messages.success(request, "✅ Mantenimento al coniuge aggiornato con successo.")
+                    return redirect('families:family_dashboard')
     else:
-        # Pre-compila con l'ultimo importo attivo
-        current = ChildSupport.objects.filter(
-            family=family,
-            support_type='spouse',
-            is_active=True
-        ).order_by('-start_date').first()
-
-        initial_data = {'amount': current.amount, 'start_date': current.start_date} if current else {}
+        # ✅ Pre-compila il form con i dati dell'accordo esistente
+        initial_data = {
+            'amount': current.monthly_amount,  # ✅ monthly_amount del modello → amount del form
+            'start_date': current.start_date,
+            'end_date': current.end_date,
+            'payment_day': current.payment_day,
+            #'split_pct_parent_a': current.split_pct_parent_a,
+            'payer_role': current.payer_role,
+            'decree_number': current.decree_number,
+            'decree_date': current.decree_date,
+        } if current else {
+            'split_pct_parent_a': 50.00,
+            'payer_role': 'parent_a',
+            'payment_day': 5,
+        }
         form = SpouseSupportForm(initial=initial_data)
 
-        # ✅ QUI DEVE ESSERE SCRITTO ESATTAMENTE COSÌ:
+    # ✅ Prepara i nomi dei genitori per il template
+    parent_a_name = "Genitore A"
+    parent_b_name = "Genitore B"
+
+    member_a = FamilyMember.objects.filter(
+        family=family, role='parent_a', user__is_active=True
+    ).select_related('user').first()
+
+    member_b = FamilyMember.objects.filter(
+        family=family, role='parent_b', user__is_active=True
+    ).select_related('user').first()
+
+    if member_a and member_a.user:
+        parent_a_name = member_a.user.get_full_name().strip() or member_a.user.email
+
+    if member_b and member_b.user:
+        parent_b_name = member_b.user.get_full_name().strip() or member_b.user.email
+
     return render(request, "families/spousal_support.html", {
         "form": form,
         "family": family,
-        "current_support": current
+        "current_support": current,
+        "is_professional": is_professional,
+        "parent_a_name": parent_a_name,
+        "parent_b_name": parent_b_name,
     })
 
 
@@ -830,7 +1106,7 @@ def register_member_after_signup(request, user):
         accept_invitation(invitation, user)
 
     request.session.pop("invitation_id", None)
-    #request.session.pop("invited_role", None)
+
 
 
 @login_required
@@ -872,6 +1148,7 @@ def cancel_invitation_view(request, invitation_id):
     return redirect("families:family_dashboard")
 
 
+
 @login_required
 def dashboard_view(request):
     user = request.user
@@ -884,8 +1161,11 @@ def dashboard_view(request):
     balance = calculate_family_balance(family)
     children = family.children.filter(is_active=True)
     total_expenses = sum(e.amount for e in expenses)
-    current_spousal_support = ChildSupport.objects.filter(
-        family=family, support_type='spouse', is_active=True
+
+    # ✅ MIGRATO A SpouseSupportAgreement
+    from families.models import SpouseSupportAgreement
+    current_spousal_support = SpouseSupportAgreement.objects.filter(
+        family=family, is_active=True
     ).order_by('-start_date').first()
 
     context = {
@@ -911,129 +1191,6 @@ def dashboard_view(request):
     }
 
     return render(request, "families/family_dashboard.html", context)
-
-
-@login_required
-def support_agreement_view(request):
-    """Gestione dell'accordo di mantenimento (solo per genitori)"""
-    family = get_family_of_user(request.user, request=request)
-    if not family:
-        return redirect('families:setup')
-
-    # 🔒 Sicurezza: Solo i genitori possono modificare
-    membership = FamilyMember.objects.filter(family=family, user=request.user).first()
-    if membership and membership.role in ['lawyer_a', 'lawyer_b', 'mediator', 'consultant']:
-        messages.error(request, "⚠️ Solo i genitori possono modificare gli accordi di mantenimento.")
-        return redirect('families:family_dashboard')
-
-    # Recupera l'accordo attivo per pre-compilare il form
-    current_support = ChildSupport.objects.filter(
-        family=family,
-        support_type='child',
-        is_active=True
-    ).order_by('-start_date').first()
-
-    if request.method == "POST":
-        form = ChildSupportForm(request.POST)
-        if form.is_valid():
-            # 1. Disattiva i precedenti accordi di mantenimento figli
-            ChildSupport.objects.filter(
-                family=family,
-                support_type='child',
-                is_active=True
-            ).update(is_active=False)
-
-            # 2. Crea il nuovo record MANUALMENTE (poiché è un forms.Form)
-            ChildSupport.objects.create(
-                family=family,
-                support_type='child',
-                amount=form.cleaned_data['amount'],
-                start_date=form.cleaned_data['start_date'],
-                # ✅ Aggiungi questi solo se li hai inseriti nel tuo forms.Form
-                payer_role=form.cleaned_data.get('payer_role', 'parent_a'),
-                split_pct_parent_a=form.cleaned_data.get('split_pct_parent_a', 50.0),
-                is_active=True,
-                version=1
-            )
-
-            messages.success(request, "✅ Accordo di mantenimento aggiornato con successo!")
-            return redirect('families:setup')  # Torna al setup
-    else:
-        # Pre-compilazione del form se esiste un accordo attivo
-        initial_data = {}
-        if current_support:
-            initial_data = {
-                'amount': current_support.amount,
-                'start_date': current_support.start_date,
-            }
-            # Aggiungi questi solo se il tuo form li include
-            if hasattr(current_support, 'payer_role'):
-                initial_data['payer_role'] = current_support.payer_role
-            if hasattr(current_support, 'split_pct_parent_a'):
-                initial_data['split_pct_parent_a'] = current_support.split_pct_parent_a
-
-        form = ChildSupportForm(initial=initial_data)
-
-    context = {
-        'form': form,
-        'family': family,
-        'current_support': current_support
-    }
-
-    # ✅ Assicurati che il percorso del template sia corretto
-    return render(request, 'families/support_agreement_form.html', context)
-
-@login_required
-def create_support_agreement_view(request):
-    family = get_family_of_user(request.user, request=request)
-    if not family: return redirect("families:setup")
-
-    if request.method == "POST":
-        form = ChildSupportAgreementForm(request.POST, request.FILES)
-        if form.is_valid():
-            agreement = form.save(commit=False)
-            agreement.family = family
-            agreement.modified_by = request.user
-            agreement.save()  # Il save() triggera la generazione eventi
-            messages.success(request,
-                             f"✅ Accordo salvato. Generati {agreement.calendar_events.count()} eventi nel calendario.")
-            return redirect("calendar:calendar_view")
-    else:
-        form = ChildSupportAgreementForm()
-        form.fields["children"].queryset = family.children.filter(is_active=True)
-
-    return render(request, "families/support_agreement_form.html", {"form": form, "family": family})
-
-@login_required
-def edit_support_agreement_view(request, agreement_id):
-    family = get_family_of_user(request.user, request=request)
-    agreement = get_object_or_404(ChildSupportAgreement, pk=agreement_id, family=family)
-
-    if request.method == "POST":
-        form = ChildSupportAgreementForm(request.POST, request.FILES, instance=agreement)
-        if form.is_valid():
-            form.save()  # Il save() triggera rigenerazione eventi
-            messages.success(request, "✅ Accordo aggiornato e eventi rigenerati.")
-            return redirect("calendar:calendar_view")
-    else:
-        form = ChildSupportAgreementForm(instance=agreement)
-        form.fields["children"].queryset = family.children.filter(is_active=True)
-
-    return render(request, "families/support_agreement_form.html", {"form": form, "family": family, "is_edit": True})
-
-
-@login_required
-def delete_support_agreement_view(request, agreement_id):
-    family = get_family_of_user(request.user, request=request)
-    agreement = get_object_or_404(ChildSupportAgreement, pk=agreement_id, family=family)
-
-    if request.method == "POST":
-        agreement.is_active = False
-        agreement.save()
-        messages.success(request, "🗑️ Accordo archiviato.")
-        return redirect("calendar:calendar_view")
-
-    return render(request, "families/confirm_delete_agreement.html", {"agreement": agreement})
 
 
 @login_required
@@ -1203,7 +1360,7 @@ def lawyer_dashboard_view(request):
     }
     return render(request, "families/professional_dashboard.html", context) # 'families/lawyer/lawyer_dashboard.html', context)
 
-from families.services.dashboard_service import get_professional_cross_summary
+
 @login_required
 def professional_dashboard(request):
     """Dashboard per Avvocati, Mediatori e Consulenti con gestione multi-famiglia"""
@@ -1373,12 +1530,11 @@ def set_active_family(request, family_id):
     if hasattr(request.session, 'save'):
         request.session.save()
 
-    #redirect_url = f'families:family_dashboard?family_id={family_id}'
     return redirect(f'/families/dashboard/?family_id={family_id}')
-    #return redirect(redirect_url)
 
 
-# families/views.py
+
+
 
 
 @login_required
@@ -1396,3 +1552,215 @@ def exit_family_context(request):
     """Pulisce il contesto famiglia e torna alla dashboard avvocato"""
     request.session.pop('active_family_id', None)
     return redirect('families:professional_dashboard')
+
+
+@login_required
+def spouse_support_list(request):
+    """Lista accordi mantenimento coniuge"""
+    family = get_family_of_user(request.user, request=request)
+
+    if not family:
+        messages.error(request, "Nessuna famiglia trovata")
+        return redirect('home')
+
+    agreements = SpouseSupportAgreement.objects.filter(
+        family=family,
+        is_active=True
+    ).select_related('beneficiary').order_by('-start_date')
+
+    context = {
+        'family': family,
+        'agreements': agreements,
+    }
+
+    return render(request, 'families/spouse_support_list.html', context)
+
+
+@login_required
+def spouse_support_create(request):
+    """Crea nuovo mantenimento coniuge - SOLO AVVOCATI con sentenza"""
+    from decimal import Decimal
+    from families.forms import SpouseSupportForm
+
+    family = get_family_of_user(request.user, request=request)
+
+    if not family:
+        messages.error(request, "⚠️ Nessuna famiglia trovata")
+        return redirect('families:setup')
+
+    membership = FamilyMember.objects.filter(family=family, user=request.user).first()
+
+    if not membership:
+        messages.error(request, "⚠️ Non sei membro di questa famiglia")
+        return redirect('families:family_dashboard')
+
+    user_role = str(membership.role).lower()
+    is_professional = user_role in ['lawyer_a', 'lawyer_b', 'mediator', 'consultant']
+
+    if not is_professional:
+        messages.error(request, "⚠️ Solo gli avvocati possono creare il mantenimento al coniuge caricando la sentenza")
+        return redirect('families:spouse_support_list')
+
+    if request.method == 'POST':
+        form = SpouseSupportForm(request.POST, request.FILES)
+
+        if form.is_valid():
+            decree_number = form.cleaned_data['decree_number']
+            decree_date = form.cleaned_data['decree_date']
+            decree_file = form.cleaned_data.get('decree_file')
+
+            if not decree_file:
+                messages.error(request, "⚠️ È obbligatorio caricare il file della sentenza")
+            else:
+                # ✅ Crea nuova sentenza - MAPPA amount → monthly_amount
+                new_agreement = SpouseSupportAgreement.objects.create(
+                    family=family,
+                    monthly_amount=form.cleaned_data['amount'],  # ✅ amount del form → monthly_amount del modello
+                    split_pct_parent_a=form.cleaned_data['split_pct_parent_a'],
+                    payment_day=form.cleaned_data['payment_day'],
+                    start_date=form.cleaned_data['start_date'],
+                    end_date=form.cleaned_data.get('end_date'),
+                    payer_role=form.cleaned_data['payer_role'],
+                    decree_number=decree_number,
+                    decree_date=decree_date,
+                    decree_file=decree_file,
+                    is_active=True,
+                    version=1,
+                    certified_by=request.user,
+                    certified_at=timezone.now(),
+                    modified_by=request.user,
+                )
+
+                messages.success(
+                    request,
+                    f"✅ Sentenza registrata: €{new_agreement.monthly_amount}/mese - {decree_number}"
+                )
+                return redirect('families:spouse_support_list')
+    else:
+        form = SpouseSupportForm(initial={
+            'split_pct_parent_a': 50.00,
+            'payer_role': 'parent_a',
+            'payment_day': 5,
+        })
+
+    context = {
+        'form': form,
+        'family': family,
+        'title': 'Nuova Sentenza Mantenimento Coniuge',
+        'is_professional': is_professional,
+    }
+
+    return render(request, 'families/spouse_support_form.html', context)
+
+
+@login_required
+def spouse_support_edit(request, pk):
+    """Modifica mantenimento coniuge - SOLO AVVOCATI con nuova sentenza"""
+    from decimal import Decimal
+    from families.forms import SpouseSupportForm
+
+    family = get_family_of_user(request.user, request=request)
+
+    if not family:
+        messages.error(request, "⚠️ Nessuna famiglia trovata")
+        return redirect('families:setup')
+
+    agreement = get_object_or_404(SpouseSupportAgreement, pk=pk, family=family)
+
+    membership = FamilyMember.objects.filter(family=family, user=request.user).first()
+
+    if not membership:
+        messages.error(request, "⚠️ Non sei membro di questa famiglia")
+        return redirect('families:family_dashboard')
+
+    user_role = str(membership.role).lower()
+    is_professional = user_role in ['lawyer_a', 'lawyer_b', 'mediator', 'consultant']
+
+    if not is_professional:
+        messages.error(request, "⚠️ Solo gli avvocati possono modificare il mantenimento caricando una nuova sentenza")
+        return redirect('families:spouse_support_list')
+
+    if request.method == 'POST':
+        form = SpouseSupportForm(request.POST, request.FILES)
+
+        if form.is_valid():
+            decree_number = form.cleaned_data['decree_number']
+            decree_date = form.cleaned_data['decree_date']
+            decree_file = form.cleaned_data.get('decree_file')
+
+            if not decree_file:
+                messages.error(request, "⚠️ Per modificare è obbligatorio caricare una nuova sentenza (file)")
+            else:
+                agreement.is_active = False
+                agreement.save(update_fields=['is_active'])
+
+                # ✅ Crea nuova versione - MAPPA amount → monthly_amount
+                new_agreement = SpouseSupportAgreement.objects.create(
+                    family=family,
+                    monthly_amount=form.cleaned_data['amount'],  # ✅ amount del form → monthly_amount del modello
+                    #split_pct_parent_a=form.cleaned_data['split_pct_parent_a'],
+                    payment_day=form.cleaned_data['payment_day'],
+                    start_date=form.cleaned_data['start_date'],
+                    end_date=form.cleaned_data.get('end_date'),
+                    payer_role=form.cleaned_data['payer_role'],
+                    decree_number=decree_number,
+                    decree_date=decree_date,
+                    decree_file=decree_file,
+                    version=agreement.version + 1,
+                    previous_version=agreement,
+                    is_active=True,
+                    certified_by=request.user,
+                    certified_at=timezone.now(),
+                    modified_by=request.user,
+                )
+
+
+
+                messages.success(
+                    request,
+                    f"✅ Mantenimento aggiornato con nuova sentenza {decree_number}: €{new_agreement.monthly_amount}/mese"
+                )
+                return redirect('families:spouse_support_list')
+    else:
+        # ✅ Pre-compila con 'amount' (non 'monthly_amount')
+        form = SpouseSupportForm(initial={
+            'amount': agreement.monthly_amount,  # ✅ monthly_amount del modello → amount del form
+            'start_date': agreement.start_date,
+            'end_date': agreement.end_date,
+            'payment_day': agreement.payment_day,
+            #'split_pct_parent_a': agreement.split_pct_parent_a,
+            'payer_role': agreement.payer_role,
+            'decree_number': agreement.decree_number,
+            'decree_date': agreement.decree_date,
+        })
+
+    context = {
+        'form': form,
+        'agreement': agreement,
+        'family': family,
+        'is_professional': is_professional,
+        'title': 'Modifica Sentenza Mantenimento Coniuge',
+    }
+
+    return render(request, 'families/spouse_support_form.html', context)
+
+
+@login_required
+def view_spouse_decree_view(request, agreement_id):
+    """Visualizza sentenza mantenimento coniuge (accessibile a genitori e avvocati)"""
+    agreement = get_object_or_404(SpouseSupportAgreement, id=agreement_id)
+    family = get_family_of_user(request.user, request=request)
+
+    # Verifica che l'utente abbia accesso alla famiglia
+    if agreement.family != family:
+        messages.error(request, "⚠️ Accesso negato")
+        return redirect('families:family_dashboard')
+
+    if not agreement.decree_file:
+        messages.error(request, "⚠️ Nessuna sentenza caricata")
+        return redirect('families:spouse_support_list')
+
+    # Restituisci il file
+    response = FileResponse(agreement.decree_file.open('rb'))
+    response['Content-Disposition'] = f'inline; filename="{agreement.decree_file.name.split("/")[-1]}"'
+    return response

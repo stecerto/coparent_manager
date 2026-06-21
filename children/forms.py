@@ -88,13 +88,23 @@ ChildFormSet = inlineformset_factory(
     can_delete=True,
 )
 
-class ChildSupportForm(forms.Form):
+class ChildSupportForm(forms.ModelForm):
     class Meta:
         model = ChildSupport
         fields = ['amount', 'start_date', 'end_date', 'payer_role']
         widgets = {
-            'start_date': forms.DateInput(attrs={'type': 'date'}),
-            'end_date': forms.DateInput(attrs={'type': 'date'}),
+            'start_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'end_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+            'payer_role': forms.Select(attrs={'class': 'form-select'}),
+        }
+        labels = {
+            'amount': 'Importo Mensile (€)',
+            'start_date': 'Data Inizio',
+            'end_date': 'Data Fine (opzionale)',
+            'payer_role': 'Chi versa il mantenimento',
+        }
+        help_texts = {
+            'payer_role': 'Indica quale genitore versa il mantenimento all\'altro',
         }
 
 

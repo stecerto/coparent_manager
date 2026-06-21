@@ -141,6 +141,7 @@
             </a>
         </div>
     </div>
+
         <!-- 👫 CARD MANTENIMENTO CONIUGE (Dedicata) -->
     <div class="row g-4 mb-4">
         <div class="col-12">
@@ -150,31 +151,51 @@
                         <i class="bi bi-people-fill fs-3 text-info me-3"></i>
                         <h5 class="mb-0 fw-bold">Mantenimento al Coniuge</h5>
                     </div>
-                    <a href="{% url 'families:spousal_support' %}" class="btn btn-sm btn-outline-info">
-                        <i class="bi bi-pencil-square me-1"></i> Gestisci
+                    {% if active_membership.role in 'lawyer_a,lawyer_b,mediator,consultant' %}
+                    <a href="{% url 'families:spouse_support_list' %}" class="btn btn-sm btn-outline-info">
+                        <i class="bi bi-gavel me-1"></i> Gestisci Sentenze
                     </a>
+                    {% endif %}
                 </div>
                 <div class="card-body p-4">
                     {% if current_spousal_support %}
                         <div class="row align-items-center">
                             <div class="col-md-8">
-                                <h2 class="fw-bold text-info mb-1">€ {{ current_spousal_support.amount|floatformat:2 }} <small class="fs-6 text-muted fw-normal">/ mese</small></h2>
+                                <h2 class="fw-bold text-info mb-1">€ {{ current_spousal_support.monthly_amount|floatformat:2 }} <small class="fs-6 text-muted fw-normal">/ mese</small></h2>
                                 <p class="text-muted mb-0 small">
                                     <i class="bi bi-calendar-check me-1"></i> Attivo dal {{ current_spousal_support.start_date|date:"d/m/Y" }}
                                 </p>
+                                {% if current_spousal_support.decree_file %}
+                                <p class="mt-2 mb-0">
+                                    <a href="{% url 'families:view_spouse_decree' current_spousal_support.id %}"
+                                       class="btn btn-sm btn-outline-primary border-1" target="_blank">
+                                        <i class="bi bi-file-earmark-pdf me-1"></i>Visualizza Sentenza
+                                    </a>
+                                </p>
+                                {% endif %}
                             </div>
                             <div class="col-md-4 text-md-end mt-3 mt-md-0">
-                                <span class="badge bg-success fs-6 px-3 py-2">
-                                    <i class="bi bi-check-circle-fill me-1"></i> Configurato
-                                </span>
+                                {% if current_spousal_support.certified_by %}
+                                    <span class="badge bg-warning fs-6 px-3 py-2">
+                                        <i class="bi bi-patch-check-fill me-1"></i>Certificata da {{ current_spousal_support.certified_by.get_full_name|default:current_spousal_support.certified_by.email }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-success fs-6 px-3 py-2">
+                                        <i class="bi bi-check-circle-fill me-1"></i> Configurato
+                                    </span>
+                                {% endif %}
                             </div>
                         </div>
                     {% else %}
                         <div class="text-center py-3">
-                            <p class="text-muted mb-3">Nessun mantenimento al coniuge configurato per questa famiglia.</p>
-                            <a href="{% url 'families:spousal_support' %}" class="btn btn-info text-white">
-                                <i class="bi bi-plus-circle me-1"></i> Configura ora
+                            <p class="text-muted mb-3">Nessuna sentenza di mantenimento al coniuge registrata.</p>
+                            {% if active_membership.role in 'lawyer_a,lawyer_b,mediator,consultant' %}
+                            <a href="{% url 'families:spouse_support_create' %}" class="btn btn-info text-white">
+                                <i class="bi bi-gavel me-1"></i> Registra Sentenza
                             </a>
+                            {% else %}
+                            <p class="text-muted small mb-0">La sentenza verrà registrata dall'avvocato</p>
+                            {% endif %}
                         </div>
                     {% endif %}
                 </div>

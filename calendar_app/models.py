@@ -15,6 +15,50 @@ from families.models import Family
 from expenses.models import ExpenseCategory, Expense  # ✅ Importa Expense
 
 
+class ProfessionalEvent(models.Model):
+    """Eventi personali per professionisti (avvocati, mediatori, consulenti)"""
+
+    EVENT_TYPES = [
+        ("meeting", "👥 Riunione cliente"),
+        ("court", "⚖️ Udienza"),
+        ("consultation", "💼 Consulenza"),
+        ("mediation", "🤝 Mediazione"),
+        ("deadline", "📅 Scadenza legale"),
+        ("other", "📌 Altro"),
+    ]
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="professional_events"
+    )
+    title = models.CharField(max_length=255)
+    description = models.TextField(blank=True)
+    event_type = models.CharField(max_length=20, choices=EVENT_TYPES, default="other")
+
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    location = models.CharField(max_length=255, blank=True, help_text="Luogo dell'appuntamento")
+
+    # Link opzionale a una famiglia (se l'evento riguarda una pratica specifica)
+    family = models.ForeignKey(
+        'families.Family',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="professional_events"
+    )
+
+    is_active = models.BooleanField(default=True)
+    google_event_id = models.CharField(max_length=255, null=True, blank=True, db_index=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"{self.title} ({self.start_time.strftime('%d/%m/%Y %H:%M')})"
+
+
 class CalendarEvent(models.Model):
     EVENT_TYPES = [
         ("custody", "🏠 Affidamento / Cambio casa"),
@@ -67,13 +111,6 @@ class CalendarEvent(models.Model):
     is_active = models.BooleanField(default=True)
 
     is_auto_generated = models.BooleanField(default=False)
-    linked_agreement = models.ForeignKey(
-        "families.ChildSupportAgreement",
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        related_name="calendar_events"
-    )
 
     source = models.CharField(
         max_length=20,
@@ -81,7 +118,9 @@ class CalendarEvent(models.Model):
             ("manual", "📅 Creato manualmente"),
             ("chat", "💬 Generato da Chat"),
             ("expense", "💰 Generato da Spesa"),
-            ("agreement", "📄 Generato da Accordo"),
+            ("agreement", "📄 Generato da Accordo (legacy)"),
+            ("child_support", "💶 Mantenimento Figli"),
+            ("spouse_support", "💶 Mantenimento Coniuge"),
         ],
         default="manual",
         db_index=True
@@ -109,6 +148,14 @@ class CalendarEvent(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+
+    google_event_id = models.CharField(
+        max_length=255,
+        null=True,
+        blank=True,
+        db_index=True,
+        help_text="ID evento su Google Calendar (se sincronizzato)"
+    )
 
     def __str__(self):
         return f"{self.title} ({self.start_time.strftime('%d/%m/%Y')})"
@@ -159,3 +206,49 @@ class EventAttachment(models.Model):
         Document,
         on_delete=models.CASCADE
     )
+
+
+class GoogleCalendarToken(models.Model):
+    """Token OAuth2 per integrazione Google Calendar"""
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='google_calendar_token'
+    )
+
+    # Token OAuth2
+    access_token = models.TextField()
+    refresh_token = models.TextField()
+    token_uri = models.URLField(default='https://oauth2.googleapis.com/token')
+    client_id = models.CharField(max_length=255)
+    client_secret = models.CharField(max_length=255)
+
+    # Metadati
+    scopes = models.TextField(help_text="Scopes separati da spazio")
+    expiry = models.DateTimeField(null=True, blank=True)
+    calendar_id = models.CharField(
+        max_length=255,
+        default='primary',
+        help_text="ID calendario Google (default: primary)"
+    )
+
+    # Stato
+    is_active = models.BooleanField(default=True)
+    last_sync_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Token Google Calendar"
+        verbose_name_plural = "Token Google Calendar"
+
+    def __str__(self):
+        return f"Google Calendar - {self.user.email}"
+
+    @property
+    def is_expired(self):
+        """Verifica se il token è scaduto"""
+        if not self.expiry:
+            return False
+        from django.utils import timezone
+        return timezone.now() >= self.expiry

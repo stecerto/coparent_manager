@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+{% load static %}
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="CoParent Manager - L'unica app italiana per la co-genitorialità. Gestione calendario, spese, report legali. 100% GDPR compliant.">
+    <meta name="keywords" content="co-genitorialità, separazione, divorzio, gestione figli, calendario condiviso, spese familiari, report legali, GDPR">
+    <meta name="author" content="CoParent Manager">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://coparentmanager.com/">
+    <meta property="og:title" content="CoParent Manager - Co-genitorialità senza conflitti">
+    <meta property="og:description" content="L'unica app italiana che unisce gestione quotidiana e valore legale per genitori separati.">
+    <meta property="og:image" content="{% static 'images/screenshot-desktop.png' %}">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://coparentmanager.com/">
+    <meta property="twitter:title" content="CoParent Manager - Co-genitorialità senza conflitti">
+    <meta property="twitter:description" content="L'unica app italiana che unisce gestione quotidiana e valore legale per genitori separati.">
+    <meta property="twitter:image" content="{% static 'images/screenshot-desktop.png' %}">
+
+    <!-- Schema.org SoftwareApplication -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "CoParent Manager",
+        "operatingSystem": "Web, iOS, Android",
+        "applicationCategory": "FamilyApplication",
+        "offers": {
+            "@type": "Offer",
+            "price": "0",
+            "priceCurrency": "EUR"
+        },
+        "description": "App per la co-genitorialità che aiuta genitori separati a gestire calendario, spese e comunicazioni in modo trasparente e legale.",
+        "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "4.8",
+            "ratingCount": "127"
+        },
+        "author": {
+            "@type": "Organization",
+            "name": "CoParent Manager"
+        }
+    }
+    </script>
+
+    <!-- Schema.org FAQ -->
+<script type="application/ld+json">
+{
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": [
+        {
+            "@type": "Question",
+            "name": "CoParent Manager è conforme al GDPR?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Assolutamente sì. Tutti i dati sono crittografati, archiviati su server europei e trattati secondo le normative GDPR."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "Posso collegare il mio Google Calendar o Outlook?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Sì! La sincronizzazione è bidirezionale: gli eventi creati nell'app appaiono sul tuo calendario personale e viceversa."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "I report PDF hanno valore legale?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "I report includono cronologia dettagliata con timestamp e sono pensati come documentazione completa per il tuo avvocato o per il tribunale."
+            }
+        },
+        {
+            "@type": "Question",
+            "name": "La prova gratuita richiede carta di credito?",
+            "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "No, nessuna carta richiesta per iniziare. Hai 15 giorni gratuiti per provare tutte le funzionalità del piano scelto."
+            }
+        }
+    ]
+}
+</script>
+
+    <title>CoParent Manager - Co-genitorialità senza conflitti</title>
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="{% static 'images/favicon.ico' %}">
+    <link rel="apple-touch-icon" href="{% static 'images/apple-touch-icon.png' %}">
+
+    <!-- Bootstrap 5 -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
+
+    <!-- Custom CSS -->
+    <link href="{% static 'css/landing.css' %}" rel="stylesheet">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<!-- 🎯 NAVBAR SEMPLICE -->
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top">
+    <div class="container">
+        <a class="navbar-brand d-flex align-items-center" href="#">
+            <img src="{% static 'images/logo-coparent.svg' %}" alt="CoParent Manager" height="50">
+            <span class="ms-2 fw-bold text-dark">CoParent Manager</span>
+        </a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav ms-auto align-items-center">
+                <li class="nav-item"><a class="nav-link" href="#features">Funzionalità</a></li>
+                <li class="nav-item"><a class="nav-link" href="#testimonials">Testimonianze</a></li>
+                <li class="nav-item"><a class="nav-link" href="#pricing">Prezzi</a></li>
+                <li class="nav-item"><a class="nav-link" href="#faq">FAQ</a></li>
+                <li class="nav-item ms-lg-3">
+                    <a href="{% url 'accounts:login' %}" class="btn btn-outline-primary">Accedi</a>
+                </li>
+                <li class="nav-item ms-2">
+                    <a href="{% url 'accounts:register' %}" class="btn btn-primary">Prova Gratis</a>
+                </li>
+            </ul>
+        </div>
+    </div>
+</nav>
+
+<!-- 🚀 HERO SECTION -->
+<section class="hero-section">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-6 mb-5 mb-lg-0">
+                <h1 class="hero-title mb-4">
+                    Co-genitorialità <span class="text-gradient">senza conflitti</span>
+                </h1>
+                <p class="hero-subtitle mb-4">
+                    L'unica app italiana che unisce <strong>gestione quotidiana</strong> e <strong>valore legale</strong> per genitori separati.
+                </p>
+                <div class="d-flex flex-column flex-sm-row gap-3 mb-4">
+                    <a href="{% url 'accounts:register' %}" class="btn btn-primary btn-lg px-5">
+                        <i class="bi bi-rocket-takeoff me-2"></i>Prova gratis 15 giorni
+                    </a>
+                    <a href="#demo" class="btn btn-outline-primary btn-lg px-5">
+                        <i class="bi bi-play-circle me-2"></i>Guarda demo 2 min
+                    </a>
+                </div>
+                <div class="d-flex align-items-center gap-3 text-muted small">
+                    <span><i class="bi bi-check-circle-fill text-success me-1"></i> Nessuna carta richiesta</span>
+                    <span><i class="bi bi-check-circle-fill text-success me-1"></i> Cancella quando vuoi</span>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div class="hero-image-container">
+                    <img src="{% static 'images/screenshot-desktop.png' %}" alt="CoParent Manager Dashboard" class="img-fluid rounded-3 shadow-lg">
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 🎯 3 DIFFERENZIALI CHIAVE -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-md-4">
+                <div class="differential-card text-center p-4">
+                    <div class="differential-icon mb-3">🇮🇹</div>
+                    <h4 class="fw-bold mb-3">100% GDPR Compliant</h4>
+                    <p class="text-muted mb-0">Dati crittografati, server europei, privacy prima di tutto. Conforme alle normative italiane.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="differential-card text-center p-4">
+                    <div class="differential-icon mb-3">⚖️</div>
+                    <h4 class="fw-bold mb-3">Report per il Tribunale</h4>
+                    <p class="text-muted mb-0">PDF dettagliati con cronologia spese, calendario e comunicazioni. Documentazione completa.</p>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="differential-card text-center p-4">
+                    <div class="differential-icon mb-3">💰</div>
+                    <h4 class="fw-bold mb-3">Trasparenza Totale</h4>
+                    <p class="text-muted mb-0">Spese ordinarie auto-approvate, straordinarie con notifica. Calcolo mantenimento automatico.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 💡 FEATURES -->
+<section id="features" class="py-5">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold mb-3">Tutto ciò di cui hai bisogno</h2>
+            <p class="text-muted lead">Funzionalità pensate per semplificare la co-genitorialità</p>
+        </div>
+        <div class="row g-4">
+            {% for feature in features %}
+            <div class="col-md-6 col-lg-3">
+                <div class="feature-card h-100 p-4">
+                    <div class="feature-icon mb-3">{{ feature.icon }}</div>
+                    <h5 class="fw-bold mb-3">{{ feature.title }}</h5>
+                    <p class="text-muted mb-0 small">{{ feature.description }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- 📱 SCREENSHOTS -->
+<section class="py-5 bg-light">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold mb-3">Interfaccia intuitiva e moderna</h2>
+            <p class="text-muted lead">Progettata per essere semplice da usare, anche sotto stress</p>
+        </div>
+        <div class="row g-4">
+            <div class="col-md-4">
+                <img src="{% static 'images/screenshot-desktop-figli.png' %}" alt="Gestione Figli" class="img-fluid rounded-3 shadow">
+                <p class="text-center mt-3 fw-semibold">Gestione Figli</p>
+            </div>
+            <div class="col-md-4">
+                <img src="{% static 'images/screenshot-desktop-pannello-famiglia.png' %}" alt="Pannello Famiglia" class="img-fluid rounded-3 shadow">
+                <p class="text-center mt-3 fw-semibold">Pannello di Controllo</p>
+            </div>
+            <div class="col-md-4">
+                <img src="{% static 'images/screenshot-mobile.png' %}" alt="Versione Mobile" class="img-fluid rounded-3 shadow">
+                <p class="text-center mt-3 fw-semibold">Mobile Friendly</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 💬 TESTIMONIALS -->
+<section id="testimonials" class="py-5">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold mb-3">Cosa dicono i nostri utenti</h2>
+            <p class="text-muted lead">Storie reali di genitori che hanno semplificato la loro co-genitorialità</p>
+        </div>
+        <div class="row g-4">
+            {% for testimonial in testimonials %}
+            <div class="col-md-4">
+                <div class="testimonial-card h-100 p-4">
+                    <div class="mb-3">
+                        {% for i in "12345" %}
+                            {% if forloop.counter <= testimonial.rating %}
+                                <i class="bi bi-star-fill text-warning"></i>
+                            {% else %}
+                                <i class="bi bi-star text-warning"></i>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                    <p class="mb-3 fst-italic">"{{ testimonial.text }}"</p>
+                    <div class="mt-auto">
+                        <strong>{{ testimonial.name }}</strong><br>
+                        <small class="text-muted">{{ testimonial.role }}</small>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</section>
+
+<!-- 💰 PRICING -->
+<section id="pricing" class="py-5 bg-light">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold mb-3">Piani trasparenti, senza sorprese</h2>
+            <p class="text-muted lead">
+                <strong>{{ trial_days }} giorni gratis</strong> su tutti i piani • Nessuna carta richiesta • Cancella quando vuoi
+            </p>
+        </div>
+        <div class="row g-4 justify-content-center">
+            {% for plan in pricing_plans %}
+            <div class="col-md-4">
+                <div class="pricing-card {% if plan.recommended %}pricing-card-featured{% endif %} text-center p-4 h-100">
+                    {% if plan.recommended %}
+                        <div class="badge bg-primary mb-2">PIÙ POPOLARE</div>
+                    {% endif %}
+
+                    <h4 class="fw-bold mb-2">{{ plan.title }}</h4>
+                    <p class="text-muted small mb-3">{{ plan.limit }}</p>
+
+                    <div class="pricing-price mb-3">
+                        {% if plan.is_custom %}
+                            <span class="h3 fw-bold">Personalizzato</span>
+                        {% else %}
+                            <span class="h1 fw-bold">€{{ plan.price|floatformat:2 }}</span>
+                            <span class="text-muted">/mese</span>
+                        {% endif %}
+                    </div>
+
+                    {% if not plan.is_custom %}
+                    <div class="mb-3">
+                        <span class="badge bg-success bg-opacity-10 text-success px-3 py-2">
+                            🎁 {{ trial_days }} giorni gratis
+                        </span>
+                    </div>
+                    {% endif %}
+
+                    <ul class="list-unstyled mb-4 text-start">
+                        {% for feature in plan.features %}
+                        <li class="mb-2 {% if not feature.active %}text-muted{% endif %}">
+                            {% if feature.active %}
+                                <i class="bi bi-check-circle-fill text-success me-2"></i>
+                            {% else %}
+                                <i class="bi bi-x-circle me-2"></i>
+                            {% endif %}
+                            {{ feature.name }}
+                        </li>
+                        {% endfor %}
+                    </ul>
+
+                    {% if plan.is_custom %}
+                        <a href="mailto:support@coparentmanager.com" class="btn btn-outline-primary w-100">Contattaci</a>
+                    {% else %}
+                        <a href="{% url 'accounts:register' %}?plan={{ plan.id }}"
+                           class="btn {% if plan.recommended %}btn-primary{% else %}btn-outline-primary{% endif %} w-100">
+                            Prova {{ trial_days }} Giorni Gratis
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        <!-- Trust indicators -->
+        <div class="row mt-5 text-center">
+            <div class="col-md-4 mb-3">
+                <i class="bi bi-shield-check text-success fs-2"></i>
+                <p class="small text-muted mb-0 mt-2">Pagamento sicuro</p>
+            </div>
+            <div class="col-md-4 mb-3">
+                <i class="bi bi-arrow-repeat text-primary fs-2"></i>
+                <p class="small text-muted mb-0 mt-2">Cancella quando vuoi</p>
+            </div>
+            <div class="col-md-4 mb-3">
+                <i class="bi bi-headset text-warning fs-2"></i>
+                <p class="small text-muted mb-0 mt-2">Supporto italiano</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- ❓ FAQ -->
+<section id="faq" class="py-5">
+    <div class="container">
+        <div class="text-center mb-5">
+            <h2 class="fw-bold mb-3">Domande Frequenti</h2>
+            <p class="text-muted lead">Tutto ciò che devi sapere su CoParent Manager</p>
+        </div>
+        <div class="row justify-content-center">
+            <div class="col-lg-8">
+                <div class="accordion" id="faqAccordion">
+                    {% for item in faq %}
+                    <div class="accordion-item border-0 mb-3 shadow-sm">
+                        <h2 class="accordion-header">
+                            <button class="accordion-button collapsed fw-semibold" type="button" data-bs-toggle="collapse" data-bs-target="#faq{{ forloop.counter }}">
+                                {{ item.question }}
+                            </button>
+                        </h2>
+                        <div id="faq{{ forloop.counter }}" class="accordion-collapse collapse" data-bs-parent="#faqAccordion">
+                            <div class="accordion-body text-muted">
+                                {{ item.answer }}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- 🚀 CTA FINALE -->
+<section class="py-5 bg-primary text-white">
+    <div class="container text-center">
+        <h2 class="fw-bold mb-3">Pronto a semplificare la co-genitorialità?</h2>
+        <p class="lead mb-4">Unisciti a centinaia di famiglie che hanno già scelto CoParent Manager</p>
+        <a href="{% url 'accounts:register' %}" class="btn btn-light btn-lg px-5">
+            <i class="bi bi-rocket-takeoff me-2"></i>Inizia la prova gratuita
+        </a>
+        <p class="mt-3 small opacity-75">
+            <i class="bi bi-check-circle-fill me-1"></i> {{ trial_days }} giorni gratis
+            <span class="mx-2">•</span>
+            <i class="bi bi-check-circle-fill me-1"></i> Nessuna carta richiesta
+            <span class="mx-2">•</span>
+            <i class="bi bi-check-circle-fill me-1"></i> Cancella quando vuoi
+        </p>
+    </div>
+</section>
+
+<!-- 🦶 FOOTER -->
+<footer class="bg-dark text-white py-5">
+    <div class="container">
+        <div class="row g-4">
+            <div class="col-md-4">
+                <img src="{% static 'images/logo-coparent.svg' %}" alt="CoParent Manager" height="60" class="mb-3">
+                <p class="small text-white-50">L'app italiana per la co-genitorialità. Gestione quotidiana + valore legale.</p>
+            </div>
+            <div class="col-md-2">
+                <h6 class="fw-bold mb-3">Prodotto</h6>
+                <ul class="list-unstyled small">
+                    <li class="mb-2"><a href="#features" class="text-white-50 text-decoration-none">Funzionalità</a></li>
+                    <li class="mb-2"><a href="#pricing" class="text-white-50 text-decoration-none">Prezzi</a></li>
+                    <li class="mb-2"><a href="#faq" class="text-white-50 text-decoration-none">FAQ</a></li>
+                </ul>
+            </div>
+            <div class="col-md-2">
+                <h6 class="fw-bold mb-3">Azienda</h6>
+                <ul class="list-unstyled small">
+                    <li class="mb-2"><a href="#" class="text-white-50 text-decoration-none">Chi siamo</a></li>
+                    <li class="mb-2"><a href="#" class="text-white-50 text-decoration-none">Blog</a></li>
+                    <li class="mb-2"><a href="#" class="text-white-50 text-decoration-none">Contatti</a></li>
+                </ul>
+            </div>
+            <div class="col-md-2">
+                <h6 class="fw-bold mb-3">Legale</h6>
+                <ul class="list-unstyled small">
+                    <li class="mb-2"><a href="{% url 'privacy_policy' %}" class="text-white-50 text-decoration-none">Privacy Policy</a></li>
+                    <li class="mb-2"><a href="#" class="text-white-50 text-decoration-none">Termini</a></li>
+                    <li class="mb-2"><a href="#" class="text-white-50 text-decoration-none">Cookie Policy</a></li>
+                </ul>
+            </div>
+            <div class="col-md-2">
+                <h6 class="fw-bold mb-3">Supporto</h6>
+                <ul class="list-unstyled small">
+                    <li class="mb-2"><a href="{% url 'help' %}" class="text-white-50 text-decoration-none">Centro Assistenza</a></li>
+                    <li class="mb-2"><a href="mailto:support@coparentmanager.com" class="text-white-50 text-decoration-none">Email</a></li>
+                </ul>
+            </div>
+        </div>
+        <hr class="my-4 border-secondary">
+        <div class="text-center small text-white-50">
+            <p class="mb-0">© 2026 CoParent Manager. Tutti i diritti riservati.</p>
+            <p class="mb-0">Dati crittografati • GDPR Compliant • Server in Europa</p>
+        </div>
+    </div>
+</footer>
+
+<!-- Bootstrap JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+<!-- Custom JS -->
+<script src="{% static 'js/landing.js' %}"></script>
+
+</body>
+</html>

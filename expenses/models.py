@@ -205,7 +205,7 @@ class Expense(models.Model):
         if self.expense_type and not self.pk:  # Solo alla CREAZIONE (pk è None)
             self.category_name_snapshot = self.expense_type.display_name
             self.category_color_snapshot = self.expense_type.color
-            self.group_snapshot = self.expense_type.group
+            self.group_snapshot = self.expense_type.group.label
         super().save(*args, **kwargs)
 
     def __str__(self):

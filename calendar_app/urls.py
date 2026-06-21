@@ -27,4 +27,15 @@ urlpatterns = [
     path('events/', views.events_list_view, name='events_list'),
     # 👁️ ✅ NUOVO: Dettaglio evento (aggiungi questa riga)
     path('event/<int:event_id>/detail/', views.event_detail_view, name='event_detail'),
+
+# Google Calendar OAuth
+    path('oauth/google/', views.google_auth_view, name='google_auth'),
+    path('oauth/google/callback/', views.google_callback_view, name='google_callback'),
+    path('oauth/google/disconnect/', views.google_disconnect_view, name='google_disconnect'),
+    path('oauth/google/sync/', views.google_sync_view, name='google_sync'),
+    path('professional/calendar/full/', views.professional_calendar_full_view, name='professional_calendar_full'),
+    path('professional/events.json', views.professional_events_json, name='professional_events_json'),
+    path('professional/event/create/', views.professional_event_form_view, name='professional_event_create'),
+    path('professional/event/<int:event_id>/edit/', views.professional_event_form_view, name='professional_event_edit'),
+    path('professional/event/<int:event_id>/delete/', views.professional_event_delete, name='professional_event_delete'),
 ]

@@ -7,101 +7,115 @@
     <style>
         @page {
             size: A4;
-            margin: 25mm 15mm 25mm 15mm;
-            @top-center { content: element(header); }
-            @bottom-center { content: element(footer); }
+            margin: 20mm 15mm;
         }
 
-        /* --- HEADER E FOOTER --- */
-        .pdf-header {
-            position: running(header);
-            text-align: center;
-            border-bottom: 2px solid #0d6efd;
-            padding-bottom: 10px;
-            margin-bottom: 15px;
-        }
-        .pdf-logo { max-height: 50px; margin-bottom: 5px; }
-        .pdf-title { font-size: 16pt; font-weight: bold; color: #0d6efd; margin: 5px 0; }
-        .pdf-meta { font-size: 8pt; color: #555; line-height: 1.5; }
-
-        .pdf-footer {
-            position: running(footer);
-            text-align: center;
-            font-size: 7pt;
-            color: #666;
-            border-top: 1px solid #ccc;
-            padding-top: 8px;
-            margin-top: 10px;
-        }
-
-        /* --- CORPO E TIPOGRAFIA --- */
         body {
-            font-family: 'DejaVu Sans', 'Segoe UI', Helvetica, Arial, sans-serif;
+            font-family: 'DejaVu Sans', Helvetica, Arial, sans-serif;
             font-size: 10pt;
             line-height: 1.4;
             color: #222;
             margin: 0;
+            padding: 0;
         }
 
-        h3 {
-            font-size: 12pt;
-            color: #0d6efd;
-            margin: 20px 0 10px;
-            border-bottom: 2px solid #e9ecef;
-            padding-bottom: 6px;
-            font-weight: bold;
+        /* --- HEADER PRIMA PAGINA --- */
+        .main-header {
+            text-align: center;
+            border-bottom: 3px solid #0d6efd;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
         }
-
-        /* --- BOX RIASSUNTIVI (WeasyPrint Safe: inline-block) --- */
-        .info-row {
+        .main-header img {
+            height: 80px;
+            width: auto;
             margin-bottom: 15px;
-            overflow: hidden; /* clearfix per inline-block */
+            display: block;
+            margin-left: auto;
+            margin-right: auto;
         }
-        .info-box {
-            width: 48%;
+        .main-header h1 {
+            font-size: 18pt;
+            color: #0d6efd;
+            margin: 10px 0 5px 0;
+        }
+        .main-header .meta {
+            font-size: 9pt;
+            color: #555;
+            margin-top: 8px;
+        }
+
+        /* --- CARD RIEPILOGO (layout a griglia 3x2) --- */
+        .summary-grid {
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .summary-row {
+            width: 100%;
+            margin-bottom: 8px;
+        }
+        .summary-box {
+            width: 32%;
             display: inline-block;
             vertical-align: top;
             background: #f8f9fa;
             padding: 12px;
             border-radius: 6px;
-            border-left: 3px solid #0d6efd;
-            margin-right: 2%;
+            border-left: 4px solid #0d6efd;
+            margin-right: 1%;
             box-sizing: border-box;
-            margin-bottom: 12px;
         }
-        .info-box:nth-child(even) { margin-right: 0; border-left-color: #198754; }
-        .info-box:nth-child(3) { border-left-color: #0dcaf0; }
-        .info-box:nth-child(4) { border-left-color: #ffc107; }
+        .summary-box:last-child { margin-right: 0; }
+        .summary-box.blue { border-left-color: #0d6efd; }
+        .summary-box.green { border-left-color: #198754; }
+        .summary-box.orange { border-left-color: #fd7e14; }
+        .summary-box.purple { border-left-color: #6f42c1; }
+        .summary-box.red { border-left-color: #dc3545; }
+        .summary-box.gray { border-left-color: #6c757d; }
 
-        .info-icon { font-size: 14pt; display: block; margin-bottom: 4px; }
-        .info-label {
-            font-size: 7.5pt;
+        .summary-label {
+            font-size: 8pt;
             color: #666;
-            display: block;
-            margin-bottom: 3px;
             text-transform: uppercase;
             font-weight: 600;
             letter-spacing: 0.5px;
+            display: block;
+            margin-bottom: 4px;
         }
-        .info-value {
-            font-size: 12pt;
+        .summary-value {
+            font-size: 14pt;
             font-weight: bold;
             color: #212529;
         }
 
-        /* --- TABELLA --- */
+        /* --- SEZIONI --- */
+        h2 {
+            font-size: 13pt;
+            color: #0d6efd;
+            margin: 25px 0 10px 0;
+            border-bottom: 2px solid #e9ecef;
+            padding-bottom: 6px;
+        }
+        h2 small {
+            font-size: 9pt;
+            color: #666;
+            font-weight: normal;
+            margin-left: 8px;
+        }
+        h2.ordinary { color: #6c757d; border-bottom-color: #dee2e6; }
+
+        /* --- TABELLE --- */
         table {
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 15px;
-            border-radius: 6px;
-            overflow: hidden;
+            font-size: 9pt;
         }
         th, td {
-            padding: 8px 10px;
+            padding: 8px 6px;
             border: 1px solid #dee2e6;
             text-align: left;
-            font-size: 9pt;
+            vertical-align: top;
         }
         th {
             background: #0d6efd;
@@ -109,111 +123,155 @@
             font-weight: 600;
             text-transform: uppercase;
             font-size: 8pt;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.3px;
         }
+        table.ordinary th { background: #6c757d; }
         tbody tr:nth-child(even) { background: #f8f9fa; }
-
-        /* Evita che una riga si spezzi a metà pagina */
         tr { page-break-inside: avoid; }
 
         .text-right { text-align: right; }
+        .text-center { text-align: center; }
 
-        .total-row td {
+        /* --- TOTALI --- */
+        tfoot td {
             background: #e9ecef;
             font-weight: bold;
             font-size: 10pt;
             border-top: 2px solid #0d6efd;
         }
+        table.ordinary tfoot td { border-top-color: #6c757d; }
 
-        /* --- BADGE STATO (Pill style) --- */
+        /* --- BADGE STATO --- */
         .status {
             display: inline-block;
-            padding: 4px 8px;
-            border-radius: 12px;
+            padding: 3px 8px;
+            border-radius: 10px;
             font-size: 8pt;
             font-weight: 600;
             white-space: nowrap;
-            text-align: center;
-            min-width: 80px;
         }
-        .bg-pending { background: #fff3cd; color: #856404; border: 1px solid #ffe69c; }
-        .bg-accepted { background: #cfe2ff; color: #084298; border: 1px solid #9ec5fe; }
-        .bg-paid { background: #d1e7dd; color: #0f5132; border: 1px solid #a3cfbb; }
-        .bg-rejected { background: #f8d7da; color: #842029; border: 1px solid #f1aeb5; }
+        .bg-pending { background: #fff3cd; color: #856404; }
+        .bg-accepted { background: #cfe2ff; color: #084298; }
+        .bg-paid { background: #d1e7dd; color: #0f5132; }
+        .bg-rejected { background: #f8d7da; color: #842029; }
+        .bg-empty { background: #e9ecef; color: #6c757d; }
 
-        /* --- STATO VUOTO --- */
+        /* --- EMPTY STATE --- */
         .empty-state {
             text-align: center;
-            padding: 30px 20px;
+            padding: 25px 15px;
             color: #6c757d;
             background: #f8f9fa;
-            border-radius: 6px;
             border: 1px dashed #ced4da;
+            border-radius: 6px;
         }
-    </style>
-    <!-- WeasyPrint richiede font specifici per i numeri di pagina -->
-    <style>
-        .page::after { content: counter(page); }
-        .topage::after { content: counter(pages); }
+
+        /* --- NOTE --- */
+        .note-cell {
+            font-size: 8pt;
+            color: #6c757d;
+            font-style: italic;
+        }
+
+        /* --- BOX INFORMAZIONI --- */
+        .info-box {
+            margin-top: 25px;
+            padding: 15px;
+            background: #f8f9fa;
+            border-left: 4px solid #0d6efd;
+            border-radius: 4px;
+            page-break-inside: avoid;
+        }
+        .info-box h4 {
+            margin: 0 0 10px 0;
+            font-size: 11pt;
+            color: #0d6efd;
+        }
+        .info-box ul {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 9pt;
+            line-height: 1.6;
+        }
+
+        /* --- FOOTER --- */
+        .pdf-footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid #ccc;
+            text-align: center;
+            font-size: 8pt;
+            color: #666;
+        }
     </style>
 </head>
 <body>
-    <!-- Header PDF -->
-    <div class="pdf-header">
-        <img src="{% static 'images/icon-192x192.png' %}" alt="Logo CoParent" class="pdf-logo">
-        <div class="pdf-title">📊 Report Spese Familiari</div>
-        <div class="pdf-meta">
+
+    <!-- HEADER PRIMA PAGINA -->
+    <div class="main-header">
+        <img src="{{ logo_url }}" alt="Logo CoParent" style="height: 80px; width: auto; margin-bottom: 15px;">
+        <h1>Report Spese Familiari</h1>
+        <div class="meta">
             Famiglia: <strong>{{ family.name }}</strong> &nbsp;|&nbsp;
             Generato il: <strong>{{ generation_date|date:"d/m/Y H:i" }}</strong> &nbsp;|&nbsp;
             Utente: <strong>{{ user.first_name|default:user.email }}</strong>
         </div>
     </div>
 
-    <!-- Card Riepilogo Dati -->
-    <div class="info-row">
-        <div class="info-box">
-            <span class="info-icon">💰</span>
-            <span class="info-label">Totale Spese</span>
-            <span class="info-value">{{ total_expenses|floatformat:2 }} €</span>
+    <!-- CARD RIEPILOGO -->
+    <div class="summary-grid">
+        <div class="summary-row">
+            <div class="summary-box blue">
+                <span class="summary-label">Totale Complessivo</span>
+                <span class="summary-value">{{ total_expenses|floatformat:2 }} €</span>
+            </div>
+            <div class="summary-box gray">
+                <span class="summary-label">Spese Ordinarie</span>
+                <span class="summary-value">{{ ordinary_total|floatformat:2 }} €</span>
+            </div>
+            <div class="summary-box orange">
+                <span class="summary-label">Spese Straordinarie</span>
+                <span class="summary-value">{{ extraordinary_total|floatformat:2 }} €</span>
+            </div>
         </div>
-        <div class="info-box">
-            <span class="info-icon">👨</span>
-            <span class="info-label">Quota Genitore A</span>
-            <span class="info-value">{{ parent_a_total|floatformat:2 }} €</span>
-        </div>
-        <div class="info-box">
-            <span class="info-icon">👩</span>
-            <span class="info-label">Quota Genitore B</span>
-            <span class="info-value">{{ parent_b_total|floatformat:2 }} €</span>
-        </div>
-        <div class="info-box">
-            <span class="info-icon">📋</span>
-            <span class="info-label">Numero Spese</span>
-            <span class="info-value">{{ expenses.count }}</span>
+        <div class="summary-row">
+            <div class="summary-box green">
+                <span class="summary-label">{{ parent_a_name }}</span>
+                <span class="summary-value">{{ parent_a_total|floatformat:2 }} €</span>
+            </div>
+            <div class="summary-box purple">
+                <span class="summary-label">{{ parent_b_name }}</span>
+                <span class="summary-value">{{ parent_b_total|floatformat:2 }} €</span>
+            </div>
+            <div class="summary-box red">
+                <span class="summary-label">Numero Spese</span>
+                <span class="summary-value">{{ expenses|length }}</span>
+            </div>
         </div>
     </div>
 
-    <h3>📝 Dettaglio Movimenti</h3>
+    <!-- SEZIONE 1: SPESE STRAORDINARIE -->
+    <h2>⭐ Spese Straordinarie <small>(da ripartire tra genitori)</small></h2>
 
-    <!-- Tabella Spese -->
+    {% if extraordinary_expenses %}
     <table>
         <thead>
             <tr>
-                <th style="width:14%">📅 Data</th>
-                <th style="width:18%">👶 Figlio</th>
-                <th style="width:20%">🏷️ Categoria</th>
-                <th style="width:12%" class="text-right">💶 Importo</th>
-                <th style="width:14%">📌 Stato</th>
-                <th style="width:11%" class="text-right">Quota A</th>
-                <th style="width:11%" class="text-right">Quota B</th>
+                <th style="width:12%">Data</th>
+                <th style="width:16%">Figlio</th>
+                <th style="width:22%">Categoria</th>
+                <th style="width:12%" class="text-right">Importo</th>
+                <th style="width:12%">Stato</th>
+                <th style="width:13%" class="text-right">{{ parent_a_name }}</th>
+                <th style="width:13%" class="text-right">{{ parent_b_name }}</th>
             </tr>
         </thead>
         <tbody>
-            {% for exp in expenses %}
+            {% for exp in extraordinary_expenses %}
             <tr>
                 <td>{{ exp.expense_date|date:"d/m/Y" }}</td>
-                <td>{{ exp.child.name }} {{ exp.child.surname }}</td>
-                <td>{{ exp.expense_type.display_name|default:exp.category_name_snapshot }}</td>
+                <td>{% if exp.child %}{{ exp.child.name }} {{ exp.child.surname|default:"" }}{% else %}<em class="text-muted">-</em>{% endif %}</td>
+                <td>{{ exp.category_name_snapshot|default:exp.expense_type.display_name }}</td>
                 <td class="text-right">{{ exp.amount|floatformat:2 }} €</td>
                 <td>
                     {% if exp.status == 'pending' %}
@@ -222,39 +280,105 @@
                         <span class="status bg-accepted">Accettata</span>
                     {% elif exp.status == 'paid' %}
                         <span class="status bg-paid">Pagata</span>
-                    {% else %}
+                    {% elif exp.status == 'rejected' %}
                         <span class="status bg-rejected">Rifiutata</span>
+                    {% else %}
+                        <span class="status bg-empty">{{ exp.status }}</span>
                     {% endif %}
                 </td>
                 <td class="text-right">{{ exp.quota_a|floatformat:2 }} €</td>
                 <td class="text-right">{{ exp.quota_b|floatformat:2 }} €</td>
             </tr>
-            {% empty %}
+            {% endfor %}
+        </tbody>
+        <tfoot>
             <tr>
-                <td colspan="7">
-                    <div class="empty-state">
-                        <span style="font-size: 24pt; display: block; margin-bottom: 10px;">📭</span>
-                        <strong>Nessuna spesa registrata nel periodo</strong><br>
-                        <small>I movimenti approvati o in sospeso appariranno in questa sezione</small>
-                    </div>
+                <td>TOTALE</td>
+                <td></td>
+                <td></td>
+                <td class="text-right">{{ extraordinary_total|floatformat:2 }} €</td>
+                <td></td>
+                <td class="text-right">{{ extraordinary_parent_a|floatformat:2 }} €</td>
+                <td class="text-right">{{ extraordinary_parent_b|floatformat:2 }} €</td>
+            </tr>
+        </tfoot>
+    </table>
+    {% else %}
+    <div class="empty-state">
+        <strong>Nessuna spesa straordinaria registrata</strong><br>
+        <small>Le spese straordinarie richiedono approvazione e vengono ripartite tra i genitori</small>
+    </div>
+    {% endif %}
+
+    <!-- SEZIONE 2: SPESE ORDINARIE -->
+    <h2 class="ordinary">🛒 Spese Ordinarie <small>(coperte dal mantenimento mensile)</small></h2>
+
+    {% if ordinary_expenses %}
+    <table class="ordinary">
+        <thead>
+            <tr>
+                <th style="width:14%">Data</th>
+                <th style="width:20%">Figlio</th>
+                <th style="width:26%">Categoria</th>
+                <th style="width:14%" class="text-right">Importo</th>
+                <th style="width:14%">Stato</th>
+                <th style="width:12%">Note</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for exp in ordinary_expenses %}
+            <tr>
+                <td>{{ exp.expense_date|date:"d/m/Y" }}</td>
+                <td>{% if exp.child %}{{ exp.child.name }} {{ exp.child.surname|default:"" }}{% else %}<em class="text-muted">-</em>{% endif %}</td>
+                <td>{{ exp.category_name_snapshot|default:exp.expense_type.display_name }}</td>
+                <td class="text-right">{{ exp.amount|floatformat:2 }} €</td>
+                <td>
+                    {% if exp.status == 'paid' %}
+                        <span class="status bg-paid">Pagata</span>
+                    {% elif exp.status == 'pending' %}
+                        <span class="status bg-pending">In Sospeso</span>
+                    {% elif exp.status == 'accepted' %}
+                        <span class="status bg-accepted">Accettata</span>
+                    {% else %}
+                        <span class="status bg-empty">{{ exp.status }}</span>
+                    {% endif %}
                 </td>
+                <td class="note-cell">Coperta</td>
             </tr>
             {% endfor %}
         </tbody>
         <tfoot>
-            <tr class="total-row">
-                <td colspan="3">TOTALE COMPLESSIVO</td>
-                <td class="text-right">{{ total_expenses|floatformat:2 }} €</td>
+            <tr>
+                <td>TOTALE</td>
                 <td></td>
-                <td class="text-right">{{ parent_a_total|floatformat:2 }} €</td>
-                <td class="text-right">{{ parent_b_total|floatformat:2 }} €</td>
+                <td></td>
+                <td class="text-right">{{ ordinary_total|floatformat:2 }} €</td>
+                <td></td>
+                <td class="note-cell">Non ripartite</td>
             </tr>
         </tfoot>
     </table>
-
-    <!-- Footer PDF -->
-    <div class="pdf-footer">
-        CoParent Manager © {% now "Y" %} | Documento riservato e generato automaticamente | Pagina <span class="page"></span> di <span class="topage"></span>
+    {% else %}
+    <div class="empty-state">
+        <strong>Nessuna spesa ordinaria registrata</strong><br>
+        <small>Le spese ordinarie sono coperte dal mantenimento mensile e non vengono ripartite</small>
     </div>
+    {% endif %}
+
+    <!-- BOX INFORMAZIONI -->
+    <div class="info-box">
+        <h4>💡 Come leggere questo report</h4>
+        <ul>
+            <li><strong>Spese Straordinarie:</strong> Importi da ripartire tra <strong>{{ parent_a_name }}</strong> e <strong>{{ parent_b_name }}</strong> secondo le percentuali definite</li>
+            <li><strong>Spese Ordinarie:</strong> Importi già coperti dal mantenimento mensile, non vengono ripartiti</li>
+            <li><strong>Totale Complessivo:</strong> Somma di tutte le spese sostenute per i figli</li>
+        </ul>
+    </div>
+
+    <!-- FOOTER -->
+    <div class="pdf-footer">
+        CoParent Manager © {% now "Y" %} | Documento riservato generato automaticamente
+    </div>
+
 </body>
 </html>

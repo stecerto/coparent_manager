@@ -136,7 +136,35 @@ class ChildSupportAgreement(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     modified_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
 
+    # 🔒 Certificazione (avvocato/mediatore)
+    certified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="certified_child_agreements",
+        help_text="Avvocato o mediatore che ha certificato l'accordo"
+    )
+    certified_at = models.DateTimeField(null=True, blank=True)
+
+    @property
+    def is_certified(self):
+        """Verifica se l'accordo è certificato"""
+        return self.certified_by is not None
+
     def save(self, *args, **kwargs):
+        # 📅 Prima di salvare, elimina eventi futuri se end_date è cambiato
+        if self.pk:  # Solo se è un update
+            try:
+                old_agreement = ChildSupportAgreement.objects.get(pk=self.pk)
+                if old_agreement.end_date != self.end_date:
+                    # end_date è cambiato, elimina eventi futuri
+                    from .services.agreement_service import cleanup_child_support_calendar_events
+                    deleted = cleanup_child_support_calendar_events(self)
+                    print(f"🗑️ Eliminati {deleted} eventi calendario figli dopo {self.end_date}")
+            except ChildSupportAgreement.DoesNotExist:
+                pass
+
         # ✅ Aggiorna automaticamente il default sul profilo figlio
         super().save(*args, **kwargs)
         # ✅ Aggiorna SOLO i figli che NON hanno un override esplicito
@@ -150,6 +178,183 @@ class ChildSupportAgreement(models.Model):
 
     def __str__(self):
         return f"Mantenimento {self.decree_number or 'senza num.'} - €{self.monthly_amount}"
+
+
+def cleanup_child_support_calendar_events(agreement):
+    """Elimina eventi calendario figli dopo la data di fine mantenimento"""
+    from calendar_app.models import CalendarEvent
+    from datetime import date
+
+    family = agreement.family
+
+    # Determina data limite: end_date o default 18 anni
+    if agreement.end_date:
+        limit_date = agreement.end_date
+    else:
+        from dateutil.relativedelta import relativedelta
+        limit_date = agreement.start_date + relativedelta(years=18)
+
+    # Elimina eventi successivi a limit_date
+    deleted_count = CalendarEvent.objects.filter(
+        family=family,
+        linked_agreement=agreement,
+        start_time__date__gt=limit_date
+    ).delete()[0]
+
+    return deleted_count
+
+
+class SpouseSupportAgreement(models.Model):
+    """Mantenimento al coniuge (ex marito/moglie)"""
+    family = models.ForeignKey("Family", on_delete=models.CASCADE, related_name="spouse_support_agreements")
+
+    # 📜 Dati Sentenza
+    decree_number = models.CharField("Numero sentenza/accordo", max_length=100, blank=True)
+    decree_date = models.DateField("Data sentenza", null=True, blank=True)
+    decree_file = models.FileField("File sentenza", upload_to="legal/spouse_decrees/", null=True, blank=True)
+
+    # 💰 Termini Pagamento
+    monthly_amount = models.DecimalField(
+        "Importo mensile",
+        max_digits=10,
+        decimal_places=2,
+        help_text="Importo mensile del mantenimento (es: €500)"
+    )
+    payment_day = models.PositiveIntegerField(
+        "Giorno del mese",
+        validators=[MinValueValidator(1), MaxValueValidator(31)],
+        help_text="Es: 5 per il 5 di ogni mese"
+    )
+
+    # 📅 Date
+    start_date = models.DateField("Decorrenza")
+    end_date = models.DateField(
+        "Scadenza (opzionale)",
+        null=True,
+        blank=True,
+        help_text="Se vuota, il mantenimento è a tempo indeterminato. Se inserita, gli eventi calendario dopo questa data verranno eliminati."
+    )
+
+    # 👤 Beneficiario (ex coniuge)
+    beneficiary = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="spouse_support_beneficiary",
+        help_text="Ex coniuge che riceve il mantenimento"
+    )
+
+    # 🔄 Versioning & Stato
+    is_active = models.BooleanField(default=True)
+    version = models.PositiveIntegerField(default=1)
+    previous_version = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="new_versions"
+    )
+
+    # ✅ NUOVO: Chi versa il mantenimento
+    PAYER_CHOICES = [
+        ('parent_a', 'Genitore A versa a Genitore B'),
+        ('parent_b', 'Genitore B versa a Genitore A'),
+    ]
+
+    payer_role = models.CharField(
+        max_length=20,
+        choices=PAYER_CHOICES,
+        default='parent_a',
+        verbose_name="Chi versa il mantenimento",
+        help_text="Stabilito dal giudice nella sentenza"
+    )
+
+
+
+    # 🔒 Certificazione (avvocato/mediatore)
+    certified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="certified_spouse_agreements",
+        help_text="Avvocato o mediatore che ha certificato l'accordo"
+    )
+    certified_at = models.DateTimeField(null=True, blank=True)
+
+    # Audit
+    created_at = models.DateTimeField(auto_now_add=True)
+    modified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="modified_spouse_agreements"
+    )
+
+    class Meta:
+        ordering = ['-start_date']
+        verbose_name = "Accordo Mantenimento Coniuge"
+        verbose_name_plural = "Accordi Mantenimento Coniuge"
+
+    def save(self, *args, **kwargs):
+        print(f"\n🔍 DEBUG SpouseSupportAgreement.save() chiamato")
+        print(f"  pk: {self.pk}")
+        print(f"  family: {self.family}")
+        print(f"  start_date: {self.start_date}")
+        print(f"  end_date: {self.end_date}")
+
+        # 📅 Prima di salvare, gestisci eventi futuri se end_date è cambiato
+        if self.pk:  # Solo se è un update
+            try:
+                old_agreement = SpouseSupportAgreement.objects.get(pk=self.pk)
+                if old_agreement.end_date != self.end_date:
+                    # end_date è cambiato, elimina eventi futuri (locali + Google)
+                    from .services.agreement_service import cleanup_spouse_support_calendar_events
+                    deleted = cleanup_spouse_support_calendar_events(self)
+                    print(f"🗑️ Eliminati {deleted} eventi calendario coniuge dopo {self.end_date}")
+            except SpouseSupportAgreement.DoesNotExist:
+                pass
+
+        # ✅ Aggiorna automaticamente il default sul profilo figlio
+        super().save(*args, **kwargs)
+
+        print(f"  ✅ Salvato nel DB, ora genero eventi calendario...")
+
+        # 📅 Genera eventi calendario (locali + sync Google asincrono)
+        from .services.agreement_service import generate_spouse_support_calendar_events
+        created_count = generate_spouse_support_calendar_events(self)
+        print(f"  📅 Creati {created_count} eventi calendario per mantenimento coniuge\n")
+
+
+    @property
+    def annual_amount(self):
+        """Calcola importo annuo"""
+        return self.monthly_amount * 12
+
+    @property
+    def is_certified(self):
+        """Verifica se l'accordo è certificato"""
+        return self.certified_by is not None
+
+    def __str__(self):
+        beneficiary_name = self.beneficiary.get_full_name() if self.beneficiary else "N/D"
+        return f"Mantenimento Coniuge {beneficiary_name} - €{self.monthly_amount}/mese"
+
+    @property
+    def annual_amount(self):
+        """Calcola importo annuo"""
+        return self.monthly_amount * 12
+
+    @property
+    def is_certified(self):
+        """Verifica se l'accordo è certificato"""
+        return self.certified_by is not None
+
+    def __str__(self):
+        beneficiary_name = self.beneficiary.get_full_name() if self.beneficiary else "N/D"
+        return f"Mantenimento Coniuge {beneficiary_name} - €{self.monthly_amount}/mese"
 
 
 # ==============================================================================

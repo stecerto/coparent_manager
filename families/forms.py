@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 
 from core.choices import RoleChoices
 from expenses.models import Expense
-from .models import Invitation, ChildSupportAgreement, FamilyMember
+from .models import Invitation, ChildSupportAgreement, FamilyMember, SpouseSupportAgreement
 
 from django import forms
 from .models import Invitation
@@ -297,39 +297,172 @@ class ExpenseForm(forms.ModelForm):
                 self.fields["status"].widget.attrs["readonly"] = True
 
 
-class ChildSupportAgreementForm(forms.ModelForm):
+from django import forms
+from django.core.exceptions import ValidationError
+
+
+class SpouseSupportForm(forms.Form):
+    """Form dedicato per il mantenimento al coniuge con sentenza"""
+
+    # ✅ MANTIENI 'amount' (non 'monthly_amount')
+    amount = forms.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        label="Importo mensile (€)",
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'step': '0.01',
+            'min': '0'
+        })
+    )
+
+    start_date = forms.DateField(
+        label="Data inizio",
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control'
+        })
+    )
+
+    end_date = forms.DateField(
+        label="Data fine (opzionale)",
+        required=False,
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control'
+        })
+    )
+
+    payment_day = forms.IntegerField(
+        label="Giorno del mese per pagamento",
+        min_value=1,
+        max_value=31,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'min': '1',
+            'max': '31'
+        })
+    )
+
+    payer_role = forms.ChoiceField(
+        label="Chi versa il mantenimento",
+        choices=[
+            ('parent_a', 'Genitore A versa a Genitore B'),
+            ('parent_b', 'Genitore B versa a Genitore A'),
+        ],
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    decree_number = forms.CharField(
+        label="Numero sentenza",
+        max_length=100,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Es: Sentenza n. 123/2026'
+        })
+    )
+
+    decree_date = forms.DateField(
+        label="Data sentenza",
+        widget=forms.DateInput(attrs={
+            'type': 'date',
+            'class': 'form-control'
+        })
+    )
+
+    decree_file = forms.FileField(
+        label="File sentenza (PDF)",
+        required=False,
+        widget=forms.FileInput(attrs={
+            'class': 'form-control',
+            'accept': '.pdf'
+        })
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get('start_date')
+        end_date = cleaned_data.get('end_date')
+
+        if end_date and start_date and end_date < start_date:
+            raise ValidationError("La data fine deve essere successiva alla data inizio")
+
+        return cleaned_data
+
+
+from accounts.models import User
+
+
+class SpouseSupportAgreementForm(forms.ModelForm):
+    """Form per inserimento/modifica mantenimento coniuge"""
+
     class Meta:
-        model = ChildSupportAgreement
-        # ⚠️ SOLO campi del modello. MAI 'DELETE', 'id' o campi calcolati
+        model = SpouseSupportAgreement
         fields = [
-            'decree_number', 'decree_date', 'decree_file', 'monthly_amount',
-            'split_pct_parent_a', 'payment_day', 'start_date', 'end_date', 'children'
+            'decree_number', 'decree_date', 'decree_file',
+            'monthly_amount', 'payment_day',
+            'start_date', 'end_date', 'beneficiary'
         ]
         widgets = {
             'decree_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'start_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'end_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
-            'children': forms.SelectMultiple(attrs={'class': 'form-control'}),
-            'split_pct_parent_a': forms.NumberInput(
-                attrs={'step': '0.01', 'min': '0', 'max': '100', 'class': 'form-control'}
-            )
+            'monthly_amount': forms.NumberInput(attrs={
+                'step': '0.01',
+                'min': '0',
+                'class': 'form-control',
+                'placeholder': 'Es: 500.00'
+            }),
+            'payment_day': forms.NumberInput(attrs={
+                'min': '1',
+                'max': '31',
+                'class': 'form-control',
+                'placeholder': 'Es: 5'
+            }),
+            'beneficiary': forms.Select(attrs={'class': 'form-select'}),
+        }
+        labels = {
+            'decree_number': 'Numero sentenza/accordo',
+            'decree_date': 'Data sentenza',
+            'decree_file': 'File sentenza (PDF)',
+            'monthly_amount': 'Importo mensile (€)',
+            'payment_day': 'Giorno del mese per il pagamento',
+            'start_date': 'Data inizio mantenimento',
+            'end_date': 'Data fine mantenimento',
+            'beneficiary': 'Ex coniuge beneficiario',
+        }
+        help_texts = {
+            'monthly_amount': 'Importo mensile stabilito dalla sentenza (es: €500)',
+            'payment_day': 'Giorno del mese in cui va pagato il mantenimento (1-31)',
+            'end_date': 'Obbligatoria per mantenimento coniuge (es: 31/12/2030)',
+            'beneficiary': 'Seleziona l\'ex coniuge che riceve il mantenimento',
         }
 
-    def clean_split_pct_parent_a(self):
-        """Validazione aggiuntiva se necessaria"""
-        value = self.cleaned_data.get('split_pct_parent_a')
-        if value is not None and (value < 0 or value > 100):
-            raise forms.ValidationError("La percentuale deve essere tra 0 e 100.")
-        return value
+    def __init__(self, *args, family=None, **kwargs):
+        super().__init__(*args, **kwargs)
 
-class SpouseSupportForm(forms.Form):
-    """Form dedicato per il mantenimento al coniuge (senza figli)"""
-    amount = forms.DecimalField(
-        max_digits=10,
-        decimal_places=2,
-        label="Importo mensile (€)"
-    )
-    start_date = forms.DateField(
-        widget=forms.DateInput(attrs={"type": "date"}),
-        label="Data di inizio"
-    )
+        # Filtra beneficiari: solo utenti con ruolo spouse nella famiglia
+        if family:
+            from families.models import FamilyMember
+            spouse_members = FamilyMember.objects.filter(
+                family=family,
+                role='spouse'
+            ).select_related('user')
+
+            self.fields['beneficiary'].queryset = User.objects.filter(
+                id__in=[m.user_id for m in spouse_members]
+            )
+
+        # ✅ end_date è OPZIONALE (rimuovi required=True)
+        self.fields['end_date'].required = False
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get('start_date')
+        end_date = cleaned_data.get('end_date')
+
+        # ✅ Validazione: se end_date è inserita, deve essere dopo start_date
+        if start_date and end_date and end_date <= start_date:
+            raise forms.ValidationError("La data fine deve essere successiva alla data inizio")
+
+        return cleaned_data

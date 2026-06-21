@@ -3,17 +3,13 @@ from django.views.generic import RedirectView
 
 from families.views import family_summary, lawyer_expenses_dashboard_view, professional_dashboard, set_active_family, \
     lawyer_exit_family_context, exit_family_context, professional_pending_events_view, spousal_support_view, \
-    family_settings_view, support_agreement_view
+    family_settings_view, export_family_data_view, spouse_support_edit, spouse_support_create, \
+    spouse_support_list, edit_child_support_view, view_decree_view, view_spouse_decree_view
 from chat.views import delete_message_view
-from .views import (
-    approve_expense_view,
-    dashboard_view,
-
-    setup_view,
-    invite_member_view,
+from .views import (approve_expense_view, dashboard_view, setup_view, invite_member_view,
     accept_invite_view, resend_invitation_view, cancel_invitation_view, confirm_invitation_view, expenses_by_child,
-    invitation_landing_view, family_timeline_view, create_support_agreement_view, edit_support_agreement_view,
-    delete_support_agreement_view, lawyer_dashboard_view
+    invitation_landing_view, family_timeline_view
+
 )
 
 app_name = "families"
@@ -42,7 +38,8 @@ urlpatterns = [
     path("accept-invite/<str:token>/", accept_invite_view, name="accept_invite"),
     path("spousal-support/", spousal_support_view, name="spousal_support"),
     path('family-settings/', family_settings_view, name='family_settings'),
-    path("support-agreement/", support_agreement_view, name="support_agreement"),
+    path('child-support/<int:child_id>/edit/', edit_child_support_view, name='edit_child_support'),
+    path('export-data/', export_family_data_view, name='export_family_data'),
     # =========================
     # EXPENSES
     # =========================
@@ -54,9 +51,10 @@ urlpatterns = [
     path("timeline/", family_timeline_view, name="timeline"),
     path("by-child/", expenses_by_child, name="expenses_by_child"),
 #  ACCORDI DI MANTENIMENTO
-    path("agreement/create/", create_support_agreement_view, name="create_support_agreement"),
-    path("agreement/<int:agreement_id>/edit/", edit_support_agreement_view, name="edit_support_agreement"),
-    path("agreement/<int:agreement_id>/delete/", delete_support_agreement_view, name="delete_support_agreement"),
+    path('decree/<int:support_id>/', view_decree_view, name='view_decree'),
+    path('spouse-support/<int:agreement_id>/decree/', view_spouse_decree_view, name='view_spouse_decree'),
+
+
 
     path('lawyer/expenses/', lawyer_expenses_dashboard_view, name='lawyer_expenses'),
     path('lawyer/expenses/<int:family_id>/', lawyer_expenses_dashboard_view, name='lawyer_expenses'),
@@ -73,5 +71,10 @@ urlpatterns = [
          name='mediator_home'),
     path('consultant/home/', RedirectView.as_view(pattern_name='lawyer_home', permanent=False),
          name='consultant_home'),
+
+    # Mantenimento Coniuge
+    path('spouse-support/', spouse_support_list, name='spouse_support_list'),
+    path('spouse-support/create/', spouse_support_create, name='spouse_support_create'),
+    path('spouse-support/<int:pk>/edit/', spouse_support_edit, name='spouse_support_edit'),
 
 ]

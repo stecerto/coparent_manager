@@ -68,9 +68,36 @@
                             {{ form.custody_type|as_crispy_field }}
                         </div>
 
-                        <!-- Mantenimento -->
+                        <!-- 💰 MANTENIMENTO -->
                         <div class="mb-4">
                             {{ form.manual_maintenance_amount|as_crispy_field }}
+                            <!-- ✅ AVVISO SE ESISTE GIÀ -->
+                            {% if existing_support and not is_professional %}
+                            <div class="alert alert-warning mt-3">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                <strong>Mantenimento già configurato</strong>
+                                <p class="mb-0 small mt-2">
+                                    Il mantenimento è già stato impostato a €{{ existing_support.amount }}.
+                                    Solo un avvocato può modificarlo caricando la sentenza.
+                                </p>
+                            </div>
+                            {% else %}
+                            <!-- Chi versa il mantenimento -->
+                            <div class="mb-3 mt-3">
+                                <label class="form-label fw-bold">💸 Chi versa il mantenimento</label>
+                                <select name="payer_role" class="form-select">
+                                    <option value="parent_a" {% if child.active_support.payer_role == 'parent_a' %}selected{% endif %}>
+                                        Genitore A → Genitore B
+                                    </option>
+                                    <option value="parent_b" {% if child.active_support.payer_role == 'parent_b' %}selected{% endif %}>
+                                        Genitore B → Genitore A
+                                    </option>
+                                </select>
+                                <small class="form-text text-muted">
+                                    Indica quale genitore versa il mantenimento mensile all'altro
+                                </small>
+                            </div>
+                             {% endif %}
                             <div class="mt-2 p-3 bg-light rounded border">
                                 <div class="d-flex align-items-center gap-2 mb-2">
                                     <span class="fs-5">💰</span>

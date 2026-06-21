@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}📅 Calendario Studio{% endblock %}
+
+{% block extra_css %}
+<style>
+    #professional-calendar {
+        min-height: 650px;
+        background: white;
+        padding: 15px;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    .fc .fc-button-primary {
+        background-color: #0d6efd !important;
+        border-color: #0d6efd !important;
+    }
+    .fc .fc-button-primary:hover {
+        background-color: #0b5ed7 !important;
+    }
+    .fc .fc-daygrid-day.fc-day-today {
+        background-color: #e7f1ff !important;
+    }
+    .fc-event {
+        cursor: pointer;
+        border: none !important;
+        font-size: 0.85rem;
+        padding: 2px 5px;
+    }
+    .legend-item {
+        display: inline-flex;
+        align-items: center;
+        margin-right: 15px;
+        font-size: 0.85rem;
+    }
+    .legend-color {
+        width: 14px;
+        height: 14px;
+        border-radius: 3px;
+        margin-right: 5px;
+        display: inline-block;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+    
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+        <div>
+            <h2 class="fw-bold mb-1">📅 Calendario Studio</h2>
+            <p class="text-muted mb-0 small">Gestisci i tuoi appuntamenti professionali</p>
+        </div>
+        <a href="{% url 'calendar:professional_event_create' %}" class="btn btn-primary btn-lg">
+            <i class="bi bi-plus-circle me-2"></i>Nuovo Appuntamento
+        </a>
+    </div>
+
+    <!-- Legenda -->
+    <div class="card shadow-sm mb-3 border-0">
+        <div class="card-body py-2">
+            <div class="d-flex flex-wrap align-items-center">
+                <span class="fw-bold me-3 small">Legenda:</span>
+                <span class="legend-item"><span class="legend-color" style="background:#0d6efd"></span>Riunione</span>
+                <span class="legend-item"><span class="legend-color" style="background:#dc3545"></span>Udienza</span>
+                <span class="legend-item"><span class="legend-color" style="background:#198754"></span>Consulenza</span>
+                <span class="legend-item"><span class="legend-color" style="background:#6f42c1"></span>Mediazione</span>
+                <span class="legend-item"><span class="legend-color" style="background:#fd7e14"></span>Scadenza</span>
+                <span class="legend-item"><span class="legend-color" style="background:#6c757d"></span>Altro</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Calendario FullCalendar -->
+    <div id="professional-calendar"></div>
+
+</div>
+
+<!-- Modal dettaglio evento -->
+<div class="modal fade" id="eventModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="eventModalTitle">Dettagli Evento</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body" id="eventModalBody"></div>
+            <div class="modal-footer">
+                <a href="#" id="eventEditLink" class="btn btn-primary">
+                    <i class="bi bi-pencil me-1"></i>Modifica
+                </a>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Chiudi</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const calendarEl = document.getElementById('professional-calendar');
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: 'dayGridMonth',
+        headerToolbar: {
+            left: 'prev,next today',
+            center: 'title',
+            right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+        },
+        locale: 'it',
+        firstDay: 1,
+        height: 700,
+        editable: false,
+        selectable: true,
+        events: '{% url "calendar:professional_events_json" %}',
+        
+        // Click su giorno vuoto → crea nuovo evento
+        select: function(info) {
+            const start = info.startStr.slice(0, 16);
+            const end = info.endStr.slice(0, 16);
+            window.location.href = `{% url 'calendar:professional_event_create' %}?start=${start}&end=${end}`;
+        },
+        
+        // Click su evento → mostra dettagli
+        eventClick: function(info) {
+            const ev = info.event;
+            const props = ev.extendedProps;
+            
+            document.getElementById('eventModalTitle').textContent = ev.title;
+            
+            let html = `
+                <p><strong>📅 Data:</strong> ${ev.start.toLocaleString('it-IT', {
+                    dateStyle: 'full', timeStyle: 'short'
+                })}</p>
+            `;
+            
+            if (props.location) {
+                html += `<p><strong>📍 Luogo:</strong> ${props.location}</p>`;
+            }
+            if (props.family_name) {
+                html += `<p><strong>👨‍👩‍👧 Famiglia:</strong> ${props.family_name}</p>`;
+            }
+            if (props.description) {
+                html += `<p><strong>📝 Note:</strong><br>${props.description}</p>`;
+            }
+            
+            document.getElementById('eventModalBody').innerHTML = html;
+            document.getElementById('eventEditLink').href = props.edit_url;
+            
+            new bootstrap.Modal(document.getElementById('eventModal')).show();
+        },
+        
+        // Tooltip al hover
+        eventDidMount: function(info) {
+            const ev = info.event;
+            const props = ev.extendedProps;
+            let tooltip = ev.title;
+            if (props.location) tooltip += `\n📍 ${props.location}`;
+            if (props.family_name) tooltip += `\n👨‍👩‍👧 ${props.family_name}`;
+            info.el.setAttribute('title', tooltip);
+        }
+    });
+    
+    calendar.render();
+});
+</script>
+{% endblock %}

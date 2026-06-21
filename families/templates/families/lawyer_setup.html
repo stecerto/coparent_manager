@@ -79,6 +79,74 @@ FINE DEBUG -->
                 </div>
             </div>
 
+            <!-- 🔗 INTEGRAZIONE GOOGLE CALENDAR -->
+<div class="card shadow-sm mt-4 border-0" style="border-radius: 12px;">
+    <div class="card-header bg-white border-bottom border-start border-1 border-danger d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+        <i class="bi bi-google fs-3 text-danger me-3"></i>
+        <h5 class="mb-0 fw-bold">Google Calendar</h5>
+    </div>
+    <div class="card-body p-4">
+        {% if request.user.google_calendar_token.is_active %}
+
+        <!-- ✅ COLLEGATO - MESSAGGIO DI CONFERMA -->
+        <div class="alert alert-success mb-3 border-0">
+            <div class="d-flex align-items-start gap-3">
+                <i class="bi bi-check-circle-fill fs-1 text-success"></i>
+                <div class="flex-grow-1">
+                    <h6 class="fw-bold mb-2">✅ Google Calendar collegato con successo!</h6>
+                    <p class="mb-2">
+                        <i class="bi bi-envelope me-2"></i>
+                        <strong>Email collegata:</strong>
+                        <span class="badge bg-success">{{ request.user.google_calendar_token.user.email }}</span>
+                    </p>
+                    <p class="mb-0 small text-muted">
+                        <i class="bi bi-info-circle me-1"></i>
+                        I tuoi eventi professionali vengono sincronizzati automaticamente con il tuo Google Calendar personale.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'calendar:google_sync' %}" class="btn btn-outline-primary">
+                <i class="bi bi-arrow-repeat me-1"></i>Sincronizza Ora
+            </a>
+            <a href="{% url 'calendar:google_disconnect' %}" class="btn btn-outline-danger" onclick="return confirm('Sei sicuro di voler disconnettere Google Calendar?')">
+                <i class="bi bi-x-circle me-1"></i>Disconnetti
+            </a>
+        </div>
+
+        {% if request.user.google_calendar_token.last_sync_at %}
+        <div class="mt-3 p-2 bg-light rounded">
+            <small class="text-muted">
+                <i class="bi bi-clock me-1"></i>
+                <strong>Ultima sincronizzazione:</strong> {{ request.user.google_calendar_token.last_sync_at|date:"d/m/Y alle H:i" }}
+            </small>
+        </div>
+        {% endif %}
+
+    {% else %}
+        <!-- ❌ NON COLLEGATO -->
+        <div class="alert alert-light border mb-3">
+            <div class="d-flex align-items-start gap-3">
+                <i class="bi bi-info-circle-fill fs-3 text-info"></i>
+                <div>
+                    <h6 class="fw-bold mb-2">Collega il tuo Google Calendar</h6>
+                    <p class="mb-0 small text-muted">
+                        Sincronizza automaticamente gli eventi del tuo studio con il tuo Google Calendar personale.
+                        Riceverai promemoria per udienze, riunioni e scadenze direttamente sul tuo calendario.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <a href="{% url 'calendar:google_auth' %}" class="btn btn-danger btn-lg">
+            <i class="bi bi-google me-2"></i>Collega Google Calendar
+        </a>
+    {% endif %}
+    </div>
+</div>
+
             <!-- Info Box -->
             <div class="card shadow-sm mt-4 border-0 bg-light">
                 <div class="card-body">

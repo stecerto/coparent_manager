@@ -84,6 +84,144 @@ def lawyer_home_view(request):
     }
     return render(request, 'core/lawyer_home.html', context)
 
+@login_required
+def help_center(request):
+    """Centro assistenza con FAQ e guide"""
+    return render(request, 'core/help.html', {
+        'breadcrumbs': [
+            {'name': 'Home', 'url': '/'},
+            {'name': 'Centro Assistenza'}
+        ]
+    })
+
+
+from core.pricing import ROLE_PRICING, ROLE_PLAN_METADATA
+
+
+def landing_page_view(request):
+    """Landing page pubblica per nuovi visitatori - SEO ottimizzata"""
+    if request.user.is_authenticated:
+        return redirect('home')
+
+    # ✅ Prezzi reali per genitori (dal pricing.py)
+    parent_pricing = ROLE_PRICING['parent']
+    parent_plans = ROLE_PLAN_METADATA['parent']
+
+    # Costruisci lista piani per il template
+    pricing_plans = []
+    for plan_id in ['starter', 'pro', 'enterprise']:
+        plan_meta = parent_plans[plan_id]
+        price = parent_pricing[plan_id]
+
+        pricing_plans.append({
+            'id': plan_id,
+            'title': plan_meta['title'],
+            'limit': plan_meta['limit'],
+            'price': price,
+            'is_custom': price is None,
+            'recommended': plan_meta.get('recommended', False),
+            'features': plan_meta['features']
+        })
+
+    context = {
+        'pricing_plans': pricing_plans,
+        'trial_days': 15,
+        'features': [
+            {
+                'icon': '📅',
+                'title': 'Calendario Sincronizzato',
+                'description': 'Collega Google Calendar e Outlook. Eventi figli, visite, attività sempre aggiornati per entrambi i genitori.'
+            },
+            {
+                'icon': '💸',
+                'title': 'Spese Senza Litigi',
+                'description': 'Ordinarie auto-approvate, straordinarie con notifica. Calcolo con saldo mantenimento automatico.'
+            },
+            {
+                'icon': '📄',
+                'title': 'Report Esportabili',
+                'description': 'PDF e CSV con tutta la cronologia. Pronto da inviare al tuo avvocato o al tribunale.'
+            },
+            {
+                'icon': '💬',
+                'title': 'Chat Tracciata',
+                'description': 'Comunicazione sicura tra genitori. Possibilità di coinvolgere avvocati o mediatori come supervisori.'
+            }
+        ],
+        'differentials': [
+            {
+                'icon': '🇮🇹',
+                'title': '100% GDPR Compliant',
+                'description': 'Dati crittografati, server europei, privacy prima di tutto. Conforme alle normative italiane.'
+            },
+            {
+                'icon': '⚖️',
+                'title': 'Report per il Tribunale',
+                'description': 'PDF dettagliati con cronologia spese, calendario e comunicazioni. Documentazione completa per il tuo avvocato.'
+            },
+            {
+                'icon': '💰',
+                'title': 'Trasparenza Totale',
+                'description': 'Spese ordinarie auto-approvate, straordinarie con notifica. Calcolo mantenimento automatico, nessun malinteso.'
+            }
+        ],
+        'testimonials': [
+            {
+                'name': 'Marco R.',
+                'role': 'Papà di due figli',
+                'text': 'Finalmente posso organizzare il calendario dei ragazzi senza discussioni. La sincronizzazione con Google Calendar è fantastica.',
+                'rating': 5
+            },
+            {
+                'name': 'Laura B.',
+                'role': 'Mamma e professionista',
+                'text': 'I report PDF mi hanno salvato in tribunale. Tutto documentato, ordinato, impossibile da contestare.',
+                'rating': 5
+            },
+            {
+                'name': 'Avv. Giuseppe V.',
+                'role': 'Avvocato familista',
+                'text': 'Lo consiglio a tutti i miei clienti. Riduce i conflitti e fornisce prove documentali inconfutabili.',
+                'rating': 5
+            }
+        ],
+        'faq': [
+            {
+                'question': 'CoParent Manager è conforme al GDPR?',
+                'answer': 'Assolutamente sì. Tutti i dati sono crittografati, archiviati su server europei e trattati secondo le normative GDPR. Hai il controllo completo sui tuoi dati.'
+            },
+            {
+                'question': 'Posso collegare il mio Google Calendar o Outlook?',
+                'answer': 'Sì! La sincronizzazione è bidirezionale: gli eventi creati nell\'app appaiono sul tuo calendario personale e viceversa. Supportiamo Google Calendar e Outlook.'
+            },
+            {
+                'question': 'I report PDF hanno valore legale?',
+                'answer': 'I report includono cronologia dettagliata con timestamp e sono pensati come documentazione completa per il tuo avvocato o per il tribunale.'
+            },
+            {
+                'question': 'Posso invitare il mio avvocato o mediatore?',
+                'answer': 'Certamente. Puoi invitare avvocati, mediatori familiari o consulenti come supervisori. Avranno accesso in sola lettura o potranno moderare le comunicazioni.'
+            },
+            {
+                'question': 'La prova gratuita di 15 giorni richiede carta di credito?',
+                'answer': 'No, nessuna carta richiesta per iniziare. Hai 15 giorni gratuiti per provare tutte le funzionalità del piano scelto, senza impegno.'
+            },
+            {
+                'question': 'Cosa succede se non rinnovo l\'abbonamento?',
+                'answer': 'I tuoi dati restano al sicuro per 25 giorni dopo la scadenza. Puoi esportare tutto in qualsiasi momento. Nessun blocco improvviso.'
+            },
+            {
+                'question': 'Come posso cancellare il mio account?',
+                'answer': 'Puoi eliminare il tuo account in qualsiasi momento dalle Impostazioni. Tutti i tuoi dati personali verranno cancellati permanentemente (diritto all\'oblio GDPR Art. 17). I dati condivisi con la famiglia verranno anonimizzati per mantenere l\'integrità del servizio.'
+            },
+            {
+                'question': 'È possibile usarlo anche per famiglie non separate?',
+                'answer': 'Assolutamente sì! CoParent Manager è perfetto anche per famiglie allargate, nonni coinvolti nella gestione, o genitori che viaggiano spesso per lavoro.'
+            }
+        ]
+    }
+
+    return render(request, 'landing.html', context)
 
 
 def privacy_policy_view(request):

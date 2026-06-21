@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ is_edit|yesno:"Modifica,Crea" }} Evento{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-white border-bottom d-flex align-items-center py-3">
+                    <i class="bi bi-calendar-check fs-3 text-primary me-3"></i>
+                    <h4 class="mb-0 fw-bold">{{ is_edit|yesno:"Modifica,Nuovo" }} Appuntamento</h4>
+                </div>
+                <div class="card-body p-4">
+                    <form method="POST" id="eventForm">
+                        {% csrf_token %}
+                        
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Titolo *</label>
+                            <input type="text" name="title" class="form-control" required value="{{ event.title|default:'' }}">
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Categoria</label>
+                                <select name="event_type" class="form-select">
+                                    {% for val, label in event_types %}
+                                        <option value="{{ val }}" {% if event and event.event_type == val %}selected{% endif %}>{{ label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Famiglia/Pratica (opz.)</label>
+                                <select name="family_id" class="form-select">
+                                    <option value="">-- Nessuna --</option>
+                                    {% for f in families %}
+                                        <option value="{{ f.id }}" {% if event and event.family_id == f.id %}selected{% endif %}>{{ f.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row g-3 mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Data/Ora Inizio *</label>
+                                <input type="datetime-local" name="start_time" class="form-control" required 
+                                       value="{% if event %}{{ event.start_time|date:'Y-m-d\\TH:i' }}{% endif %}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Data/Ora Fine *</label>
+                                <input type="datetime-local" name="end_time" class="form-control"
+                                       value="{% if event %}{{ event.end_time|date:'Y-m-d\\TH:i' }}{% endif %}">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Luogo</label>
+                            <input type="text" name="location" class="form-control" value="{{ event.location|default:'' }}">
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Note</label>
+                            <textarea name="description" class="form-control" rows="3">{{ event.description|default:'' }}</textarea>
+                        </div>
+
+                        <div class="d-flex gap-2">
+                            <button type="submit" id="submitBtn" class="btn btn-success btn-lg px-4">💾 Salva</button>
+                            <a href="{% url 'calendar:professional_calendar_full' %}" class="btn btn-outline-secondary btn-lg">Annulla</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('eventForm');
+    const submitBtn = document.getElementById('submitBtn');
+
+    if (form && submitBtn) {
+        form.addEventListener('submit', function(e) {
+            // Disabilita il pulsante per prevenire doppio click
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Salvataggio...';
+
+            // Riabilita dopo 5 secondi (in caso di errore)
+            setTimeout(() => {
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = '💾 Salva';
+            }, 5000);
+        });
+    }
+});
+</script>
+{% endblock %}
+{% endblock %}

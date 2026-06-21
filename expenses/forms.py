@@ -72,8 +72,8 @@ class ExpenseForm(forms.ModelForm):
             is_active=True,
             valid_to__isnull=True,
             group__is_active=True
-        ).exclude(
-            group__code="ordinarie"  # ✅ ESCLUDE LE ORDINARIE
+       # ).exclude(
+        #    group__code="ordinarie"  # ✅ ESCLUDE LE ORDINARIE
         ).select_related("group").order_by(
             "group__label",
             "display_name"

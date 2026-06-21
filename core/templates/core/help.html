@@ -1,0 +1,682 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Guida e Supporto - CoParent Manager{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* 🎨 BACKGROUND */
+    .help-container {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 3rem 1rem 5rem;
+    }
+
+    /* 📱 HEADER */
+    .help-header {
+        text-align: center;
+        color: white;
+        margin-bottom: 3rem;
+        animation: fadeInDown 0.6s ease;
+    }
+
+    .help-header h1 {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        text-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+
+    .help-header p {
+        font-size: 1.1rem;
+        opacity: 0.95;
+        max-width: 600px;
+        margin: 0 auto;
+    }
+
+    /* 🎴 CARD SEZIONI */
+    .help-section {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+        padding: 2rem;
+        margin-bottom: 2rem;
+        animation: fadeInUp 0.6s ease;
+    }
+
+    .section-title {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 1.5rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding-bottom: 1rem;
+        border-bottom: 2px solid #f0f4ff;
+    }
+
+    .section-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+    }
+
+    /* 📱 INSTALLAZIONE APP */
+    .install-steps {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+    }
+
+    .install-step {
+        background: linear-gradient(135deg, #f0f4ff 0%, #e6f7ff 100%);
+        border-radius: 12px;
+        padding: 1.5rem;
+        border-left: 4px solid #667eea;
+        transition: transform 0.2s ease;
+    }
+
+    .install-step:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+    }
+
+    .step-number {
+        width: 32px;
+        height: 32px;
+        background: #667eea;
+        color: white;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        margin-bottom: 0.75rem;
+    }
+
+    .step-title {
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 0.5rem;
+    }
+
+    .step-desc {
+        font-size: 0.9rem;
+        color: #718096;
+        line-height: 1.5;
+    }
+
+    /* 📋 ACCORDION */
+    .accordion-item {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        overflow: hidden;
+    }
+
+    .accordion-header {
+        background: #f8fafc;
+        padding: 1.25rem;
+        cursor: pointer;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-weight: 600;
+        color: #2d3748;
+        transition: background 0.2s ease;
+    }
+
+    .accordion-header:hover {
+        background: #f0f4ff;
+    }
+
+    .accordion-icon {
+        font-size: 1.2rem;
+        color: #667eea;
+        transition: transform 0.3s ease;
+    }
+
+    .accordion-item.active .accordion-icon {
+        transform: rotate(180deg);
+    }
+
+    .accordion-body {
+        padding: 0 1.25rem;
+        max-height: 0;
+        overflow: hidden;
+        transition: all 0.3s ease;
+    }
+
+    .accordion-item.active .accordion-body {
+        padding: 1.25rem;
+        max-height: 1000px;
+    }
+
+    /* 🎯 CARDS FUNZIONI */
+    .features-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 1.5rem;
+        margin-top: 1.5rem;
+    }
+
+    .feature-card {
+        background: white;
+        border: 2px solid #e2e8f0;
+        border-radius: 12px;
+        padding: 1.5rem;
+        transition: all 0.3s ease;
+    }
+
+    .feature-card:hover {
+        border-color: #667eea;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+        transform: translateY(-2px);
+    }
+
+    .feature-icon {
+        width: 50px;
+        height: 50px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+        color: white;
+    }
+
+    .feature-title {
+        font-weight: 700;
+        color: #2d3748;
+        margin-bottom: 0.5rem;
+    }
+
+    .feature-desc {
+        font-size: 0.9rem;
+        color: #718096;
+        line-height: 1.5;
+    }
+
+    /* 🚀 ROADMAP */
+    .roadmap-item {
+        display: flex;
+        gap: 1rem;
+        padding: 1.25rem;
+        background: #f8fafc;
+        border-radius: 12px;
+        margin-bottom: 1rem;
+        align-items: flex-start;
+    }
+
+    .roadmap-status {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        font-size: 1.2rem;
+    }
+
+    .roadmap-status.done {
+        background: #c6f6d5;
+        color: #22543d;
+    }
+
+    .roadmap-status.progress {
+        background: #fefcbf;
+        color: #744210;
+    }
+
+    .roadmap-status.todo {
+        background: #e2e8f0;
+        color: #4a5568;
+    }
+
+    .roadmap-content h4 {
+        font-weight: 600;
+        color: #2d3748;
+        margin-bottom: 0.25rem;
+    }
+
+    .roadmap-content p {
+        font-size: 0.9rem;
+        color: #718096;
+        margin: 0;
+    }
+
+    /* 💬 SUPPORTO */
+    .support-box {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-radius: 16px;
+        padding: 2rem;
+        color: white;
+        text-align: center;
+        margin-top: 2rem;
+    }
+
+    .support-box h3 {
+        font-size: 1.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .support-box p {
+        margin-bottom: 1.5rem;
+        opacity: 0.95;
+    }
+
+    .btn-support {
+        background: white;
+        color: #667eea;
+        padding: 0.9rem 2rem;
+        border-radius: 12px;
+        text-decoration: none;
+        font-weight: 600;
+        display: inline-block;
+        transition: transform 0.2s ease;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .btn-support:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(0,0,0,0.2);
+    }
+
+    /* 📱 RESPONSIVE */
+    @media (max-width: 768px) {
+        .help-header h1 { font-size: 2rem; }
+        .help-section { padding: 1.5rem; }
+        .install-steps { grid-template-columns: 1fr; }
+        .features-grid { grid-template-columns: 1fr; }
+    }
+
+    @keyframes fadeInDown {
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes fadeInUp {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="help-container">
+    <!-- 🎯 HEADER -->
+    <div class="help-header">
+        <h1>📚 Guida e Supporto</h1>
+        <p>Tutto quello che devi sapere per utilizzare al meglio CoParent Manager</p>
+    </div>
+
+    <!-- 📱 INSTALLAZIONE APP -->
+    <div class="help-section">
+        <div class="section-title">
+            <div class="section-icon" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <i class="bi bi-phone"></i>
+            </div>
+            Installa l'App sul Tuo Dispositivo
+        </div>
+        
+        <p style="color: #4a5568; margin-bottom: 1.5rem;">
+            CoParent Manager è una <strong>Progressive Web App (PWA)</strong>. Installala per ricevere notifiche push e averla sempre a portata di mano!
+        </p>
+
+        <div class="install-steps">
+            <div class="install-step">
+                <div class="step-number">1</div>
+                <div class="step-title">Prima Visita</div>
+                <div class="step-desc">
+                    Il browser ti chiederà: "Vuoi ricevere notifiche?". Accetta per abilitare le notifiche push.
+                </div>
+            </div>
+
+            <div class="install-step">
+                <div class="step-number">2</div>
+                <div class="step-title">Android (Chrome)</div>
+                <div class="step-desc">
+                    Menu (⋮) → "Aggiungi alla schermata Home" oppure icona installa nella barra indirizzi.
+                </div>
+            </div>
+
+            <div class="install-step">
+                <div class="step-number">3</div>
+                <div class="step-title">iOS (Safari)</div>
+                <div class="step-desc">
+                    Tasto Condividi → "Aggiungi alla schermata Home". Nota: badge limitati su iOS.
+                </div>
+            </div>
+
+            <div class="install-step">
+                <div class="step-number">4</div>
+                <div class="step-title">Desktop (Chrome)</div>
+                <div class="step-desc">
+                    Icona installa (+) nella barra degli indirizzi per averla come app desktop.
+                </div>
+            </div>
+        </div>
+
+        <div class="alert alert-info mt-4 mb-0" style="background: #ebf8ff; border-left: 4px solid #4299e1; border-radius: 8px;">
+            <strong><i class="bi bi-info-circle-fill me-2"></i>Dopo l'installazione:</strong>
+            <ul class="mb-0 mt-2 ps-3">
+                <li>L'icona appare sulla home del telefono come un'app nativa</li>
+                <li>Quando arriva una notifica (chat, spesa, evento), vedi il numero rosso sopra l'icona (stile WhatsApp)</li>
+                <li>Cliccando l'icona, l'app si apre direttamente nella pagina corretta</li>
+                <li>Se l'app è in background, ricevi notifiche push native</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- 🎯 FUNZIONI PRINCIPALI -->
+    <div class="help-section">
+        <div class="section-title">
+            <div class="section-icon" style="background: linear-gradient(135deg, #48bb78 0%, #38a169 100%); color: white;">
+                <i class="bi bi-star"></i>
+            </div>
+            Funzioni Principali
+        </div>
+
+        <div class="features-grid">
+            <div class="feature-card">
+                <div class="feature-icon">💬</div>
+                <div class="feature-title">Chat Familiare</div>
+                <div class="feature-desc">
+                    Comunica in tempo reale con l'altro genitore. Messaggi crittografati, allegati documenti e cronologia sempre disponibile.
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">📅</div>
+                <div class="feature-title">Calendario Condiviso</div>
+                <div class="feature-desc">
+                    Gestisci turni, appuntamenti medici, eventi scolastici. Sincronizzazione con Google Calendar e Outlook.
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">💰</div>
+                <div class="feature-title">Gestione Spese</div>
+                <div class="feature-desc">
+                    Traccia spese ordinarie e straordinarie, calcola automaticamente le quote, approva pagamenti e carica ricevute.
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">📄</div>
+                <div class="feature-title">Documenti Sicuri</div>
+                <div class="feature-desc">
+                    Archivio cloud crittografato per documenti legali, buste paga, dichiarazioni. Accesso granulare e versioning.
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">⚖️</div>
+                <div class="feature-title">Mediazione Familiare</div>
+                <div class="feature-desc">
+                    Coinvolgi un mediatore professionista per risolvere conflitti in modo costruttivo e rispettoso.
+                </div>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">👨‍‍👧</div>
+                <div class="feature-title">Profili Figli</div>
+                <div class="feature-desc">
+                    Schede dettagliate per ogni figlio con informazioni sanitarie, scolastiche e percentuali di mantenimento personalizzate.
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 👥 RUOLI SPECIALI -->
+    <div class="help-section">
+        <div class="section-title">
+            <div class="section-icon" style="background: linear-gradient(135deg, #ed8936 0%, #dd6b20 100%); color: white;">
+                <i class="bi bi-people"></i>
+            </div>
+            Ruoli Speciali
+        </div>
+
+        <div class="accordion-item">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <span>🤝 Ruolo Mediatore Familiare</span>
+                <i class="bi bi-chevron-down accordion-icon"></i>
+            </div>
+            <div class="accordion-body">
+                <p><strong>Cos'è:</strong> Un professionista neutrale che aiuta i genitori a trovare accordi condivisi.</p>
+                <ul class="mb-0">
+                    <li>Accesso limitato alla chat familiare (solo lettura)</li>
+                    <li>Può visualizzare calendari e spese condivise</li>
+                    <li>Non può modificare dati o approvare spese</li>
+                    <li>Riceve notifiche quando ci sono nuovi conflitti da mediare</li>
+                    <li>Può inviare messaggi privati a entrambi i genitori</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="accordion-item">
+            <div class="accordion-header" onclick="toggleAccordion(this)">
+                <span>👨‍💼 Ruolo Consulente (Avvocato/Psicologo)</span>
+                <i class="bi bi-chevron-down accordion-icon"></i>
+            </div>
+            <div class="accordion-body">
+                <p><strong>Cos'è:</strong> Un professionista che supporta uno specifico genitore nel percorso.</p>
+                <ul class="mb-0">
+                    <li>Accesso completo ai dati del genitore che rappresenta</li>
+                    <li>Può consultare documenti legali e spese</li>
+                    <li>Riceve report periodici automatici</li>
+                    <li>Può preparare bozze di lettere e documenti</li>
+                    <li>Accesso riservato e crittografato</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- 💰 GESTIONE SPESE -->
+    <div class="help-section">
+        <div class="section-title">
+            <div class="section-icon" style="background: linear-gradient(135deg, #4299e1 0%, #3182ce 100%); color: white;">
+                <i class="bi bi-wallet2"></i>
+            </div>
+            Spese Ordinarie e Straordinarie
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 12px; overflow: hidden;">
+                    <div class="card-header bg-success text-white py-3">
+                        <h5 class="mb-0"><i class="bi bi-check-circle me-2"></i>Spese Ordinarie</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Cosa include:</strong></p>
+                        <ul>
+                            <li>Alimentazione e vitto</li>
+                            <li>Abitazione (affitto/mutuo quota figlio)</li>
+                            <li>Utenze domestiche</li>
+                            <li>Abbigliamento base</li>
+                            <li>Trasporti quotidiani</li>
+                        </ul>
+                        <div class="alert alert-light border mt-3 mb-0">
+                            <small><strong>Gestione:</strong> Coperte dall'assegno di mantenimento mensile. Non richiedono approvazione.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6 mb-4">
+                <div class="card h-100 border-0 shadow-sm" style="border-radius: 12px; overflow: hidden;">
+                    <div class="card-header bg-warning text-dark py-3">
+                        <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Spese Straordinarie</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>Cosa include:</strong></p>
+                        <ul>
+                            <li>Spese mediche non coperte da SSN</li>
+                            <li>Attività sportive/ricreative</li>
+                            <li>Gite scolastiche e viaggi</li>
+                            <li>Corsi di recupero/lingue</li>
+                            <li>Acquisto dispositivi tecnologici</li>
+                        </ul>
+                        <div class="alert alert-light border mt-3 mb-0">
+                            <small><strong>Gestione:</strong> Richiedono approvazione preventiva dell'altro genitore. Calcolo automatico quote.</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="alert alert-info mb-0" style="background: #ebf8ff; border-left: 4px solid #4299e1; border-radius: 8px;">
+            <strong><i class="bi bi-lightbulb-fill me-2"></i>Come funziona:</strong>
+            <ol class="mb-0 mt-2 ps-3">
+                <li>Inserisci la spesa con categoria e importo</li>
+                <li>Il sistema calcola automaticamente la quota di ciascun genitore (basata sulle percentuali configurate)</li>
+                <li>L'altro genitore riceve notifica e deve approvare/rifiutare</li>
+                <li>Una volta approvata, puoi caricare la ricevuta di pagamento</li>
+                <li>Il saldo viene tracciato e reportato mensilmente</li>
+            </ol>
+        </div>
+    </div>
+
+    <!-- 🚀 ROADMAP FUNZIONALITÀ -->
+    <div class="help-section">
+        <div class="section-title">
+            <div class="section-icon" style="background: linear-gradient(135deg, #9f7aea 0%, #805ad5 100%); color: white;">
+                <i class="bi bi-rocket"></i>
+            </div>
+            Prossime Funzionalità
+        </div>
+
+        <div class="roadmap-item">
+            <div class="roadmap-status done"><i class="bi bi-check-lg"></i></div>
+            <div class="roadmap-content">
+                <h4>✅ Chat Familiare & Notifiche Push</h4>
+                <p>Messaggistica sicura con notifiche in tempo reale</p>
+            </div>
+        </div>
+
+        <div class="roadmap-item">
+            <div class="roadmap-status done"><i class="bi bi-check-lg"></i></div>
+            <div class="roadmap-content">
+                <h4>✅ Gestione Spese e Documenti</h4>
+                <p>Tracciamento completo spese ordinarie/straordinarie</p>
+            </div>
+        </div>
+
+        <div class="roadmap-item">
+            <div class="roadmap-status progress"><i class="bi bi-hourglass-split"></i></div>
+            <div class="roadmap-content">
+                <h4>🔄 Modelli di Lettere Personalizzati</h4>
+                <p>Genera automaticamente lettere per avvocati, scuole, medici con template predefiniti e personalizzabili</p>
+            </div>
+        </div>
+
+        <div class="roadmap-item">
+            <div class="roadmap-status todo"><i class="bi bi-clock"></i></div>
+            <div class="roadmap-content">
+                <h4>⏳ Sincronizzazione Calendari (Google/Outlook)</h4>
+                <p>Integrazione bidirezionale con Google Calendar e Microsoft Outlook per sincronizzare automaticamente eventi e appuntamenti</p>
+            </div>
+        </div>
+
+        <div class="roadmap-item">
+            <div class="roadmap-status todo"><i class="bi bi-clock"></i></div>
+            <div class="roadmap-content">
+                <h4>⏳ Backup Automatico Cloud</h4>
+                <p>Backup crittografato automatico su cloud con possibilità di restore e export completo dati (GDPR compliant)</p>
+            </div>
+        </div>
+
+        <div class="roadmap-item">
+            <div class="roadmap-status todo"><i class="bi bi-clock"></i></div>
+            <div class="roadmap-content">
+                <h4>⏳ Pagamenti Integrati (Stripe)</h4>
+                <p>Paga direttamente le quote di mantenimento e spese straordinarie tramite Stripe con tracciamento automatico</p>
+            </div>
+        </div>
+
+        <div class="roadmap-item">
+            <div class="roadmap-status todo"><i class="bi bi-clock"></i></div>
+            <div class="roadmap-content">
+                <h4>⏳ Landing Page SEO Ottimizzata</h4>
+                <p>Pagina di presentazione ottimizzata per motori di ricerca con blog, FAQ e testimonianze</p>
+            </div>
+        </div>
+
+        <div class="roadmap-item">
+            <div class="roadmap-status todo"><i class="bi bi-clock"></i></div>
+            <div class="roadmap-content">
+                <h4>⏳ Reportistica Avanzata PDF</h4>
+                <p>Genera report mensili/annuali dettagliati per avvocati e tribunali con grafici e statistiche</p>
+            </div>
+        </div>
+
+        <div class="roadmap-item">
+            <div class="roadmap-status todo"><i class="bi bi-clock"></i></div>
+            <div class="roadmap-content">
+                <h4>⏳ Integrazione PEC</h4>
+                <p>Invia e ricevi comunicazioni ufficiali tramite Posta Elettronica Certificata direttamente dalla piattaforma</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 💬 SUPPORTO -->
+    <div class="support-box">
+        <h3><i class="bi bi-headset me-2"></i>Hai Bisogno di Aiuto?</h3>
+        <p>Il nostro supporto è sempre disponibile per aiutarti. Scrivici e ti risponderemo entro 24 ore.</p>
+        <a href="mailto:support@coparentmanager.com" class="btn-support">
+            <i class="bi bi-envelope-fill me-2"></i>Contatta il Supporto
+        </a>
+    </div>
+</div>
+{% endblock content %}
+
+{% block extra_js %}
+<script>
+    // Accordion functionality
+    function toggleAccordion(element) {
+        const item = element.parentElement;
+        const isActive = item.classList.contains('active');
+        
+        // Chiudi tutti gli accordion
+        document.querySelectorAll('.accordion-item').forEach(acc => {
+            acc.classList.remove('active');
+        });
+        
+        // Apri quello cliccato se non era attivo
+        if (!isActive) {
+            item.classList.add('active');
+        }
+    }
+
+    // Animazione al scroll
+    const observerOptions = {
+        threshold: 0.1,
+        rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = '1';
+                entry.target.style.transform = 'translateY(0)';
+            }
+        });
+    }, observerOptions);
+
+    document.querySelectorAll('.help-section').forEach(section => {
+        section.style.opacity = '0';
+        section.style.transform = 'translateY(20px)';
+        section.style.transition = 'all 0.6s ease';
+        observer.observe(section);
+    });
+</script>
+{% endblock extra_js %}

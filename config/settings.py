@@ -9,7 +9,9 @@ https://docs.djangoproject.com/en/6.0/topics/settings/
 For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
+# ✅ PERMETTI HTTP PER OAUTH2 IN SVILUPPO (NON USARE IN PRODUZIONE!)
 import os
+#os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 from pathlib import Path
 
 from celery.schedules import crontab
@@ -317,7 +319,7 @@ CELERY_TIMEZONE = TIME_ZONE  # Usa il tuo fuso orario già definito
 
 # 🧪 FALLBACK SVILUPPO (se NON hai Redis installato):
 # Esegue i task in modo sincrono, senza bisogno di broker/worker
-CELERY_TASK_ALWAYS_EAGER = True
+CELERY_TASK_ALWAYS_EAGER = False
 CELERY_BEAT_SCHEDULE = {
     'send-event-reminders-every-5-minutes': {
         'task': 'calendar_app.tasks.send_event_reminder',
@@ -340,3 +342,13 @@ CELERY_BEAT_SCHEDULE = {
 PRIVACY_VERSION = "1.0"  # Incrementa a "1.1", "2.0" quando aggiorni la policy
 ENCRYPTION_KEY=os.environ.get("ENCRYPTION_KEY")
 
+# ========================================
+# GOOGLE CALENDAR API
+# ========================================
+GOOGLE_CALENDAR_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', default='')
+GOOGLE_CALENDAR_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', default='')
+GOOGLE_CALENDAR_REDIRECT_URI = 'http://localhost:8000/calendar/oauth/google/callback/'
+GOOGLE_CALENDAR_SCOPES = [
+    'https://www.googleapis.com/auth/calendar.events',
+    'https://www.googleapis.com/auth/calendar',
+]

@@ -75,15 +75,22 @@ def register_view(request):
     if invitation:
         # Email dall'invito
         initial_data["email"] = invitation.email
-
-        # ✅ ESTRATTO RUOLO BASE (rimuovi _a, _b)
         base_role = invitation.role.replace('_a', '').replace('_b', '')
-        initial_data["role"] = base_role  # Es: 'parent', 'lawyer', 'mediator', 'consultant'
+        initial_data["role"] = base_role
     elif role_from_url in ["parent", "lawyer", "mediator", "consultant"]:
         initial_data["role"] = role_from_url
 
-    if plan_from_url in ["starter", "pro", "enterprise", "base"]:
+    # ✅ MIGLIORATO: Gestione piano con fallback più chiaro
+    if plan_from_url in ["starter", "pro", "enterprise"]:
         initial_data["plan"] = plan_from_url
+    elif request.session.get("registration_plan") in ["starter", "pro", "enterprise"]:
+        initial_data["plan"] = request.session.get("registration_plan")
+    else:
+        # Default: Pro per professionisti, Starter per genitori
+        if initial_data.get("role") in ["lawyer", "mediator", "consultant"]:
+            initial_data["plan"] = "pro"
+        else:
+            initial_data["plan"] = "starter"
 
     form = RegisterForm(request.POST or None, initial=initial_data)
 
@@ -277,6 +284,41 @@ def activate_account(request):
         "error": "Link di attivazione non valido o scaduto."
     })
 
+#🔐 DIRITTO ALL'OBLIO (GDPR Art. 17)
+@login_required
+def delete_account(request):
+    """Cancellazione completa account - Diritto all'oblio GDPR"""
+    if request.method == 'POST':
+        user = request.user
+
+        # 1. Rimuovi da tutte le famiglie
+        user.family_memberships.all().delete()
+
+        # 2. Elimina profilo utente
+        if hasattr(user, 'profile'):
+            user.profile.delete()
+
+        # 3. Elimina notifiche
+        user.notifications.all().delete()
+
+        # 4. Elimina documenti caricati dall'utente
+        user.documents.all().delete()
+
+        # 5. Elimina messaggi inviati
+        user.sent_messages.all().delete()
+
+        # 6. Anonimizza dati rimanenti (spese, eventi)
+        # Non eliminare per mantenere integrità dati famiglia
+        user.expenses.update(uploaded_by=None)
+        user.calendar_events.update(created_by=None)
+
+        # 7. Elimina utente
+        user.delete()
+
+        messages.success(request, "Il tuo account è stato eliminato permanentemente.")
+        return redirect('landing')
+
+    return render(request, 'accounts/delete_account_confirm.html')
 
 # =========================
 # LOGIN
@@ -334,14 +376,14 @@ def login_view(request):
                     request,
                     "🚫 Il tuo account è sospeso per mancato pagamento. Rinnova l'abbonamento per riattivare l'accesso."
                 )
-                return redirect('pricing')
+                return redirect('core:pricing')
 
             elif is_expired:
                 messages.warning(
                     request,
                     f"⏰ Il tuo abbonamento è scaduto. Hai ancora {days_left} giorni di periodo di grazia prima della sospensione. Rinnova ora."
                 )
-                return redirect('pricing')
+                return redirect('core:pricing')
 
             # 🔑 GESTIONE INVITO PENDENTE (priorità massima!)
             pending_token = request.session.pop("pending_invite_token", None)

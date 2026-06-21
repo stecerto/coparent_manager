@@ -172,6 +172,65 @@
             </div>
         </div>
 
+        <!-- 🔗 INTEGRAZIONE GOOGLE CALENDAR -->
+        <div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
+            <div class="card-header bg-white border-bottom border-start border-1 border-danger d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                <i class="bi bi-google fs-3 text-danger me-3"></i>
+                <h5 class="mb-0 fw-bold">Google Calendar</h5>
+            </div>
+            <div class="card-body p-4">
+                {% if request.user.google_calendar_token.is_active %}
+                    
+            <!-- ✅ COLLEGATO -->
+            <div class="alert alert-success mb-3">
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <i class="bi bi-check-circle-fill fs-4"></i>
+                    <div>
+                        <strong>Google Calendar collegato con successo!</strong>
+                        <p class="mb-0 small mt-1">
+                            <i class="bi bi-envelope me-1"></i>
+                            Account: <strong>{{ request.user.google_calendar_token.user.email }}</strong>
+                        </p>
+                    </div>
+                </div>
+                <p class="mb-0 small">
+                    I tuoi eventi vengono sincronizzati automaticamente con Google Calendar.
+                </p>
+            </div>
+
+            <div class="d-flex gap-2">
+                <a href="{% url 'calendar:google_sync' %}" class="btn btn-outline-primary">
+                    <i class="bi bi-arrow-repeat me-1"></i>Sincronizza Ora
+                </a>
+                <a href="{% url 'calendar:google_disconnect' %}" class="btn btn-outline-danger">
+                    <i class="bi bi-x-circle me-1"></i>Disconnetti
+                </a>
+            </div>
+
+            {% if request.user.google_calendar_token.last_sync_at %}
+            <small class="text-muted d-block mt-3">
+                <i class="bi bi-clock me-1"></i>
+                Ultima sincronizzazione: {{ request.user.google_calendar_token.last_sync_at|date:"d/m/Y H:i" }}
+            </small>
+            {% endif %}
+
+        {% else %}
+            <!-- ❌ NON COLLEGATO -->
+            <div class="alert alert-light border mb-3">
+                <i class="bi bi-info-circle me-2"></i>
+                <strong>Collega il tuo Google Calendar</strong>
+                <p class="mb-0 small mt-2">
+                    Sincronizza automaticamente gli eventi di CoParent Manager con il tuo Google Calendar personale.
+                </p>
+            </div>
+
+            <a href="{% url 'calendar:google_auth' %}" class="btn btn-danger">
+                <i class="bi bi-google me-2"></i>Collega Google Calendar
+            </a>
+        {% endif %}
+            </div>
+        </div>
+
         <!-- ✅ SEZIONE FIGLI: Visibile SOLO ai genitori -->
         {% if membership.role == "parent_a" or membership.role == "parent_b" %}
         <div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
@@ -197,7 +256,6 @@
                                 <div>
                                     <strong class="d-block">{{ child.name }} {{ child.surname }}</strong>
                                     <small class="d-block text-muted">
-                                        <i class="bi bi-calendar-event me-1"></i> Nato il {{ child.birth_date|date:"d/m/Y" }} •
                                         <i class="bi bi-pie-chart me-1"></i> Ripartizione:
                                         <strong>{{ child.pct_a_display }}% A</strong> / <strong>{{ child.pct_b_display }}% B</strong>
                                     </small>
@@ -225,43 +283,7 @@
             </div>
         </div>
 
-        <!-- ✅ SEZIONE ACCORDO DI MANTENIMENTO -->
-        <div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
-            <div class="card-header bg-white border-bottom border-start border-1 border-info d-flex justify-content-between align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
-                <div class="d-flex align-items-center">
-                    <i class="bi bi-cash-coin fs-3 text-info me-3"></i>
-                    <h5 class="mb-0 fw-bold">Accordo di Mantenimento</h5>
-                </div>
-                <a href="{% url 'families:support_agreement' %}" class="btn btn-sm btn-outline-info">
-                    <i class="bi bi-gear me-1"></i> Configura
-                </a>
-            </div>
-            <div class="card-body p-4">
-                <p class="text-muted small mb-3">
-                    Definisci l'importo mensile e la percentuale di ripartizione tra i genitori.
-                    Questi dati sono fondamentali per calcolare automaticamente il saldo netto e le quote delle spese straordinarie.
-                </p>
 
-                {% if current_support %}
-                    <div class="alert alert-success border-0 shadow-sm mb-0 d-flex align-items-center">
-                        <i class="bi bi-check-circle-fill fs-4 me-3"></i>
-                        <div>
-                            <strong class="d-block">Accordo Attivo</strong>
-                            <small>
-                                € {{ current_support.amount|floatformat:2 }}/mese •
-                                Ripartizione: {{ current_support.split_pct_parent_a|default:50 }}% A /
-                                {% with pct_b=100|add:"-current_support.split_pct_parent_a" %}{{ pct_b|default:50 }}{% endwith %}% B
-                            </small>
-                        </div>
-                    </div>
-                {% else %}
-                    <div class="alert alert-light border text-center mb-0">
-                        <i class="bi bi-info-circle me-2 text-muted"></i>
-                        <span class="text-muted small">Nessun accordo configurato. Clicca su "Configura" per impostarlo.</span>
-                    </div>
-                {% endif %}
-            </div>
-        </div>
 
         {% else %}
         <!-- ℹ️ Box informativo per Avvocati/Mediatori/Consulenti -->
@@ -309,6 +331,7 @@
                 {% endif %}
             </div>
 
+
             <!-- DESTRA -->
             <div class="d-flex gap-2 flex-wrap">
                 {% if membership.role == "parent_a" or membership.role == "parent_b" %}
@@ -322,6 +345,35 @@
                 </button>
             </div>
         </div>
+
+
+            <div class="card mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">📦 Esporta Dati Famiglia</h5>
+                    <p class="card-text text-muted small">
+                        Scarica tutti i dati della famiglia in un file ZIP (JSON + documenti).
+                        Utile per backup o portabilità dati (GDPR Art. 20).
+                    </p>
+                    <a href="{% url 'families:export_family_data' %}" class="btn btn-outline-primary">
+                        <i class="bi bi-download me-2"></i>Esporta Dati
+                    </a>
+                </div>
+            </div>
+        <!-- 🔐 ZONA PERICOLO -->
+            <div class="card border-danger mt-5">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>Zona Pericolo</h5>
+                </div>
+                <div class="card-body">
+                    <h6 class="card-title">Elimina Account</h6>
+                    <p class="card-text text-muted small">
+                        Questa azione è irreversibile. Tutti i tuoi dati personali verranno eliminati permanentemente (Diritto all'Oblio - GDPR Art. 17).
+                    </p>
+                    <a href="{% url 'accounts:delete_account' %}" class="btn btn-outline-danger">
+                        <i class="bi bi-trash-fill me-2"></i>Elimina il mio account
+                    </a>
+                </div>
+            </div>
     </form>
 
 </div>

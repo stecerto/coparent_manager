@@ -101,7 +101,7 @@
                         🔔
                         <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.65rem; display: none;"></span>
                     </a>
-                    <ul class="dropdown-menu dropdown-menu-end p-0" style="min-width: 320px; max-height: 400px; overflow-y: auto;">
+                    <ul class="dropdown-menu p-0" style="min-width: 320px; max-width: 90vw; max-height: 400px; overflow-y: auto; left: 0 !important; right: auto !important;">
                         <li class="p-2 border-bottom bg-light">
                             <div class="d-flex justify-content-between align-items-center">
                                 <strong class="small">🔔 Notifiche</strong>
@@ -133,7 +133,14 @@
                            href="{% url 'home' %}">🏠 Home</a>
                     {% endif %}
                 </li>
-
+                <li>
+                {% if user.is_authenticated and user.profile.role in 'lawyer,mediator,consultant' %}
+                    <a class="nav-link {% if request.resolver_match.url_name == 'professional_calendar' %}active{% endif %}"
+                        href="{% url 'calendar:professional_calendar_full' %}" >
+                        📅 Calendario Studio
+                    </a>
+                {% endif %}
+                </li>
                 <!-- 🧭 Menu Genitori -->
                 {% if user.is_authenticated and user.profile.role not in "lawyer_a,lawyer_b, consultant, mediator" %}
                     {% if is_setup_complete or request.resolver_match.url_name in "setup,summary,invite_member" %}
@@ -182,6 +189,12 @@
                                 <li><a class="dropdown-item" href="{% url 'calendar:event_create' %}">➕ Nuovo Evento</a></li>
                             </ul>
                         </li>
+                        <!-- ❓ Centro Assistenza -->
+                        <li class="nav-item">
+                            <a class="nav-link" href="{% url 'help' %}" title="Centro Assistenza">
+                                ❓
+                            </a>
+                        </li>
 
                     {% endif %}
                 {% endif %}
@@ -193,14 +206,15 @@
                             {# ✅ DENTRO il contesto: Pannello di controllo della famiglia specifica #}
                             <a class="nav-link {% if request.resolver_match.url_name == 'professional_dashboard' %}active{% endif %}"
                                href="{% url 'families:family_dashboard' %}?family_id={{ request.session.active_family_id }}">
-                                📊 Pannello di Controllo
+                                📊 Pannello Famiglia
                             </a>
                         {% else %}
                             {# ✅ FUORI dal contesto: Pannello di controllo generale (Home Studio) #}
-                            <a class="nav-link {% if request.resolver_match.url_name == 'professional_dashboard' or request.resolver_match.url_name == 'lawyer_home' %}active{% endif %}"
+                            <a class="nav-link {% if request.resolver_match.url_name == 'professional_dashboard' %}active{% endif %}"
                                href="{% url 'families:professional_dashboard' %}">
                                 📊 Pannello di Controllo
                             </a>
+
                         {% endif %}
                     </li>
                 {% endif %}
@@ -336,8 +350,9 @@
         <p class="mb-1 text-muted small fw-bold">© 2026 CoParent Manager</p>
         <p class="mb-0 text-muted small">
             <a href="{% url 'privacy_policy' %}" class="text-decoration-none me-2">Privacy Policy</a> |
+            <a href="{% url 'help' %}" class="text-decoration-none me-2">❓ Centro Assistenza</a> |
             <a href="#" class="text-decoration-none me-2">Termini</a> |
-            <a href="#" class="text-decoration-none">Supporto</a>
+            <a href="mailto:support@coparentmanager.com" class="text-decoration-none">📧 Supporto</a>
         </p>
         <p class="mt-2 text-muted small" style="font-size:0.75rem;">
             Dati crittografati • GDPR Compliant • Backup giornalieri

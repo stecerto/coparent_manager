@@ -119,11 +119,11 @@
                                 <label class="form-label fw-bold d-flex align-items-center gap-2">
                                     <span>🕐</span>
                                     <span>Data e Ora Fine</span>
-                                    <span class="badge bg-danger ms-2">Obbligatorio</span>
+                                <!--     <span class="badge bg-danger ms-2">Obbligatorio</span>  -->
                                 </label>
                                 <input type="datetime-local" name="end_time" class="form-control"
-                                       value="{% if event %}{{ event.end_time|date:'Y-m-d\\TH:i' }}{% elif end %}{{ end|slice:':16' }}{% endif %}"
-                                       required>
+                                       value="{% if event %}{{ event.end_time|date:'Y-m-d\\TH:i' }}{% elif end %}{{ end|slice:':16' }}{% endif %}">
+                                     <!--   required>  -->
                             </div>
                         </div>
 
@@ -135,7 +135,7 @@
                                 <span class="badge bg-secondary ms-2">Opzionale</span>
                             </label>
                             <select name="children" multiple class="form-select" size="3">
-                                {% for child in family.children.all %}
+                                {% for child in children_list %}
                                 <option value="{{ child.id }}"
                                     {% if event and child in event.children.all %}selected{% endif %}>
                                     {{ child.name }} {{ child.surname }}

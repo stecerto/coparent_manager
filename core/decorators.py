@@ -16,7 +16,7 @@ def plan_required(min_plan="pro"):
 
             if user_level < required_level:
                 messages.error(request, f"⚠️ Funzione riservata al piano {min_plan.title()}. Effettua l'upgrade.")
-                return redirect('pricing')
+                return redirect('core:pricing')
             return view_func(request, *args, **kwargs)
         return _wrapped_view
     return decorator
