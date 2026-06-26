@@ -22,7 +22,7 @@ def handle_setup(request, mode="setup"):
     # ✅ AVVOCATI/MEDIATORI/CONSULENTI: Non devono fare setup famiglia
     if profile.role in ["lawyer", "mediator", "consultant"]:
         messages.info(request, "✅ Il tuo profilo professionale è attivo. Riceverai inviti dalle famiglie.")
-        return redirect("families:professional_dashboard")
+        return redirect('families:professional_dashboard')
 
     # ✅ GENITORI: Procedi con il setup famiglia
     family = get_family_of_user(user)

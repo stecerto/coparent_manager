@@ -1,232 +1,207 @@
-import logging
-from datetime import datetime
-
-from django.db import transaction
+# chat/services/message_service.py
+"""
+Servizi per la gestione dei messaggi della chat.
+NON contiene definizioni di modelli (sono in chat/models.py).
+"""
+from django.db.models import Q
 from django.utils import timezone
 
-from chat.models import FamilyMessage, MessageAttachment
-from documents.models import Document, DocumentAuditLog
-from calendar_app.models import CalendarEvent
-
-logger = logging.getLogger(__name__)
+from chat.models import FamilyMessage, Conversation
 
 
-@transaction.atomic
-def send_message(
-        family,
-        sender,
-        content,
-        recipient=None,
-        files=None,
-        create_calendar_event=False,
-        event_data=None,
-        reply_to=None,
-        thread_type="family"
-):
+def get_family_messages(family, user, thread_type='family', limit=50):
     """
-    Invia un messaggio con eventuali allegati e crea evento calendario (se richiesto).
-    ✅ ARCHITETTURA AGGIORNATA: Questo servizio non crea più spese.
-    Le spese vengono gestite esclusivamente dall'app Expenses.
+    Recupera i messaggi di una famiglia per un thread specifico.
+    Gestisce permessi in base al thread_type.
     """
-    files = files or []
-
-    # 1. Crea messaggio
-    message = FamilyMessage.objects.create(
+    qs = FamilyMessage.objects.filter(
         family=family,
-        sender=sender,
-        recipient=recipient,
-        content=content,
-        reply_to=reply_to,
-        thread_type=thread_type
+        thread_type=thread_type,
+        is_active=True,
+        deleted_at__isnull=True
+    ).select_related('sender', 'reply_to').order_by('-created_at')
+
+    # Filtra per visibilità in base al thread
+    if thread_type == 'family':
+        pass  # Tutti i membri della famiglia vedono
+    elif thread_type in ['legal_a', 'legal_b']:
+        # Solo avvocato + genitore del lato corrispondente
+        qs = qs.filter(
+            Q(sender__family_memberships__family=family) &
+            Q(sender__family_memberships__role__in=_get_allowed_roles(thread_type))
+        )
+    # Aggiungi altri filtri per mediation, consulting, private...
+
+    return qs[:limit]
+
+
+def get_unread_count(user, family=None):
+    """Conta messaggi non letti per un utente"""
+    from datetime import timedelta
+    recent_cutoff = timezone.now() - timedelta(days=7)
+
+    qs = FamilyMessage.objects.filter(
+        recipient=user,
+        created_at__gte=recent_cutoff,
+        is_active=True,
+        deleted_at__isnull=True
     )
 
-    # 2. Gestione Allegati
+    if family:
+        qs = qs.filter(family=family)
+
+    return qs.count()
+
+
+from django.utils import timezone
+from chat.models import FamilyMessage, MessageAttachment
+from documents.models import Document
+from calendar_app.services.calendar_service import create_event
+
+
+def send_message(
+        sender,
+        family,
+        content,
+        thread_type='family',
+        recipient=None,
+        reply_to=None,
+        files=None,  # ✅ AGGIUNTO: Lista di file allegati
+        create_calendar_event=False,  # ✅ AGGIUNTO: Flag per creare evento
+        event_data=None  # ✅ AGGIUNTO: Dati dell'evento da creare
+):
+    """
+    Crea un nuovo messaggio con validazione permessi, allegati e opzionale creazione evento calendario.
+
+    Args:
+        sender: Utente che invia il messaggio
+        family: Famiglia di destinazione
+        content: Testo del messaggio
+        thread_type: Tipo di thread (family, legal_a, legal_b, mediation_private, etc.)
+        recipient: Utente destinatario (None per messaggi di gruppo)
+        reply_to: Messaggio a cui si sta rispondendo (opzionale)
+        files: Lista di file allegati (opzionale)
+        create_calendar_event: Se True, crea un evento calendario (opzionale)
+        event_data: Dizionario con dati dell'evento (opzionale)
+
+    Returns:
+        FamilyMessage: Il messaggio creato
+    """
+
+    # 1. Crea il messaggio
+    message = FamilyMessage.objects.create(
+        sender=sender,
+        family=family,
+        content=content,
+        thread_type=thread_type,
+        recipient=recipient,
+        reply_to=reply_to,
+    )
+
+    # 2. Gestisci allegati
     if files:
-        for f in files:
-            attachment = MessageAttachment.objects.create(
+        for file in files:
+            MessageAttachment.objects.create(
                 message=message,
-                file=f,
+                file=file,
+                filename=file.name,
+                file_size=file.size,
+                content_type=file.content_type or 'application/octet-stream',
                 uploaded_by=sender
             )
 
-            filename = f.name.lower()
-            category = "chat"
+            # ✅ Se è un thread privato con professionista, salva anche come documento
+            if thread_type in ['legal_a', 'legal_b', 'mediation_private', 'consultant_private']:
+                Document.objects.create(
+                    family=family,
+                    uploaded_by=sender,
+                    owner=sender,
+                    file=file,
+                    title=file.name[:100],
+                    is_private=True,
+                    scope="private"
+                )
 
-            if "verbale" in filename:
-                category = "minutes"
-            elif "accordo" in filename:
-                category = "agreement"
-
-            shared_doc = Document.objects.create(
-                family=family,
-                owner=sender,
-                uploaded_by=sender,
-                title=f.name.rsplit(".", 1)[0],
-                file=attachment.file,
-                category=category,
-                scope="shared",
-                is_active=True
-            )
-
-            DocumentAuditLog.objects.create(
-                document=shared_doc,
-                user=sender,
-                action="upload"
-            )
-
-    # 3. Evento Calendario (SEMPLIFICATO)
+    # 3. Crea evento calendario se richiesto
     if create_calendar_event and event_data:
         try:
-            start_time_str = str(event_data.get("start_time"))
-            end_time_str = str(event_data.get("end_time"))
+            # Estrai i dati dall'event_data
+            title = event_data.get('title', content[:50])
+            start_time = event_data.get('start_time', timezone.now())
+            end_time = event_data.get('end_time', timezone.now())
+            description = event_data.get('description', content)
+            event_type = event_data.get('event_type', 'other')
+            children_ids = event_data.get('children_ids', [])
 
-            if start_time_str and end_time_str:
-                start_time = datetime.fromisoformat(start_time_str)
-                end_time = datetime.fromisoformat(end_time_str)
+            # Recupera i figli se specificati
+            children = []
+            if children_ids:
+                children = family.children.filter(id__in=children_ids)
 
-                if timezone.is_naive(start_time):
-                    start_time = timezone.make_aware(start_time)
-                if timezone.is_naive(end_time):
-                    end_time = timezone.make_aware(end_time)
-
-                # ✅ Estrai e rimuovi children_ids prima di creare l'evento
-                children_ids = event_data.pop("children_ids", [])
-
-                # ✅ RIMOSSO: Non estraiamo più "amount". Il calendario non gestisce spese.
-                event_data.pop("amount", None)
-
-                safe_data = {
-                    "family": family,
-                    "created_by": sender,
-                    "title": str(event_data.get("title", content[:50]))[:200],
-                    "description": str(event_data.get("description", content)),
-                    "start_time": start_time,
-                    "end_time": end_time,
-                    "event_type": event_data.get("event_type", "other"),  # ✅ Default a "other"
-                    "source": event_data.get("source", "chat"),
-                    "linked_id": event_data.get("linked_id"),
-                }
-                # Rimuovi chiavi con valore None per evitare errori di validazione
-                safe_data = {k: v for k, v in safe_data.items() if v is not None}
-
-                # Creazione evento
-                event = CalendarEvent.objects.create(**safe_data)
-                logger.info(f"📅 Evento creato con successo. ID: {event.id}")
-
-                # ❌ RIMOSSO: L'intero blocco "if amount_str:" che creava l'oggetto Expense.
-                # ❌ RIMOSSO: event.linked_expense = expense
-
-                # ✅ Collegamento figli (ManyToMany richiede .set() dopo il create)
-                if children_ids:
-                    from children.models import ChildProfile
-                    children = ChildProfile.objects.filter(id__in=children_ids, family=family, is_active=True)
-                    event.children.set(children)
-
-                # Collega l'evento al messaggio
-                message.linked_event = event
-                message.save()
-
-        except Exception as e:
-            logger.error(f"❌ Errore creazione evento calendario da chat: {e}", exc_info=True)
-
-    # 🔔 NOTIFICA (se messaggio privato 1-to-1)
-    if recipient and thread_type in ['legal_a', 'legal_b', 'mediation_private', 'consultant_private', 'lawyer_private',
-                                     'mediator_private']:
-        try:
-            from notifications.services import create_notification
-            create_notification(
-                user=recipient,
-                notification_type="chat_private",
-                title=f"💬 Nuovo messaggio da {sender.first_name or sender.email}",
-                message=content[:150] + ("..." if len(content) > 150 else ""),
-                target_url=f"/chat/?family_id={family.id}&thread={thread_type}",
-                target_model="FamilyMessage",
-                target_id=message.id,
-                metadata={
-                    "sender_id": sender.id,
-                    "family_id": family.id,
-                    "thread_type": thread_type,
-                },
-                #send_email=False
+            # Crea l'evento
+            event = create_event(
+                family=family,
+                title=title,
+                start_time=start_time,
+                end_time=end_time,
+                created_by=sender,
+                description=description,
+                event_type=event_type,
+                children=children
             )
+
+            # ✅ Collega l'evento al messaggio (se hai un campo linked_event)
+            # message.linked_event = event
+            # message.save(update_fields=['linked_event'])
+
         except Exception as e:
-            logger.error(f"❌ Errore notifica chat: {e}", exc_info=True)
+            # Logga l'errore ma non bloccare la creazione del messaggio
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Errore creazione evento da chat: {e}", exc_info=True)
 
     return message
 
 
-def update_message(message, user, new_content, files=None, create_calendar_event=False, event_data=None):
-    """
-    Versioning: disattiva il messaggio precedente e crea nuova versione.
-    """
+def delete_message(message, user):
+    """Eliminazione soft (versioning) di un messaggio"""
+    message.deleted_at = timezone.now()
+    message.deleted_by = user
     message.is_active = False
+    message.save(update_fields=['deleted_at', 'deleted_by', 'is_active'])
+
+
+def edit_message(message, new_content, user):
+    """Modifica un messaggio creando una nuova versione"""
+    # Crea versione precedente
+    old_version = FamilyMessage.objects.create(
+        family=message.family,
+        sender=message.sender,
+        content=message.content,
+        thread_type=message.thread_type,
+        recipient=message.recipient,
+        reply_to=message.reply_to,
+        version=message.version,
+        is_active=False,
+    )
+
+    # Aggiorna messaggio corrente
+    message.content = new_content
+    message.version += 1
+    message.previous_version = old_version
     message.edited_at = timezone.now()
     message.edited_by = user
     message.save()
 
-    new_msg = FamilyMessage.objects.create(
-        family=message.family,
-        sender=message.sender,
-        recipient=message.recipient,
-        content=new_content,
-        previous_version=message,
-        version=message.version + 1
-    )
-
-    if files:
-        for f in files:
-            MessageAttachment.objects.create(
-                message=new_msg,
-                file=f,
-                uploaded_by=user
-            )
-
-    if create_calendar_event and event_data:
-        # Nota: Assicurati che la funzione create_event in calendar_app.services
-        # non contenga logica di creazione spese.
-        from calendar_app.services.calendar_service import create_event
-        event = create_event(
-            family=message.family,
-            title=event_data.get("title", new_content[:50]),
-            start_time=event_data.get("start_time"),
-            end_time=event_data.get("end_time"),
-            created_by=user,
-            description=event_data.get("description", new_content)
-        )
-        new_msg.linked_event = event
-        new_msg.save()
-
-    return new_msg
-
-
-def delete_message(message, user):
-    """Soft delete con storico."""
-    message.is_active = False
-    message.deleted_at = timezone.now()
-    message.deleted_by = user
-    message.save()
     return message
 
 
-def get_family_messages(family):
-    """Recupera solo messaggi attivi di una famiglia"""
-    return FamilyMessage.objects.filter(family=family, is_active=True).order_by("created_at")
-
-
-def get_private_messages(family, user1, user2):
-    """Recupera messaggi privati tra due utenti, solo attivi"""
-    return FamilyMessage.objects.filter(
-        family=family,
-        sender__in=[user1, user2],
-        recipient__in=[user1, user2],
-        is_active=True
-    ).order_by("created_at")
-
-
-def get_all_versions(message):
-    versions = []
-    current = message
-    while current:
-        versions.append(current)
-        current = current.previous_version
-    return versions[::-1]
+def _get_allowed_roles(thread_type):
+    """Helper: restituisce i ruoli permessi per un thread"""
+    role_map = {
+        'legal_a': ['lawyer_a', 'parent_a'],
+        'legal_b': ['lawyer_b', 'parent_b'],
+        'mediation': ['mediator', 'parent_a', 'parent_b'],
+        'consulting': ['consultant', 'parent_a', 'parent_b'],
+    }
+    return role_map.get(thread_type, [])

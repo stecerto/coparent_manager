@@ -3,22 +3,209 @@
 
 {% block title %}💬 Chat - CoParent Manager{% endblock %}
 
-{% block extra_css %}
+{{% block extra_css %}
 <link href="{% static 'css/chat_style.css' %}" rel="stylesheet">
 <style>
-    /* ✅ OFFCANVAS UNIFICATO (Mobile + Desktop) */
-    .chat-offcanvas {
-        width: 340px !important;
-        border-right: 1px solid #dee2e6;
+    /* ============================================ */
+/* 🔒 CHAT READONLY (solo lettura)              */
+/* ============================================ */
+
+.sidebar-chat-item.chat-readonly {
+    opacity: 0.7;
+    background-color: #f8f9fa;
+}
+
+.sidebar-chat-item.chat-readonly:hover {
+    opacity: 0.9;
+    background-color: #e9ecef;
+    transform: translateX(2px);
+}
+
+.sidebar-chat-item.chat-readonly.active-chat {
+    opacity: 1;
+    background-color: rgba(108, 117, 125, 0.1);
+    border-color: rgba(108, 117, 125, 0.3);
+    border-left: 3px solid #6c757d;
+}
+
+/* Badge "Solo lettura" nella card header */
+.chat-readonly-indicator {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.25rem 0.75rem;
+    border-radius: 20px;
+    font-size: 0.75rem;
+    font-weight: 500;
+    background-color: #6c757d;
+    color: white;
+}
+
+
+    /* ============================================ */
+    /* 🎯 LAYOUT COMPATTO - Desktop                 */
+    /* ============================================ */
+
+    /* Altezza dinamica: viewport - navbar - topbar - widget - padding */
+    :root {
+        --chat-header-height: 280px;  /* Spazio per logo + navbar + topbar + widget */
     }
 
+    .chat-main-wrapper {
+        height: calc(100vh - var(--chat-header-height)) !important;
+        max-height: calc(100vh - var(--chat-header-height)) !important;
+        min-height: 400px !important;
+        border-radius: 12px;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+
+    /* Header chat compatto */
+    .chat-main-wrapper > .card-header {
+        flex-shrink: 0;
+    }
+
+    /* Container messaggi: occupa tutto lo spazio disponibile */
+    .chat-container {
+        flex-grow: 1 !important;
+        max-height: none !important;
+        overflow-y: auto;
+        min-height: 0;
+    }
+
+    /* ============================================ */
+    /* 📤 FOOTER FORM ADATTIVO                      */
+    /* ============================================ */
+
+    .chat-main-wrapper > .card-footer {
+        flex-shrink: 0;
+        max-height: 280px !important;  /* ← Aumentato */
+        overflow-y: auto !important;
+        padding: 0.75rem !important;
+    }
+
+    /* Il form interno usa flex per tenere il pulsante sempre in basso */
+    .chat-main-wrapper > .card-footer form {
+        display: flex;
+        flex-direction: column;
+        gap: 0.5rem;
+    }
+
+    /* Il pulsante "Invia" rimane sempre visibile */
+    .chat-main-wrapper > .card-footer .d-flex.gap-2 {
+        margin-top: auto !important;  /* ← Spinge il pulsante in basso */
+        padding-top: 0.5rem;
+        border-top: 1px solid #e9ecef;
+    }
+
+    /* Scrollbar custom per il footer */
+    .chat-main-wrapper > .card-footer::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .chat-main-wrapper > .card-footer::-webkit-scrollbar-track {
+        background: #f8f9fa;
+        border-radius: 3px;
+    }
+
+    .chat-main-wrapper > .card-footer::-webkit-scrollbar-thumb {
+        background: #adb5bd;
+        border-radius: 3px;
+    }
+
+    /* ============================================ */
+    /* 📱 MOBILE - WhatsApp Style                   */
+    /* ============================================ */
+
     @media (max-width: 767px) {
+        :root {
+            --chat-header-height: 200px;  /* Meno spazio su mobile */
+        }
+
+        /* Chat occupa quasi tutto lo schermo */
+        .chat-main-wrapper {
+            height: calc(100vh - var(--chat-header-height)) !important;
+            max-height: calc(100vh - var(--chat-header-height)) !important;
+            min-height: 500px !important;
+            margin: 0 -12px;  /* Edge-to-edge */
+            border-radius: 0;
+        }
+
+        /* Header più compatto su mobile */
+        .chat-main-wrapper > .card-header {
+            padding: 0.75rem !important;
+        }
+
+        .chat-main-wrapper > .card-header h5 {
+            font-size: 1rem !important;
+        }
+
+        /* Pulsanti azione più piccoli */
+        .chat-main-wrapper > .card-header .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+        }
+
+        /* Sidebar offcanvas: full-screen su mobile */
         .chat-offcanvas {
-            width: 85% !important;
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+
+        /* Messaggi più compatti */
+        .chat-message {
+            margin-bottom: 0.5rem !important;
+        }
+
+        .message-bubble {
+            max-width: 85% !important;
+            padding: 0.5rem 0.75rem !important;
+        }
+
+        .message-content {
+            font-size: 0.9rem !important;
+        }
+
+        /* Form di invio compatto */
+        .chat-main-wrapper > .card-footer {
+            padding: 0.75rem !important;
+        }
+
+        .chat-main-wrapper > .card-footer textarea {
+            font-size: 0.9rem !important;
+            min-height: 60px !important;
+        }
+
+        /* Nascondi elementi non essenziali su mobile */
+        .chat-main-wrapper > .card-header .d-flex.gap-2 .btn-outline-secondary {
+            display: none !important;
         }
     }
 
-    /* ✅ EVIDENZIAZIONE RICERCA */
+    /* ============================================ */
+    /* 🎨 SIDEBAR CHAT ITEM                         */
+    /* ============================================ */
+
+    .sidebar-chat-item {
+        transition: all 0.2s ease;
+        border: 1px solid transparent;
+    }
+    .sidebar-chat-item:hover {
+        background-color: rgba(13, 110, 253, 0.05);
+        border-color: rgba(13, 110, 253, 0.2);
+        transform: translateX(4px);
+    }
+    .sidebar-chat-item.active-chat {
+        background-color: rgba(13, 110, 253, 0.1);
+        border-color: rgba(13, 110, 253, 0.3);
+        border-left: 3px solid #0d6efd;
+    }
+
+    /* ============================================ */
+    /* 🔍 RICERCA                                   */
+    /* ============================================ */
+
     .search-highlight {
         background-color: #fff3cd;
         padding: 2px 4px;
@@ -38,34 +225,10 @@
         display: block;
     }
 
-    /* ✅ ALTEZZA CHAT */
-    .chat-main-wrapper {
-        min-height: 70vh;
-        border-radius: 12px;
-        overflow: hidden;
-    }
-    .chat-container {
-        max-height: 60vh;
-        overflow-y: auto;
-    }
+    /* ============================================ */
+    /* 🏷️ BADGE CONTESTO                            */
+    /* ============================================ */
 
-    /* ✅ SIDEBAR CHAT ITEM */
-    .sidebar-chat-item {
-        transition: all 0.2s ease;
-        border: 1px solid transparent;
-    }
-    .sidebar-chat-item:hover {
-        background-color: rgba(13, 110, 253, 0.05);
-        border-color: rgba(13, 110, 253, 0.2);
-        transform: translateX(4px);
-    }
-    .sidebar-chat-item.active-chat {
-        background-color: rgba(13, 110, 253, 0.1);
-        border-color: rgba(13, 110, 253, 0.3);
-        border-left: 3px solid #0d6efd;
-    }
-
-    /* ✅ BADGE CONTESTO */
     .context-badge {
         display: inline-flex;
         align-items: center;
@@ -74,6 +237,107 @@
         border-radius: 20px;
         font-size: 0.9rem;
         font-weight: 500;
+    }
+
+    @media (max-width: 767px) {
+        .context-badge {
+            padding: 0.35rem 0.75rem;
+            font-size: 0.8rem;
+        }
+
+        .context-badge .fs-5 {
+            font-size: 1rem !important;
+        }
+    }
+
+    /* ============================================ */
+    /* 📜 SCROLLBAR CUSTOM                          */
+    /* ============================================ */
+
+    .chat-container::-webkit-scrollbar {
+        width: 8px;
+    }
+
+    .chat-container::-webkit-scrollbar-track {
+        background: #f1f1f1;
+        border-radius: 4px;
+    }
+
+    .chat-container::-webkit-scrollbar-thumb {
+        background: #888;
+        border-radius: 4px;
+    }
+
+    .chat-container::-webkit-scrollbar-thumb:hover {
+        background: #555;
+    }
+
+    /* ============================================ */
+    /* 📤 FORM FLEX: contenuto scroll + azioni fisse */
+    /* ============================================ */
+
+    .chat-main-wrapper > .card-footer {
+        max-height: 340px !important;
+        padding: 0 !important;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .chat-form-flex {
+        display: flex;
+        flex-direction: column;
+        flex-grow: 1;
+        min-height: 0;
+        max-height: 320px;
+    }
+
+    /* Area scrollabile (contenuto form) */
+    .chat-form-scroll {
+        flex-grow: 1;
+        overflow-y: auto;
+        min-height: 0;
+    }
+
+    /* Area fissa (pulsante Invia) */
+    .chat-form-actions {
+        flex-shrink: 0;
+        background: white;
+        border-top: 2px solid #e9ecef !important;
+        box-shadow: 0 -2px 4px rgba(0,0,0,0.03);
+    }
+
+    /* Scrollbar custom per area scrollabile */
+    .chat-form-scroll::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .chat-form-scroll::-webkit-scrollbar-track {
+        background: #f8f9fa;
+        border-radius: 3px;
+    }
+
+    .chat-form-scroll::-webkit-scrollbar-thumb {
+        background: #adb5bd;
+        border-radius: 3px;
+    }
+
+    .chat-form-scroll::-webkit-scrollbar-thumb:hover {
+        background: #6c757d;
+    }
+
+    /* Mobile: footer più compatto */
+    @media (max-width: 767px) {
+        .chat-main-wrapper > .card-footer {
+            max-height: 280px !important;
+        }
+
+        .chat-form-actions {
+            padding: 0.5rem !important;
+        }
+
+        .chat-form-actions .btn {
+            width: 100%;
+        }
     }
 </style>
 {% endblock %}
@@ -271,149 +535,137 @@
             </div>
         </div>
 
-        <!-- ✍️ FORM DI INVIO -->
-        <div class="card-footer bg-white border-top p-3">
-            <form method="POST" enctype="multipart/form-data" id="chatForm-current">
-                {% csrf_token %}
+       <!-- ✍️ FORM DI INVIO -->
+<div class="card-footer bg-white border-top p-0">
+    <form method="POST" enctype="multipart/form-data" id="chatForm-current" class="chat-form-flex">
+        {% csrf_token %}
 
-                {% if active_thread == "family" %}
-                    <input type="hidden" name="thread_type" value="family">
-                {% else %}
-                    <input type="hidden" name="thread_type" value="{{ active_thread }}">
-                {% endif %}
+        {% if active_thread == "family" %}
+            <input type="hidden" name="thread_type" value="family">
+        {% else %}
+            <input type="hidden" name="thread_type" value="{{ active_thread }}">
+        {% endif %}
 
-                {% if private_with_user %}
-                    <input type="hidden" name="recipient_id" value="{{ private_with_user.id }}">
-                {% endif %}
+        {% if private_with_user %}
+            <input type="hidden" name="recipient_id" value="{{ private_with_user.id }}">
+        {% endif %}
 
-                <!-- Anteprima Risposta -->
-                <div id="replyPreview" class="alert alert-info border-0 shadow-sm py-2 mb-3 d-none">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span><strong>↩️ Risposta a:</strong> <span id="replyText"></span></span>
-                        <button type="button" class="btn-close btn-close-sm" onclick="cancelReply()"></button>
-                    </div>
+        <!-- 📜 AREA SCROLLABILE (contenuto del form) -->
+        <div class="chat-form-scroll p-3">
+
+            <!-- Anteprima Risposta -->
+            <div id="replyPreview" class="alert alert-info border-0 shadow-sm py-2 mb-3 d-none">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span><strong>↩️ Risposta a:</strong> <span id="replyText"></span></span>
+                    <button type="button" class="btn-close btn-close-sm" onclick="cancelReply()"></button>
                 </div>
+            </div>
 
-                <!-- Contesto Rifiuto Spesa -->
-                {% if reject_context and active_thread == 'family' %}
-                <div class="alert alert-warning border-0 shadow-sm mb-3">
-                    <div class="d-flex align-items-start gap-3">
-                        <span class="fs-3">🔴</span>
-                        <div class="flex-grow-1">
-                            <h6 class="mb-2 fw-bold">Giustificazione rifiuto spesa</h6>
-                            <div class="card bg-white border-0 shadow-sm mb-2">
-                                <div class="card-body p-3">
-                                    <div class="row g-2 small">
-                                        <div class="col-md-6"><strong>💰 Importo:</strong> € {{ reject_context.amount|floatformat:2 }}</div>
-                                        <div class="col-md-6"><strong>📅 Data:</strong> {{ reject_context.date }}</div>
-                                        <div class="col-md-6"><strong>🏷️ Categoria:</strong> {{ reject_context.category }}</div>
-                                        <div class="col-md-6"><strong>👤 Inserita da:</strong> {{ reject_context.created_by }}</div>
-                                        {% if reject_context.description %}
-                                        <div class="col-12"><strong>📝 Descrizione:</strong> {{ reject_context.description|truncatechars:100 }}</div>
-                                        {% endif %}
-                                    </div>
+            <!-- Contesto Rifiuto Spesa -->
+            {% if reject_context and active_thread == 'family' %}
+            <div class="alert alert-warning border-0 shadow-sm mb-3">
+                <div class="d-flex align-items-start gap-3">
+                    <span class="fs-3">🔴</span>
+                    <div class="flex-grow-1">
+                        <h6 class="mb-2 fw-bold">Giustificazione rifiuto spesa</h6>
+                        <div class="card bg-white border-0 shadow-sm mb-2">
+                            <div class="card-body p-3">
+                                <div class="row g-2 small">
+                                    <div class="col-md-6"><strong>💰 Importo:</strong> € {{ reject_context.amount|floatformat:2 }}</div>
+                                    <div class="col-md-6"><strong>📅 Data:</strong> {{ reject_context.date }}</div>
+                                    <div class="col-md-6"><strong>🏷️ Categoria:</strong> {{ reject_context.category }}</div>
+                                    <div class="col-md-6"><strong>👤 Inserita da:</strong> {{ reject_context.created_by }}</div>
+                                    {% if reject_context.description %}
+                                    <div class="col-12"><strong>📝 Descrizione:</strong> {{ reject_context.description|truncatechars:100 }}</div>
+                                    {% endif %}
                                 </div>
                             </div>
-
-                            {% if reject_context.linked_event %}
-                            <div class="alert alert-info border-0 shadow-sm mb-2 py-2">
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="fs-4">📅</span>
-                                    <div class="flex-grow-1">
-                                        <strong class="d-block">Evento collegato:</strong>
-                                        <a href="{{ reject_context.linked_event.url }}" target="_blank" class="text-decoration-none fw-bold">
-                                            {{ reject_context.linked_event.title }}
-                                        </a>
-                                        <small class="d-block text-muted">
-                                            {{ reject_context.linked_event.event_type }} • {{ reject_context.linked_event.date }}
-                                        </small>
-                                    </div>
-                                </div>
-                            </div>
-                            {% endif %}
-
-                            <p class="mb-0 small fst-italic text-muted">Scrivi il motivo del rifiuto qui sotto.</p>
                         </div>
+                        <p class="mb-0 small fst-italic text-muted">Scrivi il motivo del rifiuto qui sotto.</p>
                     </div>
-                    <input type="hidden" name="reject_expense_id" value="{{ reject_context.expense_id }}">
                 </div>
-                {% endif %}
+                <input type="hidden" name="reject_expense_id" value="{{ reject_context.expense_id }}">
+            </div>
+            {% endif %}
 
-                <!-- CAMPO MESSAGGIO -->
-                <div class="mb-3">
-                    <label for="messageInput" class="form-label visually-hidden">Messaggio</label>
-                    <textarea name="message" class="form-control" rows="3" placeholder="Scrivi un messaggio..." required id="messageInput"></textarea>
-                </div>
+            <!-- CAMPO MESSAGGIO -->
+            <div class="mb-3">
+                <label for="messageInput" class="form-label visually-hidden">Messaggio</label>
+                <textarea name="message" class="form-control" rows="1" placeholder="Scrivi un messaggio..." required id="messageInput"></textarea>
+            </div>
 
-                <!-- PULSANTE PER MOSTRARE ALLEGATI E OPZIONI -->
-                <button class="btn btn-sm btn-outline-secondary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#chatExtras">
-                    <span class="me-1">📎</span> Allegati e Opzioni ▼
-                </button>
+            <!-- PULSANTE PER MOSTRARE ALLEGATI E OPZIONI -->
+            <button class="btn btn-sm btn-outline-secondary mb-2" type="button" data-bs-toggle="collapse" data-bs-target="#chatExtras">
+                <span class="me-1">📎</span> Allegati e Opzioni ▼
+            </button>
 
-                <!-- SEZIONE COLLABILE -->
-                <div class="collapse mb-3" id="chatExtras">
-                    <div class="card bg-light border-0">
-                        <div class="card-body p-3">
-                            <!-- Allegati -->
-                            <div class="mb-3">
-                                <label for="attachmentsInput" class="form-label small fw-bold text-muted">📎 Allegati (opzionale)</label>
-                                <input type="file" name="attachments" multiple class="form-control form-control-sm" id="attachmentsInput">
-                                <div class="form-text small">Formati supportati: JPG, PNG, PDF (max 5MB ciascuno)</div>
-                            </div>
-
-                            <!-- Crea Evento -->
-                            {% if can_create_event %}
-                            <div class="form-check mb-3">
-                                <input class="form-check-input" type="checkbox" name="create_event" id="createEventCheck" onchange="toggleEventFields()">
-                                <label class="form-check-label small fw-bold" for="createEventCheck">📅 Crea anche un evento nel calendario</label>
-                            </div>
-                            <div id="eventFields" class="d-none border rounded p-3 mb-3 bg-white">
-                                <div class="mb-2">
-                                    <label for="eventTitle" class="form-label small fw-bold text-muted">Titolo evento</label>
-                                    <input type="text" name="event_title" placeholder="Titolo evento" class="form-control form-control-sm" id="eventTitle">
-                                </div>
-                                <div class="row g-2 mb-2">
-                                    <div class="col-6">
-                                        <label for="eventStart" class="form-label small fw-bold text-muted">Inizio</label>
-                                        <input type="datetime-local" name="event_start" class="form-control form-control-sm" id="eventStart">
-                                    </div>
-                                    <div class="col-6">
-                                        <label for="eventEnd" class="form-label small fw-bold text-muted">Fine</label>
-                                        <input type="datetime-local" name="event_end" class="form-control form-control-sm" id="eventEnd">
-                                    </div>
-                                </div>
-
-                                <div class="mb-2">
-                                    <label for="eventChildren" class="form-label small fw-bold text-muted">👶 Coinvolgi figli (opzionale)</label>
-                                    <select name="event_children" multiple class="form-select form-select-sm" size="3" id="eventChildren">
-                                        {% for child in family_children %}
-                                            <option value="{{ child.id }}">{{ child.name }} {{ child.surname }}</option>
-                                        {% endfor %}
-                                    </select>
-                                </div>
-                                <div class="mb-2">
-                                    <label for="eventDescription" class="form-label small fw-bold text-muted">Descrizione</label>
-                                    <textarea name="event_description" placeholder="Descrizione evento" class="form-control form-control-sm" rows="2" id="eventDescription"></textarea>
-                                </div>
-                            </div>
-                            {% endif %}
+            <!-- SEZIONE COLLABILE -->
+            <div class="collapse mb-2" id="chatExtras">
+                <div class="card bg-light border-0">
+                    <div class="card-body p-3">
+                        <!-- Allegati -->
+                        <div class="mb-3">
+                            <label for="attachmentsInput" class="form-label small fw-bold text-muted">📎 Allegati (opzionale)</label>
+                            <input type="file" name="attachments" multiple class="form-control form-control-sm" id="attachmentsInput">
+                            <div class="form-text small">Formati supportati: JPG, PNG, PDF (max 5MB ciascuno)</div>
                         </div>
+
+                        <!-- Crea Evento -->
+                        {% if can_create_event %}
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" name="create_event" id="createEventCheck" onchange="toggleEventFields()">
+                            <label class="form-check-label small fw-bold" for="createEventCheck">📅 Crea anche un evento nel calendario</label>
+                        </div>
+                        <div id="eventFields" class="d-none border rounded p-3 mb-3 bg-white">
+                            <div class="mb-2">
+                                <label for="eventTitle" class="form-label small fw-bold text-muted">Titolo evento</label>
+                                <input type="text" name="event_title" placeholder="Titolo evento" class="form-control form-control-sm" id="eventTitle">
+                            </div>
+                            <div class="row g-2 mb-2">
+                                <div class="col-6">
+                                    <label for="eventStart" class="form-label small fw-bold text-muted">Inizio</label>
+                                    <input type="datetime-local" name="event_start" class="form-control form-control-sm" id="eventStart">
+                                </div>
+                                <div class="col-6">
+                                    <label for="eventEnd" class="form-label small fw-bold text-muted">Fine</label>
+                                    <input type="datetime-local" name="event_end" class="form-control form-control-sm" id="eventEnd">
+                                </div>
+                            </div>
+                            <div class="mb-2">
+                                <label for="eventChildren" class="form-label small fw-bold text-muted">👶 Coinvolgi figli (opzionale)</label>
+                                <select name="event_children" multiple class="form-select form-select-sm" size="3" id="eventChildren">
+                                    {% for child in family_children %}
+                                        <option value="{{ child.id }}">{{ child.name }} {{ child.surname }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="mb-2">
+                                <label for="eventDescription" class="form-label small fw-bold text-muted">Descrizione</label>
+                                <textarea name="event_description" placeholder="Descrizione evento" class="form-control form-control-sm" rows="2" id="eventDescription"></textarea>
+                            </div>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
+            </div>
 
-                <input type="hidden" name="reply_to" id="replyToInput">
-
-                <div class="d-flex gap-2 flex-wrap">
-                    <button type="submit" class="btn btn-success ms-auto px-4 fw-bold">
-                        <span class="me-1">📤</span> Invia messaggio
-                    </button>
-                </div>
-            </form>
+            <input type="hidden" name="reply_to" id="replyToInput">
         </div>
+
+        <!-- 📤 AREA FISSA (pulsante Invia sempre visibile) -->
+        <div class="chat-form-actions p-3 bg-white border-top">
+            <div class="d-flex gap-2 flex-wrap">
+                <button type="submit" class="btn btn-success ms-auto px-4 fw-bold">
+                    <span class="me-1">📤</span> Invia messaggio
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
     </div>
 </div>
 
-<!-- ✅ OFFCANVAS SIDEBAR -->
+<!-- ✅ OFFCANVAS SIDEBAR CON SEZIONI -->
 <div class="offcanvas offcanvas-start chat-offcanvas" tabindex="-1" id="chatSidebar">
     <div class="offcanvas-header border-bottom bg-light">
         <h5 class="offcanvas-title fw-bold d-flex align-items-center gap-2">
@@ -423,33 +675,103 @@
         <button type="button" class="btn-close" data-bs-dismiss="offcanvas"></button>
     </div>
     <div class="offcanvas-body p-0">
-        <div class="d-flex flex-column gap-2 p-3">
-            {% for chat in available_chats %}
-                <a href="{{ chat.url }}"
-                   class="sidebar-chat-item d-flex align-items-start p-3 text-decoration-none rounded {% if chat.is_active %}active-chat{% endif %} {% if chat.is_private %}chat-private-item{% endif %}">
 
-                    {% if chat.is_private %}
-                        <span class="fs-4 me-3 mt-1">🔒</span>
-                    {% else %}
+        {# ============================================ #}
+        {# SEZIONE 1: CHAT FAMIGLIA                     #}
+        {# ============================================ #}
+        <div class="p-3 border-bottom">
+            <h6 class="text-muted text-uppercase small fw-bold mb-2">
+                <i class="bi bi-people-fill me-1"></i>Chat Famiglia
+                {% if is_professional_in_family_chat %}
+                    <span class="badge bg-secondary ms-1" style="font-size: 0.65rem;">🔒 Solo lettura</span>
+                {% endif %}
+            </h6>
+            {% for chat in available_chats %}
+                {% if chat.section == "family" %}
+                    <a href="{{ chat.url }}"
+                       class="sidebar-chat-item d-flex align-items-start p-3 text-decoration-none rounded mb-2 {% if chat.is_active %}active-chat{% endif %} {% if chat.readonly %}chat-readonly{% endif %}">
+
                         <span class="fs-4 me-3 mt-1">{{ chat.icon }}</span>
-                    {% endif %}
+
+                        <div class="flex-grow-1">
+                            <h6 class="mb-0 small fw-bold" style="line-height: 1.4;">
+                                {{ chat.name }}
+                            </h6>
+                            {% if chat.readonly %}
+                                <small class="text-muted">
+                                    <i class="bi bi-eye me-1"></i>Solo consultazione
+                                </small>
+                            {% else %}
+                                <small class="text-muted">Chat di gruppo</small>
+                            {% endif %}
+                        </div>
+
+                        {% if chat.readonly %}
+                            <span class="badge bg-secondary ms-2">🔒</span>
+                        {% endif %}
+                    </a>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        {# ============================================ #}
+        {# SEZIONE 2: CHAT PRIVATE                      #}
+        {# ============================================ #}
+        <div class="p-3 border-bottom">
+            <h6 class="text-muted text-uppercase small fw-bold mb-2">
+                <i class="bi bi-lock-fill me-1"></i>Chat Private
+                <span class="badge bg-success ms-1" style="font-size: 0.65rem;">✍️ Scrivibili</span>
+            </h6>
+            {% for chat in available_chats %}
+                {% if chat.section == "private" %}
+                    <a href="{{ chat.url }}"
+                       class="sidebar-chat-item d-flex align-items-start p-3 text-decoration-none rounded mb-2 {% if chat.is_active %}active-chat{% endif %} {% if chat.is_private %}chat-private-item{% endif %}">
+
+                        <span class="fs-4 me-3 mt-1">{{ chat.icon }}</span>
+
+                        <div class="flex-grow-1">
+                            <h6 class="mb-0 small fw-bold" style="line-height: 1.4;">
+                                {{ chat.name }}
+                            </h6>
+                            <small class="text-muted">Chat privata</small>
+                        </div>
+                    </a>
+                {% endif %}
+            {% endfor %}
+        </div>
+
+        {# ============================================ #}
+        {# SEZIONE 3: CHAT DI GRUPPO (solo genitori)   #}
+        {# ============================================ #}
+        {% for chat in available_chats %}
+            {% if chat.section == "group" %}
+                {# Mostra la sezione solo se ci sono chat di gruppo #}
+                {% if forloop.first %}
+                    <div class="p-3">
+                        <h6 class="text-muted text-uppercase small fw-bold mb-2">
+                            <i class="bi bi-chat-dots-fill me-1"></i>Chat di Gruppo
+                        </h6>
+                {% endif %}
+
+                <a href="{{ chat.url }}"
+                   class="sidebar-chat-item d-flex align-items-start p-3 text-decoration-none rounded mb-2 {% if chat.is_active %}active-chat{% endif %}">
+
+                    <span class="fs-4 me-3 mt-1">{{ chat.icon }}</span>
 
                     <div class="flex-grow-1">
                         <h6 class="mb-0 small fw-bold" style="line-height: 1.4;">
                             {{ chat.name }}
                         </h6>
-                        {% if chat.is_private %}
-                            <small class="text-muted">Chat privata</small>
-                        {% endif %}
+                        <small class="text-muted">Chat di gruppo</small>
                     </div>
                 </a>
-            {% empty %}
-                <div class="p-4 text-center">
-                    <span class="fs-1 d-block mb-2">💬</span>
-                    <p class="text-muted small mb-0">Nessuna chat disponibile</p>
-                </div>
-            {% endfor %}
-        </div>
+
+                {% if forloop.last %}
+                    </div>
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+
     </div>
 </div>
 
@@ -458,32 +780,65 @@
 {% block extra_js %}
 <script>
 document.addEventListener("DOMContentLoaded", () => {
-   // ✅ SCROLL AUTOMATICO: pagina + container chat
-function scrollChatIntoView() {
-    // 1️⃣ Scrolla il container interno dei messaggi in fondo
-    const chatContainer = document.getElementById("chatMessages-current");
-    if (chatContainer) {
-        chatContainer.scrollTop = chatContainer.scrollHeight;
+    /// ✅ TEXTAREA AUTO-ESPANDENTE - VERSIONE CORRETTA
+const messageInput = document.getElementById('messageInput');
+
+if (messageInput) {
+    // Forza altezza iniziale
+    messageInput.style.height = '40px';
+    messageInput.style.minHeight = '40px';
+    messageInput.style.maxHeight = '120px';
+    messageInput.style.overflowY = 'hidden';
+
+    // Funzione per adattare l'altezza
+    function autoResize() {
+        this.style.height = 'auto';
+        const scrollHeight = this.scrollHeight;
+        const newHeight = Math.min(Math.max(scrollHeight, 40), 100);  // ← Ridotto a 100px
+        this.style.height = newHeight + 'px';
+        this.style.overflowY = (scrollHeight > 100) ? 'auto' : 'hidden';
     }
 
-    // 2️⃣ Scrolla la PAGINA PRINCIPALE fino al wrapper della chat
-    const chatWrapper = document.querySelector(".chat-main-wrapper");
-    if (chatWrapper) {
-        chatWrapper.scrollIntoView({ behavior: 'instant', block: 'start' });
-        // Piccolo offset per non attaccare la chat al bordo superiore
-        window.scrollBy(0, -10);
+    // Listener per digitazione
+    messageInput.addEventListener('input', autoResize);
+
+    // Listener per paste
+    messageInput.addEventListener('paste', function() {
+        setTimeout(autoResize.bind(this), 10);
+    });
+
+    // ✅ FIX: NON resettare il valore nel submit!
+    // Il form è sincrono, la pagina si ricarica comunque
+    const chatForm = document.getElementById('chatForm-current');
+    if (chatForm) {
+        chatForm.addEventListener('submit', function() {
+            // Reset SOLO dell'altezza, NON del valore
+            messageInput.style.height = '40px';
+            // ❌ RIMOSSO: messageInput.value = '';
+        });
+    }
+
+    // Inizializza
+    setTimeout(() => autoResize.call(messageInput), 100);
+}
+   // ✅ SCROLL AUTOMATICO INTELLIGENTE
+function scrollChatIntoView() {
+    const chatContainer = document.getElementById("chatMessages-current");
+    if (chatContainer) {
+        // Scrolla solo il container interno, non la pagina
+        chatContainer.scrollTop = chatContainer.scrollHeight;
     }
 }
 
 // Tentativo 1: immediato
 scrollChatIntoView();
 
-// Tentativo 2: dopo caricamento completo (immagini, font, CSS)
+// Tentativo 2: dopo caricamento completo
 window.addEventListener('load', function() {
-    setTimeout(scrollChatIntoView, 50);
+    setTimeout(scrollChatIntoView, 100);
 });
 
-// Tentativo 3: doppio requestAnimationFrame per timing perfetto
+// Tentativo 3: doppio requestAnimationFrame
 requestAnimationFrame(() => {
     requestAnimationFrame(scrollChatIntoView);
 });

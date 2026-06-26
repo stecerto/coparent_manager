@@ -58,7 +58,7 @@ def _get_event_icon(event_type):
     """Restituisce un'icona emoji in base al tipo di evento."""
     icons = {
         'custody': '🏠',
-        'support': '💶',
+        'support': '💰',
         'school': '🏫',
         'medical': '🏥',
         'expense': '💰',

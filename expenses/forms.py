@@ -25,6 +25,7 @@ class ExpenseCategoryForm(forms.ModelForm):
             )
         }
 
+
 class ExpenseForm(forms.ModelForm):
     class Meta:
         model = Expense
@@ -34,7 +35,6 @@ class ExpenseForm(forms.ModelForm):
             "amount",
             "description",
             "expense_date",
-            #"status"
         ]
         labels = {
             "child": "Figlio",
@@ -42,45 +42,74 @@ class ExpenseForm(forms.ModelForm):
             "amount": "Importo",
             "description": "Descrizione",
             "expense_date": "Data",
-            #"status": "Stato"
         }
         widgets = {
-            'expense_type': Select2Widget(attrs={'data-placeholder': 'Cerca categoria...'}),  # 🔄 Combobox
+            'expense_type': Select2Widget(attrs={'data-placeholder': 'Cerca categoria...'}),
             'expense_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'amount': forms.NumberInput(attrs={'class': 'form-control', 'step': '0.01'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'child': forms.Select(attrs={'class': 'form-select'})
         }
 
+    # ✅ NUOVO: Checkbox per spesa coniuge
+    is_for_spouse = forms.BooleanField(
+        required=False,
+        label="Spesa per coniuge (mantenimento attivo)",
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input',
+            'id': 'id_is_for_spouse'
+        }),
+        help_text="Seleziona se questa spesa è relativa al mantenimento del coniuge"
+    )
+
     def __init__(self, *args, **kwargs):
-        # ✅ 1. Estrai custom kwargs PRIMA di chiamare super()
         user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
 
-        # ✅ 2. Sicurezza: parte vuoto
+        # ✅ Sicurezza: parte vuoto
         self.fields["child"].queryset = ChildProfile.objects.none()
         self.fields["child"].empty_label = "Seleziona figlio"
 
-        # ✅ 3. Se c'è un user, carica i figli della sua famiglia
+        # ✅ Verifica se c'è mantenimento coniuge attivo
+        has_spouse_support = False
         if user:
             family = get_family_of_user(user)
             if family:
                 self.fields["child"].queryset = family.children.filter(is_active=True)
 
-        # ✅ 4. Categorie raggruppate (ESCLUDENDO "ordinarie")
+                # ✅ Controlla mantenimento coniuge
+                from children.models import ChildSupport
+                from datetime import date
+                from django.db.models import Q
+
+                today = date.today()
+                spouse_support = ChildSupport.objects.filter(
+                    family=family,
+                    support_type='spouse',
+                    is_active=True,
+                    start_date__lte=today
+                ).filter(
+                    Q(end_date__isnull=True) | Q(end_date__gte=today)
+                ).first()
+
+                has_spouse_support = spouse_support is not None
+
+        # ✅ Se non c'è mantenimento coniuge, nascondi il checkbox
+        if not has_spouse_support:
+            self.fields['is_for_spouse'].widget = forms.HiddenInput()
+            self.fields['is_for_spouse'].required = False
+
+        # ✅ Categorie raggruppate
         categories = ExpenseCategory.objects.filter(
             is_active=True,
             valid_to__isnull=True,
             group__is_active=True
-       # ).exclude(
-        #    group__code="ordinarie"  # ✅ ESCLUDE LE ORDINARIE
         ).select_related("group").order_by(
             "group__label",
             "display_name"
         )
 
         grouped_choices = []
-
         for group, cats in itertools.groupby(categories, key=lambda c: c.group.label):
             grouped_choices.append((
                 group,
@@ -90,13 +119,13 @@ class ExpenseForm(forms.ModelForm):
         self.fields["expense_type"].choices = grouped_choices
         self.fields["expense_type"].empty_label = "Seleziona categoria"
 
-        # ✅ 5. Rimuovi il campo status (viene impostato automaticamente dal service)
         if 'status' in self.fields:
             del self.fields['status']
 
     expense_type = forms.ModelChoiceField(
         queryset=ExpenseCategory.objects.filter(is_active=True),
-        required=True ) # 🔥 OBBLIGATORIO
+        required=True
+    )
 
 
 class ExpenseFilterForm(forms.Form):

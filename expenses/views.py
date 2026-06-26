@@ -92,8 +92,33 @@ def expenses_dashboard(request):
 
 @login_required
 def expenses_list(request):
-    family = get_family_of_user(request.user, request=request)
-    membership = FamilyMember.objects.filter(family=family, user=request.user).first()
+    user = request.user
+    profile = getattr(user, 'profile', None) or getattr(user, 'userprofile', None)
+
+    # ✅ NUOVO: Gestione professionisti con family_id
+    family_id = request.GET.get('family_id') or request.session.get('active_family_id')
+    is_professional = profile and profile.role in ['lawyer_a', 'lawyer_b', 'mediator', 'consultant']
+
+    if is_professional and family_id:
+        family = get_object_or_404(Family, id=family_id)
+
+        # Verifica accesso
+        membership = FamilyMember.objects.filter(
+            family=family,
+            user=user,
+            role__in=['lawyer_a', 'lawyer_b', 'mediator', 'consultant']
+        ).first()
+
+        if not membership:
+            messages.error(request, "⚠️ Non hai accesso a questa famiglia")
+            return redirect('families:lawyer_dashboard')
+    else:
+        # Logica esistente per genitori
+        family = get_family_of_user(user, request=request)
+        if not family:
+            return redirect("families:setup")
+        membership = FamilyMember.objects.filter(family=family, user=user).first()
+
     can_manage = membership and membership.role in ["parent_a", "parent_b"] if membership else False
 
     expenses = Expense.objects.filter(family=family, is_active=True).select_related(
@@ -121,6 +146,8 @@ def expenses_list(request):
         "total_expenses": total_expenses,
         "page_title": page_title,
         "can_manage_expenses": can_manage,
+        "family": family,  # ✅ Aggiunto per il template
+        "membership": membership,  # ✅ Aggiunto per il template
     })
 
 from django.contrib import messages
@@ -129,6 +156,15 @@ from django.contrib import messages
 @login_required
 @transaction.atomic
 def add_expense(request):
+    user = request.user
+    profile = getattr(user, 'profile', None) or getattr(user, 'userprofile', None)
+
+    # ✅ BLOCCO PROFESSIONISTI: Solo i genitori possono inserire spese
+    if profile and profile.role in ['lawyer_a', 'lawyer_b', 'mediator', 'consultant']:
+        messages.error(request,
+                       "⚠️ Solo i genitori possono inserire spese. I professionisti hanno accesso in sola lettura.")
+        return redirect("expenses:expenses_list")
+
     # ✅ FIX: passa request=request
     family = get_family_of_user(request.user, request=request)
     if not family:
@@ -176,18 +212,21 @@ def add_expense(request):
         form = ExpenseForm(request.POST, request.FILES, user=request.user)
         if form.is_valid():
             cleaned = form.cleaned_data
-            child = cleaned.get("child")
+
+            # ✅ Controlla se è spesa per coniuge
+            is_for_spouse = cleaned.get('is_for_spouse', False)
+
+            # ✅ Se è per coniuge, ignora il campo child
+            child = None if is_for_spouse else cleaned.get("child")
             expense_date = cleaned["expense_date"]
 
-            # ✅ VALIDAZIONE CONIUGE: controlla date mantenimento
-            if is_spouse:
+            # ✅ VALIDAZIONE CONIUGE
+            if is_spouse or is_for_spouse:
                 from children.models import ChildSupport
                 from datetime import date
-
                 today = date.today()
 
                 if child:
-                    # Spesa per figlio: controlla mantenimento figlio
                     child_support = ChildSupport.objects.filter(
                         child=child,
                         support_type='child',
@@ -203,8 +242,7 @@ def add_expense(request):
                             f"⚠️ Non puoi inserire spese per {child.name} dopo il {child_support.end_date.strftime('%d/%m/%Y')}"
                         )
                         return redirect("expenses:expenses_list")
-                else:
-                    # Spesa per coniuge: controlla mantenimento coniuge
+                elif is_for_spouse:
                     spouse_support = ChildSupport.objects.filter(
                         family=family,
                         support_type='spouse',
@@ -231,46 +269,49 @@ def add_expense(request):
                 expense_date=expense_date,
                 membership=membership
             )
+
+            # ✅ Se è per coniuge, aggiungi nota alla descrizione
+            if is_for_spouse:
+                expense.description = f"[Coniuge] {expense.description}" if expense.description else "[Coniuge]"
+                expense.save(update_fields=['description'])
+
             if expense.group_snapshot.lower() != "ordinarie" and expense.status != "paid":
                 approve_expense(expense, request.user, membership.role)
 
                 import logging
                 logger = logging.getLogger(__name__)
 
-                # Determina il ruolo dell'altro genitore
                 other_parent_role = RoleChoices.PARENT_B if str(membership.role).lower() in ['parent_a',
                                                                                              'parent'] else RoleChoices.PARENT_A
-
-                # Cerca l'altro genitore nella famiglia
                 other_parent = FamilyMember.objects.filter(family=family, role=other_parent_role).select_related(
                     'user').first()
 
                 if other_parent and other_parent.user != request.user:
                     try:
                         category_name = expense.expense_type.display_name if expense.expense_type else "Spesa"
+                        beneficiary = "Coniuge" if is_for_spouse else (child.name if child else "Famiglia")
                         create_notification(
                             user=other_parent.user,
                             notification_type="expense_pending",
                             title=f"🆕 Nuova spesa da approvare",
-                            message=f"{request.user.first_name or request.user.email} ha inserito una nuova spesa di €{expense.amount} per '{category_name}'.",
+                            message=f"{request.user.first_name or request.user.email} ha inserito una nuova spesa di €{expense.amount} per '{category_name}' ({beneficiary}).",
                             target_url=f"/expenses/list/",
                             target_model="Expense",
                             target_id=expense.id,
-                            metadata={"amount": str(expense.amount), "category": category_name}
+                            metadata={"amount": str(expense.amount), "category": category_name,
+                                      "beneficiary": beneficiary}
                         )
                     except Exception as e:
                         logger.error(f"Errore invio notifica spesa a {other_parent.user.email}: {e}")
 
-                # ✅ Messaggio diverso in base al tipo
             if expense.group_snapshot.lower() == "ordinarie":
                 messages.success(request,
                                  f"✅ Spesa ordinaria registrata e approvata automaticamente: €{expense.amount}")
             else:
-                messages.success(request, f"✅ Spesa inserita (v1). In attesa dell'altro genitore.")
+                beneficiary = "coniuge" if is_for_spouse else (f"figlio {child.name}" if child else "famiglia")
+                messages.success(request, f"✅ Spesa per {beneficiary} inserita. In attesa dell'altro genitore.")
 
-            # ✅ CONIUGE: spese auto-approvate (non richiedono approvazione genitori)
             if is_spouse:
-                # Auto-approva da entrambi i genitori
                 parent_a = FamilyMember.objects.filter(family=family, role='parent_a').first()
                 parent_b = FamilyMember.objects.filter(family=family, role='parent_b').first()
 
@@ -292,9 +333,6 @@ def add_expense(request):
                         category="payment_proof", scope="shared", status="approved", is_active=True
                     )
 
-                messages.success(request, "✅ Spesa inserita (v1). In attesa dell'altro genitore.")
-
-            # ✅ NUOVO: Redirect intelligente verso la chat (se presente)
             if next_url:
                 separator = '&' if '?' in next_url else '?'
                 return redirect(f"{next_url}{separator}new_expense_id={expense.id}")

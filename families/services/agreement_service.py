@@ -9,7 +9,7 @@ def generate_support_calendar_events(agreement):
     """Genera eventi mensili di mantenimento per i prossimi 12 mesi"""
     family = agreement.family
     child_names = ", ".join([c.name for c in agreement.children.all()])
-    title = f"💶 Mantenimento: {child_names}"
+    title = f"💰 Mantenimento: {child_names}"
 
     # Calcola giorno sicuro (evita 31 febbraio, ecc.)
     safe_day = min(agreement.payment_day, 28)
@@ -73,7 +73,7 @@ def generate_spouse_support_calendar_events(agreement):
 
     family = agreement.family
     beneficiary_name = agreement.beneficiary.get_full_name() if agreement.beneficiary else "Coniuge"
-    title = f"💶 Mantenimento Coniuge: {beneficiary_name}"
+    title = f"💰 Mantenimento Coniuge: {beneficiary_name}"
 
     # Calcola giorno sicuro (evita 31 febbraio, ecc.)
     safe_day = min(agreement.payment_day, 28)

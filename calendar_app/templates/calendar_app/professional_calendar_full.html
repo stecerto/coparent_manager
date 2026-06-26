@@ -41,6 +41,73 @@
         margin-right: 5px;
         display: inline-block;
     }
+    .fc-list-table {
+    border-collapse: separate;
+    border-spacing: 0 4px;
+}
+
+    .fc-list-day-cushion {
+        background-color: #f8f9fa !important;
+        padding: 8px 12px !important;
+    }
+
+    .fc-list-day-cushion .fc-list-day-text {
+        font-weight: 600 !important;
+        color: #0d6efd !important;
+    }
+
+    .fc-list-event {
+        transition: all 0.2s ease;
+    }
+
+    .fc-list-event:hover {
+        background-color: #e9ecef !important;
+        cursor: pointer;
+    }
+
+    .fc-list-event td {
+        padding: 10px 12px !important;
+    }
+
+    .fc-list-event-title {
+        font-weight: 500 !important;
+    }
+
+    /* ✅ Messaggio "nessun evento" */
+    .fc-list-empty {
+        padding: 40px 20px !important;
+        text-align: center;
+        color: #6c757d;
+        font-style: italic;
+    }
+
+    /* ✅ Eventi nascosti dalla ricerca */
+    .fc-event.search-hidden {
+        opacity: 0.15 !important;
+        pointer-events: none !important;
+        filter: grayscale(100%) !important;
+    }
+
+    .fc-event.search-hidden .fc-event-title {
+        text-decoration: line-through;
+    }
+
+    /* ✅ Evidenziazione testo trovato */
+    .fc-event.search-match {
+        box-shadow: 0 0 0 2px #ffc107 !important;
+        transform: scale(1.02);
+        z-index: 10;
+    }
+
+    /* ✅ Vista lista: nascondi completamente eventi non corrispondenti */
+    .fc-list-event.search-hidden {
+        display: none !important;
+    }
+
+    /* ✅ Vista lista: righe giorno senza eventi visibili */
+    .fc-list-day.search-hidden-day {
+        display: none !important;
+    }
 </style>
 {% endblock %}
 
@@ -56,6 +123,41 @@
         <a href="{% url 'calendar:professional_event_create' %}" class="btn btn-primary btn-lg">
             <i class="bi bi-plus-circle me-2"></i>Nuovo Appuntamento
         </a>
+    </div>
+    <!-- 🔍 NUOVA: BARRA DI RICERCA EVENTI -->
+    <div class="card shadow-sm mb-3 border-0" style="border-radius: 12px;">
+        <div class="card-body p-3">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0">
+                    <i class="bi bi-search text-muted"></i>
+                </span>
+                <input
+                    type="text"
+                    id="eventSearchInput"
+                    class="form-control border-start-0 shadow-none"
+                    placeholder="Cerca eventi per titolo, famiglia, luogo o note..."
+                    autocomplete="off"
+                >
+                <button
+                    class="btn btn-outline-secondary"
+                    type="button"
+                    id="clearSearchBtn"
+                    style="display: none;"
+                    title="Cancella ricerca"
+                >
+                    <i class="bi bi-x-circle"></i>
+                </button>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+                <small class="text-muted">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Ricerca in tempo reale su tutti gli eventi visibili
+                </small>
+                <small id="searchResultsCount" class="text-primary fw-semibold" style="display: none;">
+                    <span id="visibleCount">0</span> eventi trovati
+                </small>
+            </div>
+        </div>
     </div>
 
     <!-- Legenda -->
@@ -75,6 +177,11 @@
 
     <!-- Calendario FullCalendar -->
     <div id="professional-calendar"></div>
+    <!-- ✅ MESSAGGIO NESSUN RISULTATO -->
+    <div id="noSearchResults" class="text-center py-5 border rounded-3 bg-light mt-3" style="display: none;">
+        <i class="bi bi-search fs-1 text-muted d-block mb-2"></i>
+        <p class="text-muted mb-0">Nessun evento trovato con i criteri di ricerca.</p>
+    </div>
 
 </div>
 
@@ -103,12 +210,126 @@
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const calendarEl = document.getElementById('professional-calendar');
-    const calendar = new FullCalendar.Calendar(calendarEl, {
+    const searchInput = document.getElementById('eventSearchInput');
+    const clearBtn = document.getElementById('clearSearchBtn');
+    const noResults = document.getElementById('noSearchResults');
+    const resultsCount = document.getElementById('searchResultsCount');
+    const visibleCount = document.getElementById('visibleCount');
+
+    let calendar;
+    let allEventsData = []; // ✅ Salva i dati degli eventi per la ricerca
+
+    // 🔧 FUNZIONE: Applica filtro ricerca agli eventi
+    function applySearchFilter(query) {
+        if (!calendar) return;
+
+        const normalizedQuery = query.trim().toLowerCase();
+        let matchCount = 0;
+
+        // ✅ Usa gli eventi salvati invece di calendar.getEvents()
+        allEventsData.forEach(eventData => {
+            const el = eventData.el;
+            if (!el) return;
+
+            // Costruisci testo completo da cercare
+            const searchText = [
+                eventData.title || '',
+                eventData.family_name || '',
+                eventData.location || '',
+                eventData.description || '',
+                eventData.event_type || ''
+            ].join(' ').toLowerCase();
+
+            // Rimuovi classi precedenti
+            el.classList.remove('search-hidden', 'search-match');
+
+            if (!normalizedQuery) {
+                // Nessuna ricerca: mostra tutto normalmente
+                return;
+            }
+
+            if (searchText.includes(normalizedQuery)) {
+                // Match: evidenzia
+                el.classList.add('search-match');
+                matchCount++;
+            } else {
+                // No match: nascondi
+                el.classList.add('search-hidden');
+            }
+        });
+
+        // Aggiorna UI
+        if (normalizedQuery) {
+            resultsCount.style.display = 'inline-block';
+            visibleCount.textContent = matchCount;
+            noResults.style.display = matchCount === 0 ? 'block' : 'none';
+        } else {
+            resultsCount.style.display = 'none';
+            noResults.style.display = 'none';
+        }
+
+        // Per la vista lista: nascondi giorni senza eventi visibili
+        if (calendar.view.type.startsWith('list')) {
+            setTimeout(() => hideEmptyDaysInListView(), 50);
+        }
+    }
+
+    // 🔧 FUNZIONE: Nascondi giorni senza eventi nella vista lista
+    function hideEmptyDaysInListView() {
+        const dayElements = document.querySelectorAll('.fc-list-day');
+
+        dayElements.forEach(dayEl => {
+            let current = dayEl.nextElementSibling;
+            let hasVisibleEvents = false;
+
+            while (current && !current.classList.contains('fc-list-day')) {
+                if (current.classList.contains('fc-list-event') &&
+                    !current.classList.contains('search-hidden')) {
+                    hasVisibleEvents = true;
+                    break;
+                }
+                current = current.nextElementSibling;
+            }
+
+            if (hasVisibleEvents) {
+                dayEl.classList.remove('search-hidden-day');
+            } else {
+                dayEl.classList.add('search-hidden-day');
+            }
+        });
+    }
+
+    // 📅 INIZIALIZZAZIONE CALENDARIO
+    calendar = new FullCalendar.Calendar(calendarEl, {
         initialView: 'dayGridMonth',
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
             right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+        },
+        views: {
+            listWeek: {
+                type: 'list',
+                duration: { weeks: 1 },
+                buttonText: '📋 Lista',
+                listDayFormat: {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long'
+                },
+                listDaySideFormat: false,
+                noEventsContent: '📭 Nessun evento in programma questa settimana'
+            },
+            listMonth: {
+                type: 'list',
+                duration: { months: 1 },
+                buttonText: '📋 Mese',
+                listDayFormat: {
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short'
+                }
+            }
         },
         locale: 'it',
         firstDay: 1,
@@ -116,27 +337,71 @@ document.addEventListener('DOMContentLoaded', function() {
         editable: false,
         selectable: true,
         events: '{% url "calendar:professional_events_json" %}',
-        
+
+        // ✅ IMPORTANTE: Salva i dati degli eventi quando vengono renderizzati
+        eventDidMount: function(info) {
+            const ev = info.event;
+            const props = ev.extendedProps;
+
+            // ✅ Salva i dati dell'evento per la ricerca
+            const eventData = {
+                id: ev.id,
+                title: ev.title || '',
+                family_name: props.family_name || '',
+                location: props.location || '',
+                description: props.description || '',
+                event_type: props.event_type || '',
+                el: info.el
+            };
+
+            // Rimuovi eventi vecchi con lo stesso ID
+            allEventsData = allEventsData.filter(e => e.id !== ev.id);
+            allEventsData.push(eventData);
+
+            // Tooltip
+            let tooltip = ev.title;
+            if (props.location) tooltip += `\n📍 ${props.location}`;
+            if (props.family_name) tooltip += `\n👨‍👩‍👧 ${props.family_name}`;
+            info.el.setAttribute('title', tooltip);
+
+            // Riapplica filtro se c'è una ricerca attiva
+            const currentQuery = searchInput.value.trim();
+            if (currentQuery) {
+                setTimeout(() => applySearchFilter(currentQuery), 10);
+            }
+        },
+
+        // ✅ Pulisci dati eventi quando vengono rimossi
+        eventWillUnmount: function(info) {
+            allEventsData = allEventsData.filter(e => e.id !== info.event.id);
+        },
+
         // Click su giorno vuoto → crea nuovo evento
         select: function(info) {
             const start = info.startStr.slice(0, 16);
             const end = info.endStr.slice(0, 16);
             window.location.href = `{% url 'calendar:professional_event_create' %}?start=${start}&end=${end}`;
         },
-        
+
         // Click su evento → mostra dettagli
         eventClick: function(info) {
+            // Ignora click su eventi nascosti dalla ricerca
+            if (info.el.classList.contains('search-hidden')) {
+                info.jsEvent.preventDefault();
+                return false;
+            }
+
             const ev = info.event;
             const props = ev.extendedProps;
-            
+
             document.getElementById('eventModalTitle').textContent = ev.title;
-            
+
             let html = `
                 <p><strong>📅 Data:</strong> ${ev.start.toLocaleString('it-IT', {
                     dateStyle: 'full', timeStyle: 'short'
                 })}</p>
             `;
-            
+
             if (props.location) {
                 html += `<p><strong>📍 Luogo:</strong> ${props.location}</p>`;
             }
@@ -146,25 +411,52 @@ document.addEventListener('DOMContentLoaded', function() {
             if (props.description) {
                 html += `<p><strong>📝 Note:</strong><br>${props.description}</p>`;
             }
-            
+
             document.getElementById('eventModalBody').innerHTML = html;
             document.getElementById('eventEditLink').href = props.edit_url;
-            
+
             new bootstrap.Modal(document.getElementById('eventModal')).show();
-        },
-        
-        // Tooltip al hover
-        eventDidMount: function(info) {
-            const ev = info.event;
-            const props = ev.extendedProps;
-            let tooltip = ev.title;
-            if (props.location) tooltip += `\n📍 ${props.location}`;
-            if (props.family_name) tooltip += `\n👨‍👩‍👧 ${props.family_name}`;
-            info.el.setAttribute('title', tooltip);
         }
     });
-    
+
     calendar.render();
+
+    // 🔍 EVENT LISTENER: Ricerca in tempo reale
+    searchInput.addEventListener('input', function() {
+        const query = this.value;
+        clearBtn.style.display = query ? 'block' : 'none';
+
+        // ✅ Debug: mostra cosa stiamo cercando
+        console.log('🔍 Ricerca:', query);
+        console.log('📊 Eventi totali:', allEventsData.length);
+
+        applySearchFilter(query);
+    });
+
+    // ❌ Pulsante clear
+    clearBtn.addEventListener('click', function() {
+        searchInput.value = '';
+        clearBtn.style.display = 'none';
+        applySearchFilter('');
+        searchInput.focus();
+    });
+
+    // ⌨️ Shortcut ESC per cancellare
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            this.value = '';
+            this.dispatchEvent(new Event('input'));
+        }
+    });
+
+    // 🔄 Riapplica filtro quando cambia la vista del calendario
+    calendar.on('datesSet', function() {
+        const currentQuery = searchInput.value.trim();
+        if (currentQuery) {
+            // ✅ Aspetta che gli eventi siano renderizzati
+            setTimeout(() => applySearchFilter(currentQuery), 200);
+        }
+    });
 });
 </script>
 {% endblock %}

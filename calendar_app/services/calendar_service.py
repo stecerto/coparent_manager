@@ -36,7 +36,7 @@ def generate_child_support_calendar_events(support):
         return 0
 
     child_name = f"{child.name} {child.surname}"
-    title = f"💶 Mantenimento: {child_name}"
+    title = f"💰 Mantenimento: {child_name}"
 
     # Determina data inizio e fine
     current_date = support.start_date.replace(day=1)  # Primo giorno del mese

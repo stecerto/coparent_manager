@@ -1,80 +1,81 @@
 from django.urls import path
-from django.views.generic import RedirectView
+from . import views
 
-from families.views import family_summary, lawyer_expenses_dashboard_view, professional_dashboard, set_active_family, \
-    lawyer_exit_family_context, exit_family_context, professional_pending_events_view, spousal_support_view, \
-    family_settings_view, export_family_data_view, spouse_support_edit, spouse_support_create, \
-    spouse_support_list, edit_child_support_view, view_decree_view, view_spouse_decree_view
-from chat.views import delete_message_view
-from .views import (approve_expense_view, dashboard_view, setup_view, invite_member_view,
-    accept_invite_view, resend_invitation_view, cancel_invitation_view, confirm_invitation_view, expenses_by_child,
-    invitation_landing_view, family_timeline_view
-
-)
-
-app_name = "families"
+app_name = 'families'
 
 urlpatterns = [
+    # ========================================
+    # 🏠 DASHBOARD PRINCIPALI
+    # ========================================
+    path('dashboard/', views.dashboard_view, name='family_dashboard'),
+    path('setup/', views.setup_view, name='setup'),
+    path('summary/', views.family_summary, name='summary'),
+    path('settings/', views.family_settings_view, name='family_settings'),
 
-    # =========================
-    # DASHBOARD
-    # =========================
-    path("dashboard/", dashboard_view, name="family_dashboard"),
+    # ========================================
+    # 👔 DASHBOARD PROFESSIONISTI (ROUTING INTELLIGENTE)
+    # ========================================
+    # ✅ Questa view ora fa routing automatico in base al ruolo:
+    #    - lawyer → lawyer_dashboard.html
+    #    - mediator → mediator_dashboard.html
+    #    - consultant → consultant_dashboard.html
+    path('professional/', views.professional_dashboard, name='professional_dashboard'),  # ✅ DECOMMENTATA
 
-    path("summary/", family_summary, name="summary"),
+    # Eventi/documenti pendenti trasversali
+    path('professional/pending/', views.professional_pending_events_view, name='professional_pending_events'),
 
-    # =========================
-    # SETUP FAMIGLIA
-    # =========================
-    path("setup/", setup_view, name="setup"),
+    # ✅ NUOVO: Dashboard specifiche (opzionali, se vuoi URL dedicati)
+    path('professional/lawyer/', views.lawyer_dashboard_view, name='lawyer_dashboard'),
+    path('professional/mediator/', views.mediator_dashboard_view, name='mediator_dashboard'),
+    path('professional/consultant/', views.consultant_dashboard_view, name='consultant_dashboard'),
 
-    # =========================
-    # INVITI
-    # =========================
-    path("invite/", invite_member_view, name="invite_member"),
-    path("invite/<str:token>/", invitation_landing_view, name="invitation_landing"),
-    path("invite/<uuid:token>/confirm/", confirm_invitation_view, name="invite_confirm"),
-    path("message/<int:pk>/delete/", delete_message_view, name="delete_message"),
-    path("accept-invite/<str:token>/", accept_invite_view, name="accept_invite"),
-    path("spousal-support/", spousal_support_view, name="spousal_support"),
-    path('family-settings/', family_settings_view, name='family_settings'),
-    path('child-support/<int:child_id>/edit/', edit_child_support_view, name='edit_child_support'),
-    path('export-data/', export_family_data_view, name='export_family_data'),
-    # =========================
-    # EXPENSES
-    # =========================
-    path(
-        "expenses/<int:expense_id>/approve/", approve_expense_view, name="approve_expense"),
+    # ========================================
+    # 🔄 CONTESTO FAMIGLIA (Switch/Exit)
+    # ========================================
+    path('set-active/<int:family_id>/', views.set_active_family, name='set_active_family'),
+    #path('exit-context/', views.exit_family_context, name='exit_family_context'),
+    path('lawyer-exit-context/', views.lawyer_exit_family_context, name='lawyer_exit_family_context'),
 
-    path("invite/resend/<int:invitation_id>/", resend_invitation_view, name="invite_resend"),
-    path("invite/cancel/<int:invitation_id>/", cancel_invitation_view, name="invite_cancel"),
-    path("timeline/", family_timeline_view, name="timeline"),
-    path("by-child/", expenses_by_child, name="expenses_by_child"),
-#  ACCORDI DI MANTENIMENTO
-    path('decree/<int:support_id>/', view_decree_view, name='view_decree'),
-    path('spouse-support/<int:agreement_id>/decree/', view_spouse_decree_view, name='view_spouse_decree'),
+    # ========================================
+    # 👨‍👩‍👧 FIGLI
+    # ========================================
+    path('children/edit/<int:child_id>/', views.edit_child_support_view, name='edit_child_support'),
+    path('children/decree/<int:support_id>/', views.view_decree_view, name='view_decree'),
 
+    # ========================================
+    # 💰 SPESE (Vista Avvocato)
+    # ========================================
+    path('lawyer/expenses/', views.lawyer_expenses_dashboard_view, name='lawyer_expenses'),
+    path('lawyer/expenses/<int:family_id>/', views.lawyer_expenses_dashboard_view, name='lawyer_expenses_family'),
 
+    # ========================================
+    # 💼 MANTENIMENTO CONIUGE
+    # ========================================
+    path('spouse-support/', views.spouse_support_list, name='spouse_support_list'),
+    path('spouse-support/create/', views.spouse_support_create, name='spouse_support_create'),
+    path('spouse-support/edit/<int:pk>/', views.spouse_support_edit, name='spouse_support_edit'),
+    path('spouse-support/decree/<int:agreement_id>/', views.view_spouse_decree_view, name='view_spouse_decree'),
 
-    path('lawyer/expenses/', lawyer_expenses_dashboard_view, name='lawyer_expenses'),
-    path('lawyer/expenses/<int:family_id>/', lawyer_expenses_dashboard_view, name='lawyer_expenses'),
+    # ========================================
+    # 📨 INVITI
+    # ========================================
+    path('invite/', views.invite_member_view, name='invite_member'),
+    path('invite/accept/<uuid:token>/', views.accept_invite_view, name='accept_invite'),
+    path('invite/landing/<uuid:token>/', views.invitation_landing_view, name='invitation_landing'),
+    path('invite/confirm/<uuid:token>/', views.confirm_invitation_view, name='confirm_invitation'),
+    path('invite/resend/<int:invitation_id>/', views.resend_invitation_view, name='resend_invitation'),
+    path('invite/cancel/<int:invitation_id>/', views.cancel_invitation_view, name='cancel_invitation'),
 
-    path('professional/dashboard/', professional_dashboard, name='professional_dashboard'),
-    path('professional/pending-events/', professional_pending_events_view, name='professional_pending_events'),
-    path('set-active/<int:family_id>/', set_active_family, name='set_active_family'),
-    path("families/exit-lawyer-context/", lawyer_exit_family_context, name="exit_lawyer_context"),
-    path("families/exit-context/", exit_family_context, name="exit_family_context"),
-    # 🔄 Redirect delle vecchie route (compatibilità)
-    path('lawyer/home/', RedirectView.as_view(pattern_name='lawyer_home', permanent=False),
-         name='lawyer_home'),
-    path('mediator/home/', RedirectView.as_view(pattern_name='lawyer_home', permanent=False),
-         name='mediator_home'),
-    path('consultant/home/', RedirectView.as_view(pattern_name='lawyer_home', permanent=False),
-         name='consultant_home'),
+    # ========================================
+    # 📤 EXPORT
+    # ========================================
+    path('export/', views.export_family_data_view, name='export_family_data'),
 
-    # Mantenimento Coniuge
-    path('spouse-support/', spouse_support_list, name='spouse_support_list'),
-    path('spouse-support/create/', spouse_support_create, name='spouse_support_create'),
-    path('spouse-support/<int:pk>/edit/', spouse_support_edit, name='spouse_support_edit'),
-
+    # ========================================
+    # 📊 ALTRO
+    # ========================================
+    path('expenses/by-child/', views.expenses_by_child, name='expenses_by_child'),
+    path('timeline/', views.family_timeline_view, name='family_timeline'),
+    path('approve-expense/<int:expense_id>/', views.approve_expense_view, name='approve_expense'),
+    path("exit-context/", views.lawyer_exit_family_context, name="exit_lawyer_context"),
 ]

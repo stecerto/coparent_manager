@@ -281,51 +281,6 @@ def export_expenses_csv(expenses_qs, family):
 
     return response
 
-
-
-logger = logging.getLogger(__name__)
-@login_required
-def family_dashboard(request):  # ← Assicurati che prenda 'request'
-    logger.info(
-        f"🔍 family_dashboard: GET={request.GET.get('family_id')}, SESSION={request.session.get('active_family_id')}")
-    user = request.user
-    # ✅ PASSA request a get_family_of_user
-    family = get_family_of_user(user, request=request)  # ← AGGIUNGI request=request
-
-    if not family:
-        return redirect("families:setup")
-
-    active_membership = FamilyMember.objects.filter(
-        family=family, user=user
-    ).select_related('user').first()
-
-    if active_membership:
-        role_raw = getattr(active_membership.role, 'value', active_membership.role)
-        role_label = str(role_raw).replace('_', ' ').title()
-    else:
-        role_label = ""
-
-    from core.services.dashboard_service import get_upcoming_events, get_pending_documents
-    upcoming_events = get_upcoming_events(family, limit=5)
-    pending_documents = get_pending_documents(family, limit=5)
-
-    context = {
-        "family": family,
-        # ✅ BADGE DINAMICO
-        "active_family": family,
-        "active_family_membership": active_membership,
-        # ✅ variabili semplificate per il template
-        "active_family_name": family.name,
-        "active_role_label": role_label,
-        "active_is_parent_a": active_membership.role == "parent_a" if active_membership else False,
-        "active_is_lawyer_a": active_membership.role == "lawyer_a" if active_membership else False,
-        # ✅ Dati per i widget
-        "upcoming_events": upcoming_events,
-        "pending_documents": pending_documents,
-    }
-    return render(request, "families/family_dashboard.html", context)
-
-
 @login_required
 def setup_view(request):
     user = request.user
@@ -380,7 +335,7 @@ def setup_view(request):
 
             # ✅ Redirect in base al ruolo
             if is_professional:
-                return redirect("families:professional_dashboard")
+                return redirect('families:professional_dashboard')
             else:
                 return redirect("families:summary")
         else:
@@ -650,12 +605,10 @@ def view_decree_view(request, support_id):
 @login_required
 def family_summary(request):
     user = request.user
-    profile = user.profile  # UserProfile collegato all'utente
+    profile = user.profile
 
-    # ✅ RUOLO DELL'UTENTE: viene da UserProfile.role
-    user_role = profile.role  # 'parent_a', 'parent_b', 'lawyer_a', 'lawyer_b'
+    user_role = profile.role
 
-    # 🎯 1. prendi membership corretta (UNICA VERITÀ)
     membership = (
         FamilyMember.objects
         .select_related("family", "user")
@@ -671,9 +624,10 @@ def family_summary(request):
 
     family = membership.family if membership else None
 
-
-    # 🎯 2. Pre-carica tutti i dati (GENITORI, AVVOCATI, FIGLI)
+    # 🎯 2. Pre-carica tutti i dati
     other_parent = parent_a = parent_b = lawyer_a_member = lawyer_b_member = None
+    mediator_member = consultant_member = None
+
     if family:
         other_parent = FamilyMember.objects.filter(
             family=family,
@@ -681,48 +635,57 @@ def family_summary(request):
         ).exclude(user=user).select_related('user__profile').first()
         parent_a = FamilyMember.objects.filter(family=family, role=RoleChoices.PARENT_A).select_related(
             'user__profile').first()
-        parent_b = FamilyMember.objects.filter(family=family, role__in=['parent_b', RoleChoices.PARENT_B]).select_related(
+        parent_b = FamilyMember.objects.filter(family=family,
+                                               role__in=['parent_b', RoleChoices.PARENT_B]).select_related(
             'user__profile').first()
         lawyer_a_member = FamilyMember.objects.filter(family=family, role=RoleChoices.LAWYER_A).select_related(
             'user__profile').first()
         lawyer_b_member = FamilyMember.objects.filter(family=family, role=RoleChoices.LAWYER_B).select_related(
             'user__profile').first()
-        # ✅ NUOVO: Recupera mediatore e consulente
         mediator_member = FamilyMember.objects.filter(family=family, role=RoleChoices.MEDIATOR).select_related(
             'user__profile').first()
         consultant_member = FamilyMember.objects.filter(family=family, role=RoleChoices.CONSULTANT).select_related(
             'user__profile').first()
 
-        # ✅ FIX ERRORE TEMPLATE: calcoliamo count nella view
     children_qs = family.children.filter(is_active=True) if family else []
     children_count = children_qs.count()
 
-    # 🎯 3. GESTIONE POST (Salva e Continua)
+    # ✅ NUOVO: Calcola i conteggi nella view (non nel template)
+    active_members_count = sum([
+        1 if parent_a and parent_a.user else 0,
+        1 if parent_b and parent_b.user else 0,
+        1 if lawyer_a_member and lawyer_a_member.user else 0,
+        1 if lawyer_b_member and lawyer_b_member.user else 0,
+        1 if mediator_member and mediator_member.user else 0,
+        1 if consultant_member and consultant_member.user else 0,
+    ])
+
+    # ✅ Calcola percentuale completamento
+    completion_items = [
+        1 if parent_a and parent_a.user else 0,
+        1 if parent_b and parent_b.user else 0,
+        1 if children_count > 0 else 0,
+    ]
+    completion_pct = int((sum(completion_items) / len(completion_items)) * 100)
+
     if request.method == "POST":
         messages.success(request, "✅ Dati confermati!")
 
-        # 🔀 SMISTAMENTO IN BASE AL RUOLO
         if user_role in ['parent_a', 'parent_b']:
             return redirect("families:family_dashboard")
         elif user_role in ['lawyer_a', 'lawyer_b']:
-            return redirect("families:professional_dashboard")
+            return redirect('families:professional_dashboard')
         else:
-            return redirect("families:summary")  # Fallback
+            return redirect("families:summary")
 
-
-
-    # Verifica tutti i membri della famiglia
     all_members = FamilyMember.objects.filter(family=family).select_related('user')
 
-
-    # ✅ CONTESTO PULITO PER IL TEMPLATE
     context = {
         'profile': profile,
         'user_role': user_role,
         'user_role_label': RoleChoices(user_role).label if user_role in RoleChoices.values else 'Utente',
         'family_name': family.name if family else '',
 
-        # Dati già pronti - il template fa solo display
         'other_parent': other_parent,
         'parent_a': parent_a,
         'parent_b': parent_b,
@@ -731,11 +694,14 @@ def family_summary(request):
         'mediator_member': mediator_member,
         'consultant_member': consultant_member,
 
-        # RoleChoices per i label
         'RoleChoices': RoleChoices,
         "children": children_qs,
-        'children_count': children_count,  # ✅ Usa questo nel template
+        'children_count': children_count,
         'membership': membership,
+
+        # ✅ NUOVI: Conteggi calcolati nella view
+        'active_members_count': active_members_count,
+        'completion_pct': completion_pct,
     }
     return render(request, 'families/summary.html', context)
 
@@ -964,20 +930,20 @@ def invite_member_view(request):
                 if invited_role_base == 'parent' and limits['families']['current'] >= limits['families']['limit']:
                     messages.error(request,
                                    f"⚠️ Hai raggiunto il limite di {limits['families']['limit']} famiglie per il tuo piano.")
-                    return redirect("families:professional_dashboard")
+                    return redirect("families:lawyerl_dashboard")
 
                 # Se sta invitando un mediatore, consuma uno slot "mediatori"
                 elif invited_role_base == 'mediator' and limits['mediators']['current'] >= limits['mediators']['limit']:
                     messages.error(request,
                                    f"⚠️ Hai raggiunto il limite di {limits['mediators']['limit']} mediatori per il tuo piano.")
-                    return redirect("families:professional_dashboard")
+                    return redirect('families:professional_dashboard')
 
                 # Se sta invitando un consulente, consuma uno slot "consulenti"
                 elif invited_role_base == 'consultant' and limits['consultants']['current'] >= limits['consultants'][
                     'limit']:
                     messages.error(request,
                                    f"⚠️ Hai raggiunto il limite di {limits['consultants']['limit']} consulenti per il tuo piano.")
-                    return redirect("families:professional_dashboard")
+                    return redirect('families:professional_dashboard')
 
     # ✅ 2. Istanza il form con inviter
     form = InvitationForm(
@@ -1031,7 +997,7 @@ def invite_member_view(request):
 
             role_label = dict(RoleChoices.choices).get(target_role, target_role)
             messages.success(request, f"✅ Invito inviato a {target_contact} come {role_label}")
-            return redirect("families:professional_dashboard")
+            return redirect('families:professional_dashboard')
 
         if invitation.channel == "whatsapp":
             wa_link = build_whatsapp_link(request, invitation)
@@ -1148,14 +1114,45 @@ def cancel_invitation_view(request, invitation_id):
     return redirect("families:family_dashboard")
 
 
-
 @login_required
 def dashboard_view(request):
     user = request.user
     profile, _ = UserProfile.objects.get_or_create(user=user)
-    family = get_family_of_user(user, request=request)
-    if not family:
-        return redirect("families:setup")
+
+    # ✅ NUOVO: Gestione professionisti con family_id da querystring
+    family_id = request.GET.get('family_id')
+    is_professional = profile.role in ['lawyer_a', 'lawyer_b', 'mediator', 'consultant']
+
+    if is_professional and family_id:
+        # Imposta il contesto famiglia nella sessione
+        request.session['active_family_id'] = int(family_id)
+        family = get_object_or_404(Family, id=family_id)
+
+        # Verifica che il professionista abbia accesso a questa famiglia
+        membership = FamilyMember.objects.filter(
+            family=family,
+            user=user,
+            role__in=['lawyer_a', 'lawyer_b', 'mediator', 'consultant']
+        ).first()
+
+        if not membership:
+            messages.error(request, "⚠️ Non hai accesso a questa famiglia")
+            return redirect('families:professional_dashboard')
+    else:
+        # Logica esistente per genitori
+        family = get_family_of_user(user, request=request)
+        if not family:
+            return redirect("families:setup")
+        membership = FamilyMember.objects.filter(family=family, user=user).first()
+
+    # ✅ Calcola role_label (come in family_dashboard)
+    if membership:
+        role_raw = getattr(membership.role, 'value', membership.role)
+        role_label = str(role_raw).replace('_', ' ').title()
+    else:
+        role_label = ""
+
+    # ✅ Dati comuni
     expenses = family.expenses.all().order_by("-expense_date")[:5]
     events = get_family_events(family)[:5]
     balance = calculate_family_balance(family)
@@ -1168,26 +1165,40 @@ def dashboard_view(request):
         family=family, is_active=True
     ).order_by('-start_date').first()
 
+    # ✅ Widget dati (come in family_dashboard)
+    from core.services.dashboard_service import get_upcoming_events, get_pending_documents
+    upcoming_events = get_upcoming_events(family, limit=5)
+    pending_documents = get_pending_documents(family, limit=5)
+
     context = {
         "family": family,
-        # ✅ Esplícito per la topbar (sovrascrive il context processor se necessario)
+        # ✅ Esplícito per la topbar
         "active_family": family,
         "active_family_name": family.name,
-        "active_family_membership": FamilyMember.objects.filter(
-            family=family, user=user
-        ).select_related('user').first(),
-        # ... resto del tuo context ...
-        "current_spousal_support" : current_spousal_support,
+        "active_family_membership": membership,
+        "active_role_label": role_label,
+        "active_is_parent_a": membership.role == "parent_a" if membership else False,
+        "active_is_lawyer_a": membership.role == "lawyer_a" if membership else False,
+
+        # ✅ Mantenimento coniuge
+        "current_spousal_support": current_spousal_support,
+
+        # ✅ Dati per il template
         "children": children,
         "expenses": expenses,
         "expenses_count": family.expenses.count(),
         "documents_count": family.documents.count(),
         "messages_count": family.chat.count() if hasattr(family, "chat") else 0,
+        "events": events,
         "events_count": family.calendar.count() if hasattr(family, "events") else 0,
         "children_count": family.children.count(),
         "balance": balance,
         "total_expenses": total_expenses,
         "show_setup_banner": profile and not profile.setup_complete,
+
+        # ✅ Widget dati
+        "upcoming_events": upcoming_events,
+        "pending_documents": pending_documents,
     }
 
     return render(request, "families/family_dashboard.html", context)
@@ -1299,7 +1310,7 @@ def family_timeline_view(request):
             "logs": logs
         }
     )
-
+'''
 @login_required
 @role_required(RoleChoices.LAWYER_A, RoleChoices.LAWYER_B)
 def lawyer_dashboard_view(request):
@@ -1358,7 +1369,7 @@ def lawyer_dashboard_view(request):
             'total_children': active_children,
         }
     }
-    return render(request, "families/professional_dashboard.html", context) # 'families/lawyer/lawyer_dashboard.html', context)
+    return render(request, 'families/lawyer/lawyer_dashboard.html', context)
 
 
 @login_required
@@ -1478,8 +1489,8 @@ def professional_dashboard(request):
        }
     }
 
-    return render(request, 'families/professional_dashboard.html', context)
-
+    return render(request, 'families/lawyer_dashboard.html', context)
+'''
 
 @login_required
 def professional_pending_events_view(request):
@@ -1545,13 +1556,7 @@ def lawyer_exit_family_context(request):
         del request.session['active_family_id']
 
     # Redirect pulito alla dashboard avvocato (senza ?family_id)
-    return redirect('families:professional_dashboard')
-
-@login_required
-def exit_family_context(request):
-    """Pulisce il contesto famiglia e torna alla dashboard avvocato"""
-    request.session.pop('active_family_id', None)
-    return redirect('families:professional_dashboard')
+    return redirect('families:lawyer_dashboard')
 
 
 @login_required
@@ -1612,11 +1617,19 @@ def spouse_support_create(request):
             if not decree_file:
                 messages.error(request, "⚠️ È obbligatorio caricare il file della sentenza")
             else:
+                # ✅ IMPORTANTE: Disattiva TUTTI i vecchi accordi attivi PRIMA di creare il nuovo
+                deactivated_count = SpouseSupportAgreement.objects.filter(
+                    family=family,
+                    is_active=True
+                ).update(is_active=False)
+
+                if deactivated_count > 0:
+                    print(f"🔄 Disattivati {deactivated_count} accordi precedenti")
+
                 # ✅ Crea nuova sentenza - MAPPA amount → monthly_amount
                 new_agreement = SpouseSupportAgreement.objects.create(
                     family=family,
                     monthly_amount=form.cleaned_data['amount'],  # ✅ amount del form → monthly_amount del modello
-                    split_pct_parent_a=form.cleaned_data['split_pct_parent_a'],
                     payment_day=form.cleaned_data['payment_day'],
                     start_date=form.cleaned_data['start_date'],
                     end_date=form.cleaned_data.get('end_date'),
@@ -1631,6 +1644,9 @@ def spouse_support_create(request):
                     modified_by=request.user,
                 )
 
+                # ✅ RIMOSSO: split_pct_parent_a non esiste nel modello SpouseSupportAgreement
+                # Se ti serve, aggiungilo al modello o usa un campo diverso
+
                 messages.success(
                     request,
                     f"✅ Sentenza registrata: €{new_agreement.monthly_amount}/mese - {decree_number}"
@@ -1638,7 +1654,6 @@ def spouse_support_create(request):
                 return redirect('families:spouse_support_list')
     else:
         form = SpouseSupportForm(initial={
-            'split_pct_parent_a': 50.00,
             'payer_role': 'parent_a',
             'payment_day': 5,
         })
@@ -1764,3 +1779,223 @@ def view_spouse_decree_view(request, agreement_id):
     response = FileResponse(agreement.decree_file.open('rb'))
     response['Content-Disposition'] = f'inline; filename="{agreement.decree_file.name.split("/")[-1]}"'
     return response
+
+
+@login_required
+def professional_dashboard(request):
+    """Dashboard per Avvocati, Mediatori e Consulenti con gestione multi-famiglia"""
+    user = request.user
+    profile = getattr(user, 'userprofile', None) or getattr(user, 'profile', None)
+    if not profile:
+        return redirect('families:setup')
+
+    role_raw = profile.role
+    role_str = str(role_raw).strip().lower() if role_raw else ''
+    role_base = role_str.replace('_a', '').replace('_b', '')
+
+    if role_base not in ['lawyer', 'mediator', 'consultant']:
+        messages.error(request, "⚠️ Accesso riservato ai professionisti.")
+        return redirect('families:family_dashboard')
+
+    # ✅ ROUTING INTELLIGENTE: Template specifico per ruolo
+    if role_base == 'lawyer':
+        return _lawyer_dashboard(request, profile, role_base)
+    elif role_base == 'mediator':
+        return _mediator_dashboard(request, profile, role_base)
+    elif role_base == 'consultant':
+        return _consultant_dashboard(request, profile, role_base)
+
+    return render(request, 'families/lawyer_dashboard.html', {})
+
+
+def _lawyer_dashboard(request, profile, role_base):
+    """Dashboard specifica per avvocati"""
+    from families.services.lawyer_dashboard_service import (
+        get_lawyer_dashboard_stats, get_lawyer_recent_activity
+    )
+
+    user = request.user
+    memberships = FamilyMember.objects.filter(
+        user=user,
+        role__in=['lawyer_a', 'lawyer_b']
+    ).select_related('family').order_by('family__name')
+
+    families_data = []
+    for mem in memberships:
+        family = mem.family
+        pending_exp = Expense.objects.filter(family=family, status='pending').count()
+        recent_cutoff = timezone.now() - timedelta(days=7)
+        unread_msg = FamilyMessage.objects.filter(
+            family=family, recipient=user, created_at__gte=recent_cutoff
+        ).count()
+
+        children_qs = family.children.filter(is_active=True).only("name", "surname")
+        children_count = children_qs.count()
+        children_names = ", ".join([f"{c.name} {c.surname}" for c in children_qs])
+
+        role_label = mem.get_role_display() if hasattr(mem, 'get_role_display') else str(mem.role).replace('_',
+                                                                                                           ' ').title()
+
+        families_data.append({
+            'family': family,
+            'role_label': role_label,
+            'pending_expenses': pending_exp,
+            'unread_messages': unread_msg,
+            'children_count': children_count,
+            'children_names': children_names,
+        })
+
+    stats = get_lawyer_dashboard_stats(user)
+
+    context = {
+        'families_data': families_data,
+        'stats': stats,
+    }
+
+    return render(request, 'families/lawyer_dashboard.html', context)
+
+
+def _mediator_dashboard(request, profile, role_base):
+    """Dashboard specifica per mediatori"""
+    from families.services.mediator_dashboard_service import (
+        get_mediator_dashboard_stats, get_mediator_active_sessions
+    )
+
+    user = request.user
+    memberships = FamilyMember.objects.filter(
+        user=user,
+        role='mediator'
+    ).select_related('family').order_by('family__name')
+
+    families_data = []
+    for mem in memberships:
+        family = mem.family
+        recent_cutoff = timezone.now() - timedelta(days=7)
+        unread_msg = FamilyMessage.objects.filter(
+            family=family, recipient=user, created_at__gte=recent_cutoff
+        ).count()
+
+        children_qs = family.children.filter(is_active=True).only("name", "surname")
+        children_count = children_qs.count()
+        children_names = ", ".join([f"{c.name} {c.surname}" for c in children_qs])
+
+        role_label = mem.get_role_display() if hasattr(mem, 'get_role_display') else 'Mediatore'
+
+        families_data.append({
+            'family': family,
+            'role_label': role_label,
+            'unread_messages': unread_msg,
+            'children_count': children_count,
+            'children_names': children_names,
+        })
+
+    stats = get_mediator_dashboard_stats(user)
+
+    context = {
+        'families_data': families_data,
+        'stats': stats,
+    }
+
+    return render(request, 'families/mediator_dashboard.html', context)
+
+
+def _consultant_dashboard(request, profile, role_base):
+    """
+    Dashboard specifica per consulenti.
+    Coerente con lawyer_dashboard e mediator_dashboard: usa FamilyMember.
+    """
+    from families.services.consultant_dashboard_service import get_consultant_dashboard_stats
+
+    user = request.user
+
+    # ✅ Recupera tutte le famiglie dove l'utente è consulente (via FamilyMember)
+    memberships = FamilyMember.objects.filter(
+        user=user,
+        role='consultant'
+    ).select_related('family').order_by('family__name')
+
+    # ✅ Costruisci families_data (come per lawyer e mediator)
+    families_data = []
+    for mem in memberships:
+        family = mem.family
+
+        # Statistiche per questa famiglia
+        children_qs = family.children.filter(is_active=True).only("name", "surname")
+        children_count = children_qs.count()
+        children_names = ", ".join([f"{c.name} {c.surname}" for c in children_qs])
+
+        recent_cutoff = timezone.now() - timedelta(days=7)
+        unread_msg = FamilyMessage.objects.filter(
+            family=family, recipient=user, created_at__gte=recent_cutoff
+        ).count()
+
+        role_label = mem.get_role_display() if hasattr(mem, 'get_role_display') else 'Consulente'
+
+        families_data.append({
+            'family': family,
+            'role_label': role_label,
+            'unread_messages': unread_msg,
+            'children_count': children_count,
+            'children_names': children_names,
+        })
+
+    # ✅ Recupera statistiche aggregate
+    stats = get_consultant_dashboard_stats(user)
+
+    context = {
+        'families_data': families_data,  # ✅ Coerente con lawyer/mediator
+        'stats': stats,
+    }
+
+    return render(request, 'families/consultant_dashboard.html', context)
+
+@login_required
+def lawyer_dashboard_view(request):
+    user = request.user
+    profile = getattr(user, 'profile', None) or getattr(user, 'userprofile', None)
+    # ✅ DEBUG: Log del ruolo
+    print(f"\n🔍 lawyer_dashboard_view:")
+    print(f"  User: {user.email}")
+    print(f"  Profile: {profile}")
+    print(f"  Role: {profile.role if profile else 'None'}")
+    """Wrapper: forza dashboard avvocato"""
+    profile = getattr(request.user, 'profile', None)
+    if not profile or str(profile.role).lower().replace('_a', '').replace('_b', '') != 'lawyer':
+        messages.error(request, "⚠️ Accesso riservato agli avvocati.")
+        return redirect('families:professional_dashboard')
+    return _lawyer_dashboard(request, profile, 'lawyer')
+
+
+@login_required
+def mediator_dashboard_view(request):
+    user = request.user
+    profile = getattr(user, 'profile', None) or getattr(user, 'userprofile', None)
+    # ✅ DEBUG: Log del ruolo
+    print(f"\n🔍 mediator_dashboard_view:")
+    print(f"  User: {user.email}")
+    print(f"  Profile: {profile}")
+    print(f"  Role: {profile.role if profile else 'None'}")
+    """Wrapper: forza dashboard mediatore"""
+    profile = getattr(request.user, 'profile', None)
+    if not profile or str(profile.role).lower().replace('_a', '').replace('_b', '') != 'mediator':
+        messages.error(request, "⚠️ Accesso riservato ai mediatori.")
+        return redirect('families:professional_dashboard')  # ✅ FIX: era 'families:mediator_dashboard'
+
+    return _mediator_dashboard(request, profile, 'mediator')
+
+
+@login_required
+def consultant_dashboard_view(request):
+    user = request.user
+    profile = getattr(user, 'profile', None) or getattr(user, 'userprofile', None)
+    # ✅ DEBUG: Log del ruolo
+    print(f"\n🔍 consultant_dashboard_view:")
+    print(f"  User: {user.email}")
+    print(f"  Profile: {profile}")
+    print(f"  Role: {profile.role if profile else 'None'}")
+    """Wrapper: forza dashboard consulente"""
+    profile = getattr(request.user, 'profile', None)
+    if not profile or str(profile.role).lower().replace('_a', '').replace('_b', '') != 'consultant':
+        messages.error(request, "⚠️ Accesso riservato ai consulenti.")
+        return redirect('families:consultant_dashboard')
+    return _consultant_dashboard(request, profile, 'consultant')

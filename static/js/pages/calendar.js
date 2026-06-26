@@ -13,10 +13,28 @@ document.addEventListener('DOMContentLoaded', function() {
         height: 650,
         editable: true,
         selectable: true,
+
+        // ✅ TOOLBAR CON VISTA LISTA AGGIUNTA
         headerToolbar: {
             left: 'prev,next today',
             center: 'title',
-            right: 'dayGridMonth,timeGridWeek,timeGridDay'
+            right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek'
+        },
+
+        // ✅ CONFIGURAZIONE VISTA LISTA
+        views: {
+            listWeek: {
+                type: 'list',
+                duration: { weeks: 1 },
+                buttonText: '📋 Lista',
+                listDayFormat: {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long'
+                },
+                listDaySideFormat: false,
+                noEventsContent: '📭 Nessun evento in programma questa settimana'
+            }
         },
 
         // 📡 EVENTI DAL BACKEND
@@ -24,10 +42,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // ➕ CREAZIONE EVENTO (click su giorno)
         select: function(info) {
-            // FullCalendar invia date ISO con timezone: "2026-05-17T00:00:00+02:00"
-            const start = info.startStr.split('+')[0]; // Rimuovi timezone per il form
+            const start = info.startStr.split('+')[0];
             const end = info.endStr ? info.endStr.split('+')[0] : start;
-
             window.location.href = `/calendar/event/create/?start=${start}&end=${end}`;
         },
 
@@ -36,7 +52,7 @@ document.addEventListener('DOMContentLoaded', function() {
             window.location.href = `/calendar/event/${info.event.id}/edit/`;
         },
 
-        // 🔁 DRAG & DROP - Aggiorna date + mantieni children
+        // 🔁 DRAG & DROP
         eventDrop: function(info) {
             updateEvent(info.event, { only_dates: true });
         },
@@ -46,19 +62,18 @@ document.addEventListener('DOMContentLoaded', function() {
             updateEvent(info.event, { only_dates: true });
         },
 
-        // 🎨 COLORI + TOOLTIP CON NOMI FIGLI
+        // 🎨 COLORI + TOOLTIP
         eventDidMount: function(info) {
             const eventType = info.event.extendedProps.event_type;
             const children = info.event.extendedProps.children || [];
 
-            // ✅ Colori allineati al modello CalendarEvent.EVENT_TYPES
             const colors = {
-                custody: "#6f42c1",    // Viola: Affidamento
-                school: "#0d6efd",      // Blu: Scuola
-                medical: "#198754",     // Verde: Medico
-                expense: "#ffc107",     // Giallo: Spesa
-                legal: "#dc3545",       // Rosso: Legale
-                other: "#6c757d"        // Grigio: Altro
+                custody: "#6f42c1",
+                school: "#0d6efd",
+                medical: "#198754",
+                expense: "#ffc107",
+                legal: "#dc3545",
+                other: "#6c757d"
             };
 
             const color = colors[eventType] || "#6c757d";
@@ -66,12 +81,10 @@ document.addEventListener('DOMContentLoaded', function() {
             info.el.style.borderColor = color;
             info.el.style.color = "#fff";
 
-            // ✅ Tooltip con nomi figli (se presenti)
             if (children.length > 0) {
                 info.el.title = `Figli: ${children.join(", ")}`;
             }
 
-            // Badge figli nell'evento (opzionale, più visibile)
             if (children.length > 0) {
                 const badge = document.createElement('span');
                 badge.className = 'fc-event-badge';
@@ -83,6 +96,8 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     calendar.render();
+
+
 
     // 📤 UPDATE EVENT (drag&drop / resize)
     function updateEvent(event, options = {}) {

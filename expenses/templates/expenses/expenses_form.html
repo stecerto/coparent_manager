@@ -117,9 +117,13 @@
                             <span class="text-primary me-2">✓</span>
                             <strong>Documenti:</strong> Carica sempre la ricevuta per facilitare la verifica
                         </li>
-                        <li class="mb-0">
+                        <li class="mb-2">
                             <span class="text-primary me-2">✓</span>
                             <strong>Modifiche:</strong> Potrai modificare la spesa finché non è approvata da entrambi
+                        </li>
+                        <li class="mb-0">
+                            <span class="text-info me-2">💡</span>
+                            <strong>Spese Ordinarie:</strong> Le spese ordinarie (categoria "Ordinarie") sono <strong>comprese nel mantenimento</strong> e vengono approvate automaticamente senza necessità di approvazione dell'altro genitore.
                         </li>
                     </ul>
                 </div>
@@ -133,17 +137,98 @@
 {% block scripts %}
 <script src="{% static 'js/coparentmanager.js' %}"></script>
 <script>
-// ✅ Logica esistente preservata
+// ✅ Logica per checkbox "Spesa per coniuge"
+const spouseCheckbox = document.getElementById('id_is_for_spouse');
 const childSelect = document.getElementById('id_child');
+const childLabel = document.querySelector('label[for="id_child"]');
 const amountInput = document.getElementById('id_amount');
 const splitInput = document.getElementById('id_split_percentage_a');
 
+if (spouseCheckbox && childSelect) {
+    // ✅ Quando il checkbox cambia, abilita/disabilita il campo figlio
+    spouseCheckbox.addEventListener('change', function() {
+        if (this.checked) {
+            // ✅ Checkbox attivo: disabilita campo figlio
+            childSelect.disabled = true;
+            childSelect.style.opacity = '0.5';
+            childSelect.value = '';
+
+            // ✅ Nascondi label figlio
+            if (childLabel) {
+                childLabel.style.opacity = '0.5';
+            }
+
+            // ✅ Se c'è split_percentage, impostalo a 100%
+            if (splitInput) {
+                splitInput.value = '100';
+                splitInput.disabled = true;
+                splitInput.style.opacity = '0.5';
+            }
+
+            // ✅ Mostra alert informativo
+            showSpouseAlert();
+        } else {
+            // ✅ Checkbox non attivo: abilita campo figlio
+            childSelect.disabled = false;
+            childSelect.style.opacity = '1';
+
+            if (childLabel) {
+                childLabel.style.opacity = '1';
+            }
+
+            if (splitInput) {
+                splitInput.disabled = false;
+                splitInput.style.opacity = '1';
+            }
+
+            // ✅ Rimuovi alert informativo
+            hideSpouseAlert();
+        }
+    });
+}
+
+// ✅ Funzione per mostrare alert coniuge
+function showSpouseAlert() {
+    // Rimuovi alert esistente se presente
+    hideSpouseAlert();
+
+    // Crea nuovo alert
+    const alertDiv = document.createElement('div');
+    alertDiv.id = 'spouseAlert';
+    alertDiv.className = 'alert alert-info border-0 shadow-sm mt-3';
+    alertDiv.innerHTML = `
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-info-circle-fill fs-4"></i>
+            <div>
+                <strong>Spesa per Coniuge</strong>
+                <p class="mb-0 small mt-1">
+                    Questa spesa sarà registrata come relativa al mantenimento del coniuge.
+                    Non è necessario selezionare un figlio.
+                </p>
+            </div>
+        </div>
+    `;
+
+    // Inserisci dopo il campo figlio
+    const childFormGroup = childSelect.closest('.mb-3') || childSelect.parentElement;
+    childFormGroup.parentNode.insertBefore(alertDiv, childFormGroup.nextSibling);
+}
+
+// ✅ Funzione per nascondere alert coniuge
+function hideSpouseAlert() {
+    const existingAlert = document.getElementById('spouseAlert');
+    if (existingAlert) {
+        existingAlert.remove();
+    }
+}
+
+// ✅ Logica esistente per cambio figlio
 if (childSelect) {
     childSelect.addEventListener('change', function() {
         const childId = this.value;
         const defaultPct = getChildDefaultPercentage(childId);
 
-        if (splitInput && defaultPct) {
+        if (splitInput && defaultPct && !spouseCheckbox?.checked) {
             splitInput.value = defaultPct;
         }
     });

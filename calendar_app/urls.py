@@ -38,4 +38,5 @@ urlpatterns = [
     path('professional/event/create/', views.professional_event_form_view, name='professional_event_create'),
     path('professional/event/<int:event_id>/edit/', views.professional_event_form_view, name='professional_event_edit'),
     path('professional/event/<int:event_id>/delete/', views.professional_event_delete, name='professional_event_delete'),
+
 ]

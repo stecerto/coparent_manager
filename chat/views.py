@@ -5,6 +5,7 @@ import logging
 from urllib.parse import quote
 
 from django.contrib.auth.decorators import login_required
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
@@ -15,8 +16,9 @@ from django.db.models import Q
 
 from children.models import ChildProfile
 from core.decorators import plan_required
-from .models import FamilyMessage
-from chat.services.message_service import send_message, delete_message
+from chat.services.message_service import delete_message, send_message
+from .models import FamilyMessage, ProfessionalAttachment
+
 from families.models import FamilyMember
 from families.utils import get_family_of_user
 from core.choices import RoleChoices
@@ -29,20 +31,42 @@ logger = logging.getLogger(__name__)
 
 @login_required
 def family_chat_view(request, family_id=None, user_id=None):
-    # ✅ DEBUG TEMPORANEO
-    logger.info(f"🔍 CHAT VIEW - URL: {request.path}")
-    logger.info(f"🔍 CHAT VIEW - GET params: {dict(request.GET)}")
-    logger.info(f"🔍 CHAT VIEW - thread: {request.GET.get('thread')}")
-    logger.info(f"🔍 CHAT VIEW - chat_with: {request.GET.get('chat_with')}")
+    """
+    View principale per la chat familiare.
+    Gestisce chat di gruppo (famiglia) e chat private (1-a-1).
+
+    Funzionalità:
+    - Chat famiglia (gruppo) - solo lettura per professionisti
+    - Chat private (1-a-1) tra genitori e professionisti
+    - Chat di gruppo (mediazione, consulenza) per genitori
+    - Invio messaggi con allegati
+    - Creazione eventi dal chat
+    - Rifiuto spese con contesto
+    - Ricerca nei messaggi
+    """
     user = request.user
 
+    # ============================================
     # 🎯 1. DETERMINA FAMIGLIA E MEMBERSHIP
+    # ============================================
+
+    # ✅ FIX: Leggi family_id dalla querystring (non dal path parameter)
+    # Priorità: 1. Path parameter URL, 2. Querystring ?family_id=, 3. Sessione
+    family_id_from_get = request.GET.get('family_id')
+    if not family_id:
+        family_id = family_id_from_get or request.session.get('active_family_id')
+
     if family_id:
-        membership = get_object_or_404(
-            FamilyMember.objects.select_related('family', 'user__profile'),
-            user=user, family_id=family_id,
-            role__in=RoleChoices.lawyer_roles()
-        )
+        # ✅ FIX: Accetta TUTTI i ruoli validi (genitori + professionisti)
+        membership = FamilyMember.objects.filter(
+            user=user,
+            family_id=family_id
+        ).select_related('family', 'user__profile').first()
+
+        if not membership:
+            messages.error(request, "⚠️ Non hai accesso a questa chat")
+            return redirect('families:professional_dashboard')
+
         family = membership.family
     else:
         family = get_family_of_user(user, request=request)
@@ -53,10 +77,17 @@ def family_chat_view(request, family_id=None, user_id=None):
     if not membership:
         return HttpResponseForbidden("Non hai accesso a questa famiglia")
 
+    # ✅ Normalizza il ruolo dell'utente
     role_val = membership.role.value if hasattr(membership.role, 'value') else str(membership.role)
     role_base = str(role_val).strip().lower().replace('_a', '').replace('_b', '')
 
+    # ✅ Determina se l'utente è un professionista
+    is_professional = role_base in ['lawyer', 'mediator', 'consultant']
+
+    # ============================================
     # 🔐 2. RECUPERA TUTTI I PROFESSIONISTI DELLA FAMIGLIA
+    # ============================================
+
     professional_members = FamilyMember.objects.filter(
         family=family,
         role__in=[
@@ -87,7 +118,10 @@ def family_chat_view(request, family_id=None, user_id=None):
             'name': prof_member.user.get_full_name() or prof_member.user.email,
         })
 
+    # ============================================
     # 🔍 3. DETERMINA CON CHI STA CHATTANDO ORA
+    # ============================================
+
     chat_with_id = request.GET.get('chat_with') or user_id
     private_with_user = None
     current_thread_type = None
@@ -95,6 +129,7 @@ def family_chat_view(request, family_id=None, user_id=None):
     if chat_with_id:
         try:
             private_with_user = User.objects.get(id=chat_with_id)
+            # Cerca il thread_type corretto per questo utente
             for prof in available_professionals:
                 if prof['user'].id == private_with_user.id:
                     current_thread_type = prof['thread_type']
@@ -102,15 +137,18 @@ def family_chat_view(request, family_id=None, user_id=None):
         except User.DoesNotExist:
             pass
 
-    # 🔍 4. RICERCA & CONTESTO RIFIUTO SPESA (OTTIMIZZATO)
+    # ============================================
+    # 🔍 4. RICERCA & CONTESTO RIFIUTO SPESA
+    # ============================================
+
     search_query = request.GET.get("q", "").strip()
     reject_expense_id = request.GET.get("reject_expense_id")
     reject_context = None
+
     if reject_expense_id:
         expense = Expense.objects.filter(id=reject_expense_id, family=family, is_active=True).select_related(
             'created_by', 'category').first()
         if expense:
-            # ✅ FIX: Corretto il typo su category (era expense.management.commands.category.name)
             reject_context = {
                 "expense_id": expense.id,
                 "amount": expense.amount,
@@ -121,9 +159,11 @@ def family_chat_view(request, family_id=None, user_id=None):
                 "description": expense.description,
                 "status": expense.get_status_display() if hasattr(expense, 'get_status_display') else expense.status,
             }
-            # ❌ RIMOSSO: Lookup di linked_event per disaccoppiare completamente dal calendario.
 
+    # ============================================
     # 📥 5. GESTIONE POST (INVIO MESSAGGI)
+    # ============================================
+
     if request.method == "POST":
         logger.info("=" * 60)
         logger.info("📨 POST CHAT - INIZIO")
@@ -138,6 +178,29 @@ def family_chat_view(request, family_id=None, user_id=None):
         if not thread_type:
             thread_type = "family"
 
+        # ✅ BLOCCO PROFESSIONISTI: Non possono scrivere nella chat famiglia
+        if is_professional and thread_type == 'family':
+            messages.error(request,
+                           "⚠️ I professionisti non possono scrivere nella chat famiglia. Usa la chat privata con il tuo assistito.")
+            return redirect(f"{request.path}?family_id={family.id}&thread=family")
+        # ✅ MEDIATORE: Può scrivere SOLO nella chat mediazione (gruppo)
+        if role_base == 'mediator' and thread_type not in ['mediation']:
+            messages.error(request,
+                           "⚠️ Come mediatore puoi comunicare solo nella chat di mediazione di gruppo.")
+            return redirect(f"{request.path}?family_id={family.id}&thread=mediation")
+
+        # 3. AVVOCATO: solo chat private con genitori (legal_a/legal_b)
+        if role_base == 'lawyer' and thread_type not in ['legal_a', 'legal_b']:
+            messages.error(request,
+                           "⚠️ Come avvocato puoi comunicare solo nelle chat private con i tuoi assistiti.")
+            return redirect(f"{request.path}?family_id={family.id}")
+
+        # 4. CONSULENTE: chat private (consultant_private) O chat gruppo (consulting)
+        if role_base == 'consultant' and thread_type not in ['consultant_private', 'consulting']:
+            messages.error(request,
+                           "⚠️ Come consulente puoi comunicare nelle chat private con gli assistiti o nella chat di consulenza.")
+            return redirect(f"{request.path}?family_id={family.id}")
+
         content = request.POST.get("message", "").strip()
         reply_id = request.POST.get("reply_to")
         reply_message = FamilyMessage.objects.filter(id=reply_id, family=family).first() if reply_id else None
@@ -146,6 +209,7 @@ def family_chat_view(request, family_id=None, user_id=None):
         if not content and not files:
             return redirect(request.path)
 
+        # ✅ Verifica permessi thread
         from chat.services.permissions import get_accessible_threads_for_user
         allowed_threads = get_accessible_threads_for_user(user, family)
 
@@ -155,9 +219,9 @@ def family_chat_view(request, family_id=None, user_id=None):
                 "safe_redirect": f"/chat/?family_id={family.id}"
             })
 
+        # ✅ Determina il destinatario per chat private
         recipient = None
-        if thread_type in ['legal_a', 'legal_b', 'mediation_private', 'consultant_private', 'lawyer_private',
-                           'mediator_private']:
+        if thread_type in ['legal_a', 'legal_b', 'consultant_private']:
             recipient_id = request.POST.get('recipient_id')
             if recipient_id:
                 try:
@@ -165,9 +229,16 @@ def family_chat_view(request, family_id=None, user_id=None):
                 except User.DoesNotExist:
                     pass
 
-        create_event_flag = (thread_type in ['family', 'legal_a', 'legal_b', 'mediation_private', 'lawyer_private',
-                                             'mediator_private', 'consultant_private']
-                             and request.POST.get("create_event") == "on")
+        # ✅ Gestione creazione evento dal chat
+        create_event_flag = (thread_type in [
+            'family',
+            'legal_a',
+            'legal_b',
+            'consultant_private',  # ✅ AGGIUNTO
+            'mediation',  # ✅ AGGIUNTO (chat gruppo mediazione)
+            'consulting',  # ✅ AGGIUNTO (chat gruppo consulenza)
+        ]) and request.POST.get("create_event") == "on"
+
         event_data = None
         if create_event_flag:
             now = timezone.now()
@@ -179,13 +250,13 @@ def family_chat_view(request, family_id=None, user_id=None):
                 "source": "chat",
                 "linked_id": None,
                 "children_ids": request.POST.getlist("event_children"),
-                # ❌ RIMOSSO: "amount": request.POST.get("event_amount"),
-                # Le spese ora si creano e gestiscono esclusivamente dall'app Expenses.
             }
+            # Rimuovi chiavi non volute
             for unwanted_key in ("amount", "expense_id", "category", "reject_expense_id",
                                  "chat_type", "message", "attachments", "reply_to", "create_event", "thread_type"):
                 event_data.pop(unwanted_key, None)
 
+        # ✅ Invia il messaggio
         msg = send_message(
             family=family,
             sender=user,
@@ -198,6 +269,7 @@ def family_chat_view(request, family_id=None, user_id=None):
             thread_type=thread_type
         )
 
+        # ✅ Salva allegati come documenti privati (per chat private)
         if files and thread_type in ['legal_a', 'legal_b', 'mediation_private', 'consultant_private']:
             for f in files:
                 Document.objects.create(
@@ -205,7 +277,10 @@ def family_chat_view(request, family_id=None, user_id=None):
                     file=f, title=f.name[:100], is_private=True
                 )
 
-        if thread_type in ['legal_a', 'legal_b', 'mediation_private', 'consultant_private'] and recipient:
+        # ============================================
+        # ✅ NOTIFICA PER CHAT PRIVATE
+        # ============================================
+        if thread_type in ['legal_a', 'legal_b', 'consultant_private'] and recipient:  # ✅ AGGIUNTO consultant_private
             try:
                 from notifications.services import create_notification
                 create_notification(
@@ -213,27 +288,38 @@ def family_chat_view(request, family_id=None, user_id=None):
                     notification_type="chat_private",
                     title=f"Nuovo messaggio da {user.first_name or user.email}",
                     message=content[:150] + ("..." if len(content) > 150 else ""),
-                    target_url=f"/chat/?family_id={family.id}&thread={thread_type}",
+                    target_url=f"/chat/?family_id={family.id}&thread={thread_type}&chat_with={user.id}",
                     target_model="FamilyMessage",
                     target_id=msg.id,
                     metadata={"sender_id": user.id, "family_id": family.id, "thread_type": thread_type}
-                    #send_email=False
                 )
             except Exception as e:
                 logger.error(f"Errore notifica: {e}", exc_info=True)
 
+        # ✅ Redirect alla chat corretta
+        # ============================================
+        # ✅ REDIRECT ALLA CHAT CORRETTA
+        # ============================================
         redirect_url = request.path
         if recipient:
-            redirect_url += f"?thread={thread_type}&chat_with={recipient.id}"
+            # Chat privata: mantieni thread e chat_with
+            redirect_url += f"?family_id={family.id}&thread={thread_type}&chat_with={recipient.id}"
         elif thread_type != "family":
-            redirect_url += f"?thread={thread_type}"
+            # Chat di gruppo: mantieni solo thread
+            redirect_url += f"?family_id={family.id}&thread={thread_type}"
+        else:
+            # Chat famiglia
+            redirect_url += f"?family_id={family.id}&thread=family"
 
         return redirect(redirect_url)
 
+    # ============================================
     # 📊 6. PREPARA I DATI PER LA UI (GET)
+    # ============================================
+
     active_thread = request.GET.get("thread", "family")
 
-    # ✅ NUOVO: Gestione del ritorno dall'app Expenses dopo aver creato una spesa
+    # ✅ Gestione del ritorno dall'app Expenses dopo aver creato una spesa
     new_expense_id = request.GET.get("new_expense_id")
     new_expense = None
     prefill_message = ""
@@ -244,42 +330,53 @@ def family_chat_view(request, family_id=None, user_id=None):
             expense_desc = new_expense.description or "Nuova spesa"
             prefill_message = f"📎 Ho appena registrato una spesa: {expense_desc} (€ {new_expense.amount})"
 
-    # ✅ NUOVO: Costruisci l'URL per il pulsante "Aggiungi Spesa" che include il ritorno alla chat
+    # ✅ Costruisci l'URL per il pulsante "Aggiungi Spesa"
     current_chat_path = request.get_full_path()
-    # Usiamo quote() per codificare l'URL, così i parametri ?thread=...&chat_with=... non si rompono
     add_expense_redirect_url = f"/expenses/add/?next={quote(current_chat_path)}"
 
-    # 📊 COSTRUZIONE SIDEBAR DINAMICA
+    # ============================================
+    # 📊 7. COSTRUZIONE SIDEBAR DINAMICA CON SEZIONI
+    # ============================================
+
     available_chats = []
+    base_url = request.path
 
-    # ✅ CORRETTO: Usa URL assoluti con request.path
-    base_url = request.path  # Es: "/chat/"
-
+    # ✅ SEZIONE 1: CHAT FAMIGLIA (solo lettura per professionisti)
     available_chats.append({
         "type": "family",
         "name": "💬 Chat Famiglia",
         "icon": "👨‍👩‍👧‍👦",
         "is_active": (active_thread == "family"),
-        "url": f"{base_url}?thread=family",  # ✅ URL assoluto
-        "is_private": False
+        "url": f"{base_url}?thread=family",
+        "is_private": False,
+        "section": "family",  # ✅ Identifica la sezione
+        "readonly": is_professional,  # ✅ Solo lettura per professionisti
     })
 
-    if role_base in ['lawyer', 'mediator', 'consultant']:
+    # ============================================
+    # 📊 SEZIONE 2: CHAT PRIVATE
+    # ============================================
+
+    # ✅ Professionisti con chat private: avvocato E consulente
+    if role_base in ['lawyer', 'consultant']:
         parents = FamilyMember.objects.filter(
-            family=family, role__in=[RoleChoices.PARENT_A, RoleChoices.PARENT_B, 'parent_a', 'parent_b', 'parent']
+            family=family,
+            role__in=[RoleChoices.PARENT_A, RoleChoices.PARENT_B, 'parent_a', 'parent_b', 'parent']
         ).select_related('user').exclude(user=user)
 
         for p in parents:
+            # ✅ Determina il thread_type corretto
             if role_base == 'lawyer':
                 thread_type = f"legal_{p.role.split('_')[1]}" if hasattr(p.role, 'split') else 'legal_a'
-            elif role_base == 'mediator':
-                thread_type = 'mediation_private'
             elif role_base == 'consultant':
-                thread_type = 'consultant_private'
+                thread_type = 'consultant_private'  # ✅ Consulente usa consultant_private
             else:
                 thread_type = f"{role_base}_private"
 
+            # ✅ Verifica se questa chat è attiva
             is_active = (active_thread == thread_type and private_with_user and private_with_user.id == p.user.id)
+
+            # ✅ Costruisci il nome visualizzato
             parent_name = p.user.get_full_name() or p.user.email
             role_short = "Gen. A" if 'a' in str(p.role).lower() else "Gen. B" if 'b' in str(
                 p.role).lower() else "Genitore"
@@ -288,14 +385,17 @@ def family_chat_view(request, family_id=None, user_id=None):
             available_chats.append({
                 "type": thread_type,
                 "name": clean_name,
-                "icon": "👤",
+                "icon": "🔒",
                 "is_active": is_active,
-                "url": f"{base_url}?thread={thread_type}&chat_with={p.user.id}",  # ✅ URL assoluto
+                "url": f"{base_url}?thread={thread_type}&chat_with={p.user.id}",
                 "user_id": p.user.id,
-                "is_private": True
+                "is_private": True,
+                "section": "private",
+                "readonly": False,
             })
 
-    if role_base == 'parent':
+    else:
+        # Genitori: chat private con i professionisti
         for prof in available_professionals:
             is_active = (active_thread == prof['thread_type'] and private_with_user and private_with_user.id == prof[
                 'user'].id)
@@ -305,26 +405,31 @@ def family_chat_view(request, family_id=None, user_id=None):
                                                                                                                  prof[
                                                                                                                      'role'] else "Prof."
             prof_name = prof['user'].first_name or prof['user'].email.split('@')[0]
-            display_name = f"{prefix} {prof_name} di {family.name}"
+            display_name = f"{prefix} {prof_name}"
 
             available_chats.append({
                 "type": prof['thread_type'],
                 "name": display_name,
                 "icon": icon,
                 "is_active": is_active,
-                "url": f"{base_url}?thread={prof['thread_type']}&chat_with={prof['user'].id}",  # ✅ URL assoluto
+                "url": f"{base_url}?thread={prof['thread_type']}&chat_with={prof['user'].id}",
                 "user_id": prof['user'].id,
-                "is_private": True
+                "is_private": True,
+                "section": "private",  # ✅ Sezione privata
+                "readonly": False,  # ✅ Le chat private sono sempre scrivibili
             })
 
+    # ✅ SEZIONE 3: CHAT DI GRUPPO (solo per genitori)
     if role_base in ['parent', 'mediator', 'consultant']:
         available_chats.append({
             "type": "mediation",
             "name": "🤝 Mediazione (Gruppo)",
             "icon": "🕊️",
             "is_active": (active_thread == "mediation"),
-            "url": f"{base_url}?thread=mediation",  # ✅ URL assoluto
-            "is_private": False
+            "url": f"{base_url}?thread=mediation",
+            "is_private": False,
+            "section": "group",  # ✅ Sezione gruppo
+            "readonly": False,
         })
 
     if role_base in ['parent', 'consultant']:
@@ -333,9 +438,15 @@ def family_chat_view(request, family_id=None, user_id=None):
             "name": "💼 Consulenza (Gruppo)",
             "icon": "💡",
             "is_active": (active_thread == "consulting"),
-            "url": f"{base_url}?thread=consulting",  # ✅ URL assoluto
-            "is_private": False
+            "url": f"{base_url}?thread=consulting",
+            "is_private": False,
+            "section": "group",  # ✅ Sezione gruppo
+            "readonly": False,
         })
+
+    # ============================================
+    # 📊 8. RECUPERA MESSAGGI VISIBILI
+    # ============================================
 
     from chat.services.permissions import get_visible_messages
     all_visible_messages = get_visible_messages(user, family)
@@ -343,17 +454,34 @@ def family_chat_view(request, family_id=None, user_id=None):
     if search_query:
         all_visible_messages = all_visible_messages.filter(content__icontains=search_query)
 
+    # ============================================
+    # 📊 FILTRA MESSAGGI IN BASE AL THREAD ATTIVO
+    # ============================================
+
     if active_thread == "family":
         current_messages = all_visible_messages.filter(thread_type="family")
-    elif active_thread in ["legal_a", "legal_b", "mediation_private", "consultant_private"] and private_with_user:
+
+    elif active_thread in ["legal_a", "legal_b", "consultant_private"] and private_with_user:
+        # ✅ AGGIUNTO consultant_private alla lista
         current_messages = all_visible_messages.filter(thread_type=active_thread).filter(
-            Q(sender=user, recipient=private_with_user) | Q(sender=private_with_user, recipient=user) |
-            Q(sender=user, recipient__isnull=True) | Q(sender=private_with_user, recipient__isnull=True)
+            Q(sender=user, recipient=private_with_user) |
+            Q(sender=private_with_user, recipient=user) |
+            Q(sender=user, recipient__isnull=True) |
+            Q(sender=private_with_user, recipient__isnull=True)
         )
+
+    elif active_thread in ["mediation", "consulting"]:
+        # ✅ Chat di gruppo
+        current_messages = all_visible_messages.filter(thread_type=active_thread)
+
     else:
         current_messages = all_visible_messages.filter(thread_type=active_thread)
 
     current_messages = current_messages.order_by("created_at").select_related("sender", "recipient", "reply_to")
+
+    # ============================================
+    # 📊 9. DATI AGGIUNTIVI (DOCUMENTI, SPESE, FIGLI)
+    # ============================================
 
     user_field = "owner"
     shared_docs = Document.objects.filter(family=family, is_active=True, is_private=False).select_related(
@@ -369,7 +497,13 @@ def family_chat_view(request, family_id=None, user_id=None):
 
     family_children = ChildProfile.objects.filter(family=family, is_active=True).order_by("surname", "name")
 
-    # 🎯 7. CONTESTO COMPLETO
+    # ============================================
+    # 🎯 10. CONTESTO COMPLETO
+    # ============================================
+
+    # ✅ Determina se l'utente è un professionista nella chat di famiglia (solo lettura)
+    is_professional_in_family_chat = is_professional and active_thread == 'family'
+
     context = {
         "family": family,
         "membership": membership,
@@ -398,6 +532,8 @@ def family_chat_view(request, family_id=None, user_id=None):
             family=family, thread_type__in=['legal_a', 'legal_b', 'mediation_private', 'consultant_private'],
             sender__in=[user, private_with_user] if private_with_user else [user], is_active=False
         ).exists() if private_with_user else False,
+        # ✅ NUOVO: Indica se il professionista è nella chat famiglia (solo lettura)
+        "is_professional_in_family_chat": is_professional_in_family_chat,
     }
 
     return render(request, "chat/chat_home.html", context)
@@ -687,3 +823,316 @@ def chat_export_pdf(request):
     filename = title.replace(" ", "_").replace(":", "").replace("/", "-")
     response["Content-Disposition"] = f'attachment; filename="{filename}_{family.id}.pdf"'
     return response
+
+
+from django.db.models import Q
+from chat.models import ProfessionalMessage, ProfessionalThread
+from accounts.models import User
+
+
+@login_required
+def professional_chat_view(request):
+    """
+    Chat tra professionisti dello studio.
+    Supporta chat generale e chat private 1-a-1.
+    """
+    user = request.user
+    profile = getattr(user, 'profile', None) or getattr(user, 'userprofile', None)
+
+    # ✅ Verifica che sia un professionista
+    if not profile or not profile.is_professional:
+        messages.error(request, "⚠️ Accesso riservato ai professionisti")
+        return redirect('families:professional_dashboard')
+
+    # ✅ Recupera tutti i colleghi professionisti
+    colleagues = User.objects.filter(
+        profile__role__in=['lawyer_a', 'lawyer_b', 'mediator', 'consultant'],
+        is_active=True
+    ).exclude(id=user.id).select_related('profile')
+
+    # ✅ Determina quale thread mostrare
+    thread_id = request.GET.get('thread_id')
+    with_user_id = request.GET.get('with_user_id')
+    active_thread = None
+
+    # CASO 1: Richiesta di chat privata con utente specifico
+    if with_user_id:
+        other_user = get_object_or_404(User, id=with_user_id)
+
+        # Cerca se esiste già una chat privata tra questi due utenti
+        existing_thread = ProfessionalThread.objects.filter(
+            thread_type='private',
+            participants=user
+        ).filter(
+            participants=other_user
+        ).first()
+
+        if existing_thread:
+            active_thread = existing_thread
+        else:
+            # Crea nuova chat privata
+            active_thread = ProfessionalThread.objects.create(
+                name=f"Chat privata",
+                thread_type='private',
+                created_by=user
+            )
+            active_thread.participants.add(user, other_user)
+
+    # CASO 2: Thread ID specifico
+    elif thread_id:
+        active_thread = get_object_or_404(ProfessionalThread, id=thread_id)
+
+        # Verifica permessi
+        if active_thread.thread_type == 'private':
+            if user not in active_thread.participants.all():
+                messages.error(request, "⚠️ Non hai accesso a questa chat")
+                return redirect('chat:professional_chat')
+
+    # CASO 3: Chat generale (default)
+    else:
+        active_thread, created = ProfessionalThread.objects.get_or_create(
+            thread_type='studio_general',
+            defaults={'name': 'Chat Generale Studio'}
+        )
+
+    # ✅ Recupera i messaggi del thread attivo
+    messages_list = ProfessionalMessage.objects.filter(
+        thread=active_thread,
+        is_active=True
+    ).select_related('sender').order_by('-created_at')[:100]
+
+    # Inverti per ordine cronologico
+    messages_list = list(messages_list)
+    messages_list.reverse()
+
+    # ✅ Recupera tutti i thread a cui l'utente può accedere
+    user_threads = ProfessionalThread.objects.filter(
+        Q(thread_type='studio_general') |
+        Q(thread_type='private', participants=user)
+    ).distinct()
+
+    # ✅ CALCOLA I NOMI VISUALIZZATI PER OGNI THREAD
+    # Questo evita di chiamare metodi con parametri nel template
+    threads_with_names = []
+    for thread in user_threads:
+        # Calcola il nome visualizzato per questo thread
+        if thread.thread_type == 'private':
+            # Per chat private: nomi degli altri partecipanti
+            others = thread.participants.exclude(id=user.id)
+            names = []
+            for p in others:
+                name = p.get_full_name() if p.get_full_name() else p.email
+                names.append(name)
+            display_name = ', '.join(names) if names else 'Chat privata'
+        else:
+            # Per chat generale: nome del thread
+            display_name = thread.name
+
+        # Aggiungi il thread con il nome calcolato
+        threads_with_names.append({
+            'thread': thread,
+            'display_name': display_name
+        })
+
+    # ✅ Calcola il nome del thread attivo
+    if active_thread.thread_type == 'private':
+        others = active_thread.participants.exclude(id=user.id)
+        names = []
+        for p in others:
+            name = p.get_full_name() if p.get_full_name() else p.email
+            names.append(name)
+        active_thread_display_name = ', '.join(names) if names else 'Chat privata'
+    else:
+        active_thread_display_name = active_thread.name
+
+    # ✅ Gestione POST (invio messaggio)
+    if request.method == 'POST':
+        content = request.POST.get('message', '').strip()
+        files = request.FILES.getlist('attachments')
+
+        if content or files:
+            # Crea il messaggio (il contenuto viene criptato automaticamente)
+            msg = ProfessionalMessage.objects.create(
+                thread=active_thread,
+                sender=user,
+                content=content,  # ✅ Viene criptato dal campo EncryptedTextField
+            )
+
+            # ✅ Gestisci allegati (vengono criptati automaticamente nel save())
+            if files:
+                for f in files:
+                    ProfessionalAttachment.objects.create(
+                        message=msg,
+                        encrypted_file=f,  # ✅ Il file verrà criptato nel save()
+                        original_filename=f.name,  # Salva il nome originale
+                        file_size=f.size,
+                        content_type=f.content_type or 'application/octet-stream',
+                        uploaded_by=user
+                    )
+
+            messages.success(request, "✅ Messaggio inviato")
+            return redirect(f"{reverse('chat:professional_chat')}?thread_id={active_thread.id}")
+
+    # ✅ Context per il template
+    context = {
+        'colleagues': colleagues,
+        'messages_list': messages_list,
+        'active_thread': active_thread,
+        'active_thread_display_name': active_thread_display_name,  # ✅ Nome già calcolato
+        'threads_with_names': threads_with_names,  # ✅ Lista con nomi già calcolati
+        'user': user,
+        'is_private_chat': active_thread.thread_type == 'private',
+    }
+
+    return render(request, 'chat/professional_chat.html', context)
+
+
+import logging
+from django.http import HttpResponse, Http404
+from chat.models import ProfessionalAttachment
+
+logger = logging.getLogger(__name__)
+
+
+@login_required
+def download_professional_attachment(request, attachment_id):
+    """
+    Scarica un allegato decriptato.
+    Verifica i permessi in modo robusto prima di servire il file.
+    """
+    user = request.user
+
+    # ✅ DEBUG: Log dell'utente che richiede il download
+    logger.info(f"📥 Download allegato ID {attachment_id} richiesto da {user.email}")
+
+    # ✅ Recupera l'allegato
+    attachment = get_object_or_404(ProfessionalAttachment, id=attachment_id)
+    thread = attachment.message.thread
+
+    # ✅ DEBUG: Log del thread
+    logger.info(f"📋 Thread: {thread.name} (tipo: {thread.thread_type})")
+
+    # ✅ Recupera il profilo in modo sicuro (gestisce sia 'profile' che 'userprofile')
+    profile = getattr(user, 'profile', None) or getattr(user, 'userprofile', None)
+
+    # ✅ VERIFICA PERMESSI in base al tipo di thread
+    if thread.thread_type == 'private':
+        # Chat privata: verifica che l'utente sia tra i partecipanti
+        participants = list(thread.participants.all())
+        participant_ids = [p.id for p in participants]
+
+        logger.info(f"👥 Partecipanti thread: {participant_ids}")
+        logger.info(f"👤 User ID: {user.id}")
+
+        if user not in participants:
+            logger.warning(f"⚠️ Utente {user.email} NON è nei partecipanti del thread privato")
+            messages.error(request, "⚠️ Non hai accesso a questo allegato")
+            return redirect('chat:professional_chat')
+
+    else:
+        # Chat generale: verifica che sia un professionista
+        is_prof = getattr(profile, 'is_professional', False) if profile else False
+
+        logger.info(f"👔 Profilo: {profile}, is_professional: {is_prof}")
+
+        if not is_prof:
+            logger.warning(f"⚠️ Utente {user.email} NON è un professionista")
+            messages.error(request, "⚠️ Accesso negato: solo professionisti")
+            return redirect('chat:professional_chat')
+
+    # ✅ Decripta il file
+    decrypted_content = attachment.get_decrypted_file()
+
+    if decrypted_content is None:
+        logger.error(f"❌ Errore decriptazione allegato ID {attachment.id}")
+        messages.error(request, "⚠️ Errore nel leggere l'allegato")
+        return redirect('chat:professional_chat')
+
+    # ✅ Prepara la response HTTP con il file decriptato
+    response = HttpResponse(
+        decrypted_content,
+        content_type=attachment.content_type or 'application/octet-stream'
+    )
+
+    # ✅ Imposta il nome del file per il download
+    filename = attachment.get_download_filename()
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    logger.info(f"✅ Allegato {filename} servito correttamente a {user.email}")
+
+    return response
+
+
+# chat/views.py
+
+@login_required
+def preview_professional_attachment(request, attachment_id):
+    """
+    Mostra l'anteprima di un allegato nel browser (inline).
+    Funziona per PDF, immagini, testo.
+    """
+    attachment = get_object_or_404(ProfessionalAttachment, id=attachment_id)
+
+    # ✅ Verifica permessi
+    if not _user_can_access_attachment(request.user, attachment):
+        messages.error(request, "⚠️ Non hai accesso a questo allegato")
+        return redirect('chat:professional_chat')
+
+    # ✅ Decripta il file
+    decrypted_content = attachment.get_decrypted_file()
+    if decrypted_content is None:
+        messages.error(request, "⚠️ Errore nel leggere l'allegato")
+        return redirect('chat:professional_chat')
+
+    # ✅ Response inline (visualizza nel browser)
+    response = HttpResponse(
+        decrypted_content,
+        content_type=attachment.content_type or 'application/octet-stream'
+    )
+    response['Content-Disposition'] = 'inline'  # ← Mostra nel browser
+
+    return response
+
+
+@login_required
+def download_professional_attachment(request, attachment_id):
+    """
+    Scarica un allegato (attachment).
+    """
+    attachment = get_object_or_404(ProfessionalAttachment, id=attachment_id)
+
+    # ✅ Verifica permessi
+    if not _user_can_access_attachment(request.user, attachment):
+        messages.error(request, "⚠️ Non hai accesso a questo allegato")
+        return redirect('chat:professional_chat')
+
+    # ✅ Decripta il file
+    decrypted_content = attachment.get_decrypted_file()
+    if decrypted_content is None:
+        messages.error(request, "⚠️ Errore nel leggere l'allegato")
+        return redirect('chat:professional_chat')
+
+    # ✅ Response attachment (download)
+    response = HttpResponse(
+        decrypted_content,
+        content_type=attachment.content_type or 'application/octet-stream'
+    )
+    filename = attachment.get_download_filename()
+    response['Content-Disposition'] = f'attachment; filename="{filename}"'
+
+    return response
+
+
+def _user_can_access_attachment(user, attachment):
+    """
+    Helper: verifica se l'utente può accedere all'allegato.
+    Ritorna True/False.
+    """
+    thread = attachment.message.thread
+    profile = getattr(user, 'profile', None) or getattr(user, 'userprofile', None)
+
+    if thread.thread_type == 'private':
+        return user in thread.participants.all()
+    else:
+        # Chat generale: solo professionisti
+        return getattr(profile, 'is_professional', False) if profile else False

@@ -356,3 +356,16 @@ mark.bg-warning {
     overflow-wrap: break-word !important;
     white-space: normal !important; /* Forza il testo a capo */
 }
+textarea#messageInput,
+textarea.form-control#messageInput,
+#chatForm-current textarea#messageInput {
+    min-height: 40px !important;
+    max-height: 100px !important;  /* ← Ridotto da 120px a 100px */
+    height: 40px !important;
+    resize: none !important;
+    overflow-y: hidden !important;
+    line-height: 1.5 !important;
+    padding: 0.5rem 0.75rem !important;
+    transition: height 0.1s ease !important;
+    box-sizing: border-box !important;
+}

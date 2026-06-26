@@ -28,6 +28,34 @@
     box-shadow: 0 0 0 2px rgba(40, 167, 69, 0.15) !important;
     transition: all 0.2s ease;
 }
+
+/* ✅ NUOVI: Separazione visiva per le sezioni */
+.card {
+    transition: all 0.2s ease;
+}
+
+.card:hover {
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important;
+}
+
+/* Zona pericolo: bordo più marcato */
+.card.border-danger {
+    border-width: 2px !important;
+}
+
+/* Pulsanti: hover effect */
+.btn {
+    transition: all 0.2s ease;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+}
+
+/* Separatore visivo tra form e zona pericolo */
+form + .card.border-danger {
+    margin-top: 3rem !important;
+}
 </style>
 {% endblock %}
 
@@ -180,7 +208,7 @@
             </div>
             <div class="card-body p-4">
                 {% if request.user.google_calendar_token.is_active %}
-                    
+
             <!-- ✅ COLLEGATO -->
             <div class="alert alert-success mb-3">
                 <div class="d-flex align-items-center gap-2 mb-2">
@@ -308,73 +336,129 @@
         </div>
         {% endif %}
 
-        <!-- ✅ PULSANTI -->
-        <div class="d-flex justify-content-between align-items-center flex-wrap mt-4 pt-3 border-top">
-            <!-- SINISTRA -->
-            <div class="d-flex gap-2 flex-wrap">
-                {% if membership.role == "parent_a" or membership.role == "parent_b" %}
-                    <a class="btn btn-outline-info" href="{% url 'families:invite_member' %}">
-                        <i class="bi bi-person-plus me-1"></i> Invita Avvocato
-                    </a>
-                {% endif %}
-
-                {% if membership.role == "lawyer_a" or membership.role == "lawyer_b" or membership.role == "mediator" or membership.role == "consultant" %}
-                    <a class="btn btn-outline-info" href="{% url 'families:invite_member' %}">
-                        <i class="bi bi-folder-plus me-1"></i> Pratica legale / Invito
-                    </a>
-                {% endif %}
-
-                {% if membership.role == "parent_a" %}
-                    <a class="btn btn-outline-success" href="{% url 'families:invite_member' %}">
-                        <i class="bi bi-people me-1"></i> Coniuge
-                    </a>
-                {% endif %}
+                <!-- ============================================ -->
+        <!-- 🎯 AZIONI PRINCIPALI                          -->
+        <!-- ============================================ -->
+        <div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
+            <div class="card-header bg-white border-bottom border-start border-1 border-primary d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                <i class="bi bi-lightning-charge-fill fs-3 text-primary me-3"></i>
+                <h5 class="mb-0 fw-bold">Azioni Rapide</h5>
             </div>
+            <div class="card-body p-4">
+                <div class="row g-3">
+                    <!-- Colonna Sinistra: Inviti -->
+                    <div class="col-md-6">
+                        <h6 class="text-muted text-uppercase small fw-bold mb-3">
+                            <i class="bi bi-person-plus me-1"></i>Invita Membri
+                        </h6>
+                        <div class="d-grid gap-2">
+                            {% if membership.role == "parent_a" or membership.role == "parent_b" %}
+                                <a class="btn btn-outline-info" href="{% url 'families:invite_member' %}">
+                                    <i class="bi bi-person-plus me-1"></i> Invita Avvocato/Mediatore/Consulente
+                                </a>
+                            {% endif %}
 
+                            {% if membership.role == "parent_a" %}
+                                <a class="btn btn-outline-success" href="{% url 'families:invite_member' %}">
+                                    <i class="bi bi-people me-1"></i> Invita Coniuge
+                                </a>
+                            {% endif %}
 
-            <!-- DESTRA -->
-            <div class="d-flex gap-2 flex-wrap">
-                {% if membership.role == "parent_a" or membership.role == "parent_b" %}
-                <a href="{% url 'children:child_form' %}" class="btn btn-warning text-dark">
-                    <i class="bi bi-plus-circle me-1"></i> Aggiungi figlio
-                </a>
-                {% endif %}
+                            {% if membership.role == "lawyer_a" or membership.role == "lawyer_b" or membership.role == "mediator" or membership.role == "consultant" %}
+                                <a class="btn btn-outline-info" href="{% url 'families:invite_member' %}">
+                                    <i class="bi bi-folder-plus me-1"></i> Pratica legale / Invito
+                                </a>
+                            {% endif %}
+                        </div>
+                    </div>
 
-                <button type="submit" class="btn btn-success btn-lg shadow-sm">
-                    <i class="bi bi-check-circle me-2"></i> Salva e Continua
-                </button>
+                    <!-- Colonna Destra: Azioni Figli -->
+                    <div class="col-md-6">
+                        <h6 class="text-muted text-uppercase small fw-bold mb-3">
+                            <i class="bi bi-people-fill me-1"></i>Gestione Figli
+                        </h6>
+                        <div class="d-grid gap-2">
+                            {% if membership.role == "parent_a" or membership.role == "parent_b" %}
+                                <a href="{% url 'children:child_form' %}" class="btn btn-warning text-dark">
+                                    <i class="bi bi-plus-circle me-1"></i> Aggiungi Figlio
+                                </a>
+                                <a href="{% url 'children:children_list' %}" class="btn btn-outline-warning">
+                                    <i class="bi bi-list-ul me-1"></i> Visualizza Tutti i Figli
+                                </a>
+                            {% else %}
+                                <div class="alert alert-light border mb-0">
+                                    <small class="text-muted">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        I figli sono gestiti dai genitori
+                                    </small>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
 
-
-            <div class="card mb-3">
-                <div class="card-body">
-                    <h5 class="card-title">📦 Esporta Dati Famiglia</h5>
-                    <p class="card-text text-muted small">
-                        Scarica tutti i dati della famiglia in un file ZIP (JSON + documenti).
-                        Utile per backup o portabilità dati (GDPR Art. 20).
-                    </p>
-                    <a href="{% url 'families:export_family_data' %}" class="btn btn-outline-primary">
-                        <i class="bi bi-download me-2"></i>Esporta Dati
-                    </a>
+        <!-- ============================================ -->
+        <!-- 💾 AZIONI SECONDARIE                          -->
+        <!-- ============================================ -->
+        <div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
+            <div class="card-header bg-white border-bottom border-start border-1 border-secondary d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+                <i class="bi bi-box-seam fs-3 text-secondary me-3"></i>
+                <h5 class="mb-0 fw-bold">Gestione Dati</h5>
+            </div>
+            <div class="card-body p-4">
+                <div class="d-flex align-items-start gap-3">
+                    <i class="bi bi-download fs-3 text-secondary"></i>
+                    <div class="flex-grow-1">
+                        <h6 class="fw-bold mb-2">Esporta Dati Famiglia</h6>
+                        <p class="mb-3 text-muted small">
+                            Scarica tutti i dati della famiglia in un file ZIP (JSON + documenti).
+                            Utile per backup o portabilità dati (GDPR Art. 20).
+                        </p>
+                        <a href="{% url 'families:export_family_data' %}" class="btn btn-outline-primary">
+                            <i class="bi bi-download me-2"></i>Esporta Dati
+                        </a>
+                    </div>
                 </div>
             </div>
-        <!-- 🔐 ZONA PERICOLO -->
-            <div class="card border-danger mt-5">
-                <div class="card-header bg-danger text-white">
-                    <h5 class="mb-0"><i class="bi bi-exclamation-triangle-fill me-2"></i>Zona Pericolo</h5>
-                </div>
-                <div class="card-body">
-                    <h6 class="card-title">Elimina Account</h6>
-                    <p class="card-text text-muted small">
-                        Questa azione è irreversibile. Tutti i tuoi dati personali verranno eliminati permanentemente (Diritto all'Oblio - GDPR Art. 17).
+        </div>
+
+        <!-- ============================================ -->
+        <!-- 💾 SALVA E CONTINUA                           -->
+        <!-- ============================================ -->
+        <div class="d-flex justify-content-end mb-5">
+            <button type="submit" class="btn btn-success btn-lg shadow-sm px-5">
+                <i class="bi bi-check-circle me-2"></i> Salva e Continua
+            </button>
+        </div>
+
+    </form>
+
+    <!-- ============================================ -->
+    <!-- 🔐 ZONA PERICOLO (Fuori dal form)             -->
+    <!-- ============================================ -->
+    <div class="card border-danger mt-5 mb-4" style="border-radius: 12px;">
+        <div class="card-header bg-danger text-white d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+            <i class="bi bi-exclamation-triangle-fill fs-3 me-2"></i>
+            <h5 class="mb-0 fw-bold">Zona Pericolo</h5>
+        </div>
+        <div class="card-body p-4">
+            <div class="d-flex align-items-start gap-3">
+                <i class="bi bi-shield-exclamation fs-3 text-danger"></i>
+                <div class="flex-grow-1">
+                    <h6 class="fw-bold mb-2 text-danger">Elimina Account</h6>
+                    <p class="mb-3 text-muted small">
+                        Questa azione è <strong>irreversibile</strong>. Tutti i tuoi dati personali verranno eliminati permanentemente
+                        (Diritto all'Oblio - GDPR Art. 17). Questa azione non può essere annullata.
                     </p>
                     <a href="{% url 'accounts:delete_account' %}" class="btn btn-outline-danger">
                         <i class="bi bi-trash-fill me-2"></i>Elimina il mio account
                     </a>
                 </div>
             </div>
-    </form>
+        </div>
+    </div>
 
 </div>
 {% endblock %}

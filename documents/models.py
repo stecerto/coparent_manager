@@ -1,3 +1,5 @@
+from pathlib import Path
+
 from django.db import models
 from django.conf import settings
 from django.utils import timezone
@@ -145,6 +147,20 @@ class Document(models.Model):
         verbose_name="Dati estratti",
         help_text="Dati strutturati estratti automaticamente dal PDF (mantenimento, affidamento, ecc.)"
     )
+
+    @property
+    def file_exists(self):
+        """Verifica se il file fisico esiste sul server"""
+        if not self.file:
+            return False
+        try:
+            return Path(self.file.path).exists()
+        except (ValueError, NotImplementedError):
+            # Per file storage remoti (S3, etc.)
+            try:
+                return self.file.storage.exists(self.file.name)
+            except Exception:
+                return False
 
     def save(self, *args, **kwargs):
         if self.file and not self.file_size:

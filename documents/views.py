@@ -13,9 +13,9 @@ from django.shortcuts import redirect
 from django.template.loader import render_to_string
 from django.utils import timezone
 from weasyprint import HTML
-
+from django.contrib import messages
 from core.plans import PLAN_LEVELS  # o il tuo import per i piani
-from families.models import FamilyMember
+from families.models import FamilyMember, Family
 from families.utils import get_family_of_user
 from .forms import DocumentUploadForm
 from .models import Document, DocumentAuditLog, DocumentVersion, DocumentSignature
@@ -27,23 +27,52 @@ from .validators import check_file_sizes
 
 logger = logging.getLogger(__name__)
 
+
 @login_required
 def document_list_view(request):
-    family = get_family_of_user(request.user, request=request)
-    membership = FamilyMember.objects.filter(
-        family=family,
-        user=request.user
-    ).first()
+    user = request.user
+    profile = getattr(user, 'profile', None) or getattr(user, 'userprofile', None)
+
+    # ✅ Gestione professionisti con family_id
+    family_id = request.GET.get('family_id') or request.session.get('active_family_id')
+    is_professional = profile and profile.role in ['lawyer_a', 'lawyer_b', 'mediator', 'consultant']
+
+    if is_professional and family_id:
+        family = get_object_or_404(Family, id=family_id)
+
+        # Verifica accesso
+        membership = FamilyMember.objects.filter(
+            family=family,
+            user=user,
+            role__in=['lawyer_a', 'lawyer_b', 'mediator', 'consultant']
+        ).first()
+
+        if not membership:
+            messages.error(request, "⚠️ Non hai accesso a questa famiglia")
+            return redirect('families:lawyer_dashboard')
+    else:
+        # Logica esistente per genitori
+        family = get_family_of_user(user, request=request)
+        if not family:
+            return redirect("families:setup")
+        membership = FamilyMember.objects.filter(
+            family=family,
+            user=user
+        ).first()
 
     role = membership.role if membership else None
 
+    # ✅ Filtro per categoria
+    category_filter = request.GET.get('category', 'all')
+
+    # Query base per documenti privati
     private_docs = Document.objects.none()
 
     if membership:
         if role in ["parent_a", "parent_b"]:
             private_docs = Document.objects.filter(
                 family=family,
-                owner=request.user,
+                owner=user,
                 scope="private",
                 is_active=True
             )
@@ -73,13 +102,20 @@ def document_list_view(request):
         scope="shared",
         is_active=True
     )
+    # ✅ APPLICA FILTRO CATEGORIA
+    if category_filter and category_filter != 'all':
+        private_docs = private_docs.filter(category=category_filter)
+        shared_docs = shared_docs.filter(category=category_filter)
 
-    checklist = get_essential_checklist(request.user, family)
+    # ✅ Filtra documenti senza file fisico
+    private_docs = [doc for doc in private_docs if doc.file_exists]
+    shared_docs = [doc for doc in shared_docs if doc.file_exists]
+    checklist = get_essential_checklist(user, family)
 
     # 🔥 PRELOAD FIRME UTENTE
     signed_docs = set(
         DocumentSignature.objects.filter(
-            user=request.user,
+            user=user,
             document__in=list(private_docs) + list(shared_docs)
         ).values_list("document_id", flat=True)
     )
@@ -90,11 +126,29 @@ def document_list_view(request):
     for doc in shared_docs:
         doc.is_signed_by_user = doc.id in signed_docs
 
+    # ✅ Statistiche per categoria
+    all_docs = list(private_docs) + list(shared_docs)
+    category_stats = {}
+    for doc in all_docs:
+        cat = doc.category
+        if cat not in category_stats:
+            category_stats[cat] = 0
+        category_stats[cat] += 1
+
+    # ✅ AGGIUNGI QUESTO: Calcola il totale
+    total_docs_count = len(all_docs)
+
     return render(request, "documents/documents_list.html", {
         "private_docs": private_docs,
         "shared_docs": shared_docs,
         "checklist": checklist,
         "role": role,
+        "family": family,
+        "membership": membership,
+        "category_filter": category_filter,
+        "category_stats": category_stats,
+        "category_choices": Document.CATEGORY_CHOICES,
+        "total_docs_count": total_docs_count,  # ✅ AGGIUNGI QUESTO
     })
 
 
@@ -131,13 +185,23 @@ def document_preview_view(request, doc_id):
 
     except Exception as e:
         logger.error(f"Errore apertura file {doc.id}: {e}", exc_info=True)
+
         messages.error(request, f"Errore durante l'apertura del file: {str(e)}")
         return redirect('documents:documents_list')
 
 
-from django.contrib import messages
+
 @login_required
 def upload_document_view(request):
+    user = request.user
+    profile = getattr(user, 'profile', None) or getattr(user, 'userprofile', None)
+    from django.contrib import messages
+    # ✅ BLOCCO PROFESSIONISTI: Solo i genitori possono caricare documenti
+    if profile and profile.role in ['lawyer_a', 'lawyer_b', 'mediator', 'consultant']:
+        messages.error(request,
+                       "⚠️ Solo i genitori possono caricare documenti. I professionisti hanno accesso in sola lettura.")
+        return redirect("documents:documents_list")
+
     family = get_family_of_user(request.user, request=request)
 
     if request.method == "POST":
@@ -253,6 +317,15 @@ def upload_document_view(request):
 
 @login_required
 def upload_shared_document_view(request):
+    user = request.user
+    profile = getattr(user, 'profile', None) or getattr(user, 'userprofile', None)
+    from django.contrib import messages
+    # ✅ BLOCCO PROFESSIONISTI: Solo i genitori possono caricare documenti
+    if profile and profile.role in ['lawyer_a', 'lawyer_b', 'mediator', 'consultant']:
+        messages.error(request,
+                       "⚠️ Solo i genitori possono caricare documenti. I professionisti hanno accesso in sola lettura.")
+        return redirect("documents:documents_list")
+
     family = get_family_of_user(request.user, request=request)
 
     if request.method == "POST":

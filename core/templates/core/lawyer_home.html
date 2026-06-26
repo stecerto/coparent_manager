@@ -32,7 +32,7 @@
 
             <!-- ✅ Punta a exit_family_context che pulisce la sessione e redirecta a professional_dashboard -->
             <a class="btn btn-success btn-style  {% if user.profile.is_blocked %}disabled-sub{% endif %}"
-               href="{% url 'families:exit_family_context' %}"
+               href="{% url 'families:lawyer_exit_family_context' %}"
                title="Torna alla dashboard principale (esci dal contesto famiglia)"
                 {% if user.profile.is_blocked %}title="⚠️ Funzione bloccata: rinnova l'abbonamento per accedere"{% endif %}>
                 📊 Vai al Pannello di controllo

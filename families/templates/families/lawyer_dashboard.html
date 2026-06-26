@@ -1,11 +1,10 @@
 {% extends "base.html" %}
 {% load static %}
-{% load plan_tags %} {# ✅ Carica il custom filter per i limiti #}
+{% load plan_tags %}
 
 {% block extra_css %}
 {{ block.super }}
 <style>
-    /* Nascondi menu famiglia solo nella dashboard professionale */
     body.professional-dashboard .navbar-nav .nav-link[href*="expenses"],
     body.professional-dashboard .navbar-nav .nav-link[href*="children"],
     body.professional-dashboard .navbar-nav .nav-link[href*="chat"],
@@ -18,58 +17,57 @@
 </style>
 {% endblock %}
 
-{% block title %}Dashboard Professionale{% endblock %}
+{% block title %}Dashboard Avvocato{% endblock %}
 
 {% block content %}
 <body class="professional-dashboard">
 
-{# 🔹 STATISTICHE RAPIDE (CORRETTE PER 4 COLONNE) #}
+{# 🔹 STATISTICHE RAPIDE AVVOCATO #}
 <div class="row g-3 mb-4">
+    <div class="col-6 col-lg-3">
+        <div class="card shadow-sm border-primary h-100">
+            <div class="card-body d-flex align-items-center">
+                <div class="display-4 text-primary me-3">⚖️</div>
+                <div>
+                    <h6 class="text-muted mb-0">Accordi Certificati</h6>
+                    <h3 class="mb-0">{{ stats.certified_agreements }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-6 col-lg-3">
+        <div class="card shadow-sm border-warning h-100">
+            <div class="card-body d-flex align-items-center">
+                <div class="display-4 text-warning me-3">📄</div>
+                <div>
+                    <h6 class="text-muted mb-0">Documenti in Attesa</h6>
+                    <h3 class="mb-0">{{ stats.pending_documents }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="col-6 col-lg-3">
         <div class="card shadow-sm border-info h-100">
             <div class="card-body d-flex align-items-center">
-                <div class="display-4 text-info me-3">👥</div>
+                <div class="display-4 text-info me-3">💰</div>
                 <div>
-                    <h6 class="text-muted mb-0">Famiglie</h6>
-                    <h3 class="mb-0">{{ stats.total_families }}</h3>
+                    <h6 class="text-muted mb-0">Spese da Approvare</h6>
+                    <h3 class="mb-0">{{ stats.pending_expenses }}</h3>
                 </div>
             </div>
         </div>
     </div>
 
     <div class="col-6 col-lg-3">
-        <div class="card shadow-sm border-success h-100">
-            <div class="card-body d-flex align-items-center">
-                <div class="display-4 text-success me-3">👶</div>
-                <div>
-                    <h6 class="text-muted mb-0">Minori</h6>
-                    <h3 class="mb-0">{{ stats.total_children }}</h3>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-6 col-lg-3">
-        <div class="card shadow-sm border-secondary h-100">
-            <div class="card-body d-flex align-items-center">
-                <div class="display-4 text-secondary me-3">📄</div>
-                <div>
-                    <h6 class="text-muted mb-0">Accordi</h6>
-                    <h3 class="mb-0">0</h3>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="col-6 col-lg-3">
-        {# ✅ NUOVA CARD: Link alla pagina dedicata #}
         <a href="{% url 'families:professional_pending_events' %}" class="text-decoration-none">
-            <div class="card shadow-sm border-warning h-100 hover-shadow transition-all bg-warning bg-opacity-10">
+            <div class="card shadow-sm border-success h-100 hover-shadow transition-all bg-success bg-opacity-10">
                 <div class="card-body d-flex align-items-center">
-                    <div class="display-4 me-3">📅</div>
+                    <div class="display-4 text-success me-3">📅</div>
                     <div>
-                        <h6 class="text-dark mb-0 fw-bold">Sospesi</h6>
-                        <h5 class="mb-0 text-warning fw-bold">Vedi →</h5>
+                        <h6 class="text-dark mb-0 fw-bold">Prossimi Eventi</h6>
+                        <h5 class="mb-0 text-success fw-bold">{{ stats.upcoming_events }} →</h5>
                     </div>
                 </div>
             </div>
@@ -77,15 +75,12 @@
     </div>
 </div>
 
-
-{# ✅ NUOVO BLOCCO LIMITI PIANO (DINAMICO) #}
+{# ✅ BLOCCO LIMITI PIANO #}
 {% with limits=user|get_lawyer_limits %}
     {% if limits %}
         <div class="card border-0 shadow-sm mb-4 bg-light">
             <div class="card-body p-3">
                 <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-
-                    <!-- 📊 Statistiche Piano (Dinamiche) -->
                     <div class="flex-grow-1">
                         <h6 class="mb-1 fw-bold text-dark">
                             Piano Attivo: <span class="badge bg-primary text-uppercase">{{ limits.plan }}</span>
@@ -101,39 +96,75 @@
                         </small>
                     </div>
 
-                    <!-- 🔘 Pulsante Azione -->
                     <div class="mt-2 mt-md-0">
                         {% if limits.families.current < limits.families.limit %}
-                            <!-- ✅ PULSANTE ATTIVO -->
                             <a href="{% url 'families:invite_member' %}" class="btn btn-success btn-sm">
                                 ➕ Invita Famiglia o Professionista
                             </a>
                         {% else %}
-                            <!-- 🔒 PULSANTE UPGRADE -->
                             <a href="{% url 'pricing' %}" class="btn btn-warning btn-sm text-dark fw-bold">
                                 🔒 Limite raggiunto. Upgrade
                             </a>
                         {% endif %}
                     </div>
-
                 </div>
             </div>
         </div>
     {% endif %}
 {% endwith %}
 
-
-
 <div class="container-fluid mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
-        <h2 class="mb-0">👔 Le tue Famiglie in Gestione</h2>
+        <h2 class="mb-0">⚖️ Le tue Famiglie in Gestione Legale</h2>
         <span class="badge bg-primary fs-6">{{ families_data|length }} famiglie</span>
     </div>
+
+    <!-- 🔍 BARRA DI RICERCA (solo se >= 4 famiglie) -->
+    {% if families_data|length >= 4 %}
+    <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+        <div class="card-body p-3">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0">
+                    <i class="bi bi-search text-muted"></i>
+                </span>
+                <input
+                    type="text"
+                    id="familySearchInput"
+                    class="form-control border-start-0 shadow-none"
+                    placeholder="Cerca per nome famiglia, figlio o ruolo..."
+                    autocomplete="off"
+                >
+                <button
+                    class="btn btn-outline-secondary"
+                    type="button"
+                    id="clearSearchBtn"
+                    style="display: none;"
+                    title="Cancella ricerca"
+                >
+                    x
+                </button>
+            </div>
+            <div class="d-flex justify-content-between align-items-center mt-2">
+                <small class="text-muted">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Ricerca in tempo reale su nome famiglia, figli e ruolo
+                </small>
+                <small id="searchResultsCount" class="text-primary fw-semibold" style="display: none;">
+                    <span id="visibleCount">0</span> risultati
+                </small>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 
     {% if families_data %}
     <div class="row g-4">
         {% for item in families_data %}
-        <div class="col-md-6 col-xl-4">
+        <!-- ✅ FIX: data-* spostati sul div esterno con classe family-card-item -->
+        <div class="col-md-6 col-xl-4 family-card-item"
+             data-family-name="{{ item.family.name|lower }}"
+             data-children-names="{{ item.children_names|lower }}"
+             data-role-label="{{ item.role_label|lower }}">
             <div class="card shadow custom-card h-100 border-start border-4 border-primary">
                 <div class="card-body">
                     <h5 class="card-title fw-bold mb-1">👨‍👩‍👧 {{ item.family.name }}</h5>
@@ -150,7 +181,6 @@
                         </div>
                     </div>
 
-                    <!-- 👶 Info Figli -->
                     <div class="mb-3">
                         <div class="d-flex justify-content-between align-items-center mb-1">
                             <span class="text-muted small fw-bold">👶 Figli</span>
@@ -167,8 +197,6 @@
                         <a href="{% url 'expenses:expenses_list' %}?family_id={{ item.family.id }}" class="btn btn-outline-primary btn-sm">💰 Spese</a>
                         <a href="{% url 'chat:chat_home' %}?family_id={{ item.family.id }}" class="btn btn-outline-success btn-sm">💬 Chat</a>
                         <a href="{% url 'calendar:calendar_view' %}?family_id={{ item.family.id }}" class="btn btn-outline-info btn-sm">📅 Calendario</a>
-
-                        <!-- ✅ NUOVO PULSANTE IMPOSTAZIONI -->
                         <a href="{% url 'families:family_settings' %}?family_id={{ item.family.id }}" class="btn btn-outline-secondary btn-sm">
                              <i class="bi bi-gear me-1"></i>Impostazioni
                         </a>
@@ -184,7 +212,7 @@
     </div>
     {% else %}
     <div class="text-center py-5 border rounded-3 bg-light mt-3">
-        <p class="text-muted fs-5 mb-3">Nessuna famiglia assegnata al tuo ruolo professionale.</p>
+        <p class="text-muted fs-5 mb-3">Nessuna famiglia assegnata per gestione legale.</p>
         <p class="small text-muted">Chiedi a un genitore di inviarti un invito tramite la piattaforma.</p>
     </div>
     {% endif %}
@@ -195,5 +223,73 @@
 {{ block.super }}
 <script>
 document.body.classList.add('professional-dashboard');
+
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('familySearchInput');
+    const clearBtn = document.getElementById('clearSearchBtn');
+    const familyCards = document.querySelectorAll('.family-card-item');
+    const noResults = document.getElementById('noSearchResults');
+    const resultsCount = document.getElementById('searchResultsCount');
+    const visibleCount = document.getElementById('visibleCount');
+
+    console.log('🔍 Elementi trovati:');
+    console.log('  - searchInput:', searchInput ? '✅' : '❌');
+    console.log('  - familyCards:', familyCards.length);
+
+    if (!searchInput || familyCards.length === 0) {
+        console.warn('⚠️ Barra ricerca o card non trovate, esco.');
+        return;
+    }
+
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim().toLowerCase();
+        let visibleCountNum = 0;
+
+        if (clearBtn) clearBtn.style.display = query ? 'block' : 'none';
+
+        familyCards.forEach(card => {
+            const searchText = [
+                card.getAttribute('data-family-name') || '',
+                card.getAttribute('data-children-names') || '',
+                card.getAttribute('data-role-label') || ''
+            ].join(' ');
+
+            if (!query || searchText.includes(query)) {
+                card.style.display = '';
+                visibleCountNum++;
+            } else {
+                card.style.display = 'none';
+            }
+        });
+
+        if (resultsCount && visibleCount) {
+            if (query) {
+                resultsCount.style.display = 'block';
+                visibleCount.textContent = visibleCountNum;
+            } else {
+                resultsCount.style.display = 'none';
+            }
+        }
+
+        if (noResults) {
+            noResults.style.display = (query && visibleCountNum === 0) ? 'block' : 'none';
+        }
+    });
+
+    if (clearBtn) {
+        clearBtn.addEventListener('click', function() {
+            searchInput.value = '';
+            searchInput.dispatchEvent(new Event('input'));
+            searchInput.focus();
+        });
+    }
+
+    searchInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            this.value = '';
+            this.dispatchEvent(new Event('input'));
+        }
+    });
+});
 </script>
 {% endblock %}

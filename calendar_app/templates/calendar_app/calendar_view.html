@@ -2,7 +2,50 @@
 {% load static %}
 
 {% block title %}📅 Calendario - CoParent Manager{% endblock %}
+{% block extra_css %}
+<style>
+    /* ✅ Miglioramenti vista lista */
+    .fc-list-table {
+        border-collapse: separate;
+        border-spacing: 0 4px;
+    }
 
+    .fc-list-day-cushion {
+        background-color: #f8f9fa !important;
+        padding: 8px 12px !important;
+    }
+
+    .fc-list-day-cushion .fc-list-day-text {
+        font-weight: 600 !important;
+        color: #0d6efd !important;
+    }
+
+    .fc-list-event {
+        transition: all 0.2s ease;
+    }
+
+    .fc-list-event:hover {
+        background-color: #e9ecef !important;
+        cursor: pointer;
+    }
+
+    .fc-list-event td {
+        padding: 10px 12px !important;
+    }
+
+    .fc-list-event-title {
+        font-weight: 500 !important;
+    }
+
+    /* ✅ Messaggio "nessun evento" */
+    .fc-list-empty {
+        padding: 40px 20px !important;
+        text-align: center;
+        color: #6c757d;
+        font-style: italic;
+    }
+</style>
+{% endblock %}
 {% block content %}
 <div class="container py-4">
 

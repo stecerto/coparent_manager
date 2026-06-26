@@ -45,20 +45,28 @@ def family_membership(request):
 
 
 def lawyer_nav_context(request):
-    """Inietta automaticamente le famiglie assegnate nel menu di ogni template avvocato."""
+    """
+    Inietta automaticamente le famiglie assegnate nel menu di ogni template professionista.
+    Supporta avvocati, mediatori e consulenti.
+    """
     if not request.user.is_authenticated:
         return {'lawyer_nav_families': []}
 
-    # Verifica se l'utente ha un profilo e un ruolo da avvocato
-    if hasattr(request.user, 'profile') and request.user.profile.role in RoleChoices.lawyer_roles():
+    # ✅ Verifica se l'utente ha un profilo e un ruolo da professionista
+    if hasattr(request.user, 'profile') and request.user.profile.is_professional:
         memberships = FamilyMember.objects.filter(
             user=request.user,
-            role__in=RoleChoices.lawyer_roles()
+            role__in=['lawyer_a', 'lawyer_b', 'mediator', 'consultant']
         ).select_related('family')
 
         families = []
         for m in memberships:
-            expected = RoleChoices.PARENT_A if m.role == RoleChoices.LAWYER_A else RoleChoices.PARENT_B
+            # ✅ Determina il ruolo del cliente in base al ruolo del professionista
+            if m.role in ['lawyer_a', 'mediator', 'consultant']:
+                expected = RoleChoices.PARENT_A
+            else:  # lawyer_b
+                expected = RoleChoices.PARENT_B
+
             client_fm = FamilyMember.objects.filter(
                 family=m.family, role=expected
             ).select_related('user').first()

@@ -62,7 +62,7 @@ class ProfessionalEvent(models.Model):
 class CalendarEvent(models.Model):
     EVENT_TYPES = [
         ("custody", "🏠 Affidamento / Cambio casa"),
-        ("support", "💶 Mantenimento"),
+        ("support", "💰 Mantenimento"),
         ("school", "🏫 Scuola / Gita Scolastica"),
         ("medical", "🏥 Medico / Terapia"),
         ("expense", "💰 Spesa / Rimborso"),
@@ -119,8 +119,8 @@ class CalendarEvent(models.Model):
             ("chat", "💬 Generato da Chat"),
             ("expense", "💰 Generato da Spesa"),
             ("agreement", "📄 Generato da Accordo (legacy)"),
-            ("child_support", "💶 Mantenimento Figli"),
-            ("spouse_support", "💶 Mantenimento Coniuge"),
+            ("child_support", "💰 Mantenimento Figli"),
+            ("spouse_support", "💰 Mantenimento Coniuge"),
         ],
         default="manual",
         db_index=True

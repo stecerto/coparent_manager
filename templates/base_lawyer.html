@@ -74,8 +74,8 @@
 
                 <!-- 📊 Dashboard Professionale -->
                 <li class="nav-item">
-                    <a class="nav-link {% if request.resolver_match.url_name == 'professional_dashboard' %}active{% endif %}"
-                       href="{% url 'families:professional_dashboard' %}">
+                    <a class="nav-link {% if request.resolver_match.url_name == 'lawyer_dashboard' %}active{% endif %}"
+                       href="{% url 'families:professional_dashboard' %}"
                         📊 Dashboard
                     </a>
                 </li>
@@ -169,7 +169,7 @@
                 <span class="badge bg-danger text-white" style="font-size: 0.7rem;">{{ active_role_label }}</span>
             {% endif %}
             <!-- Pulsante "Esci dal contesto" -->
-            <a href="{% url 'families:exit_family_context' %}"
+            <a href="{% url 'families:lawyer_exit_family_context' %}"
                class="btn btn-sm btn-outline-danger ms-2 py-0"
                style="font-size: 0.7rem;"
                title="Torna alla dashboard senza contesto famiglia">
@@ -188,7 +188,7 @@
                 {% for item in lawyer_nav_families %}
                     <li>
                         <a class="dropdown-item d-flex flex-column"
-                           href="{% url 'families:professional_dashboard' %}?family_id={{ item.family.id }}">
+                           href="{% url 'families:family_dashboard' %}?family_id={{ item.family.id }}"
                             <span class="fw-bold">{{ item.family.name }}</span>
                             {% if item.client %}
                                 <small class="text-muted">→ Assistito: {{ item.client.first_name }} {{ item.client.last_name|slice:":1" }}.</small>

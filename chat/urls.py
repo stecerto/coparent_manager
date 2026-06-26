@@ -13,5 +13,10 @@ urlpatterns = [
 
     # ✅ Chat privata avvocato-assistito
     path('lawyer/family/<int:family_id>/private/<int:user_id>/', views.family_chat_view, name='chat_private'),
-
+    path('professional/', views.professional_chat_view, name='professional_chat'),
+    path('professional/attachment/<int:attachment_id>/preview/', views.preview_professional_attachment,
+    name='preview_professional_attachment'
+),
+    path('professional/attachment/<int:attachment_id>/download/', views.download_professional_attachment,
+    name='download_professional_attachment'),
 ]

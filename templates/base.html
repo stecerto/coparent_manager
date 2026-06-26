@@ -35,10 +35,14 @@
     <style>
         .disabled-sub {
         opacity: 0.5 !important;
-        pointer-events: none !important; /* Rende fisicamente non cliccabile */
+        pointer-events: none !important;
         cursor: not-allowed !important;
         text-decoration: none !important;
-        filter: grayscale(80%); /* Effetto visivo di "bloccato" */
+        filter: grayscale(80%);
+    }
+        /* ✅ Tutti i dropdown della navbar sopra la barra widget */
+    .navbar .dropdown-menu {
+        z-index: 1060 !important;
     }
     </style>
 </head>
@@ -101,9 +105,8 @@
                         🔔
                         <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.65rem; display: none;"></span>
                     </a>
-                    <ul class="dropdown-menu p-0" style="min-width: 320px; max-width: 90vw; max-height: 400px; overflow-y: auto; left: 0 !important; right: auto !important;">
-                        <li class="p-2 border-bottom bg-light">
-                            <div class="d-flex justify-content-between align-items-center">
+                    <ul class="dropdown-menu p-0" style="min-width: 320px; max-width: 90vw; max-height: 400px; overflow-y: auto; left: 0 !important; right: auto !important; z-index: 1060 !important;">
+                        <div class="d-flex justify-content-between align-items-center">
                                 <strong class="small">🔔 Notifiche</strong>
                                 <button id="markAllReadBtn" class="btn btn-link btn-sm p-0 text-decoration-none small">Segna tutte</button>
                                 <button id="deleteAllBtn" class="btn btn-link btn-sm p-0 text-decoration-none small text-danger">🗑️ Svuota</button>
@@ -133,14 +136,7 @@
                            href="{% url 'home' %}">🏠 Home</a>
                     {% endif %}
                 </li>
-                <li>
-                {% if user.is_authenticated and user.profile.role in 'lawyer,mediator,consultant' %}
-                    <a class="nav-link {% if request.resolver_match.url_name == 'professional_calendar' %}active{% endif %}"
-                        href="{% url 'calendar:professional_calendar_full' %}" >
-                        📅 Calendario Studio
-                    </a>
-                {% endif %}
-                </li>
+
                 <!-- 🧭 Menu Genitori -->
                 {% if user.is_authenticated and user.profile.role not in "lawyer_a,lawyer_b, consultant, mediator" %}
                     {% if is_setup_complete or request.resolver_match.url_name in "setup,summary,invite_member" %}
@@ -154,7 +150,7 @@
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {% if user.profile.is_expired or user.profile.is_suspended %}disabled-sub{% endif %}"
-                               href="{% url 'expenses:expenses_dashboard' %}">💶 Spese</a>
+                               href="{% url 'expenses:expenses_dashboard' %}">💰 Spese</a>
                         </li>
                         <li class="nav-item">
                             <a class="nav-link {% if user.profile.is_expired or user.profile.is_suspended %}disabled-sub{% endif %}"
@@ -189,6 +185,8 @@
                                 <li><a class="dropdown-item" href="{% url 'calendar:event_create' %}">➕ Nuovo Evento</a></li>
                             </ul>
                         </li>
+
+
                         <!-- ❓ Centro Assistenza -->
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'help' %}" title="Centro Assistenza">
@@ -199,25 +197,44 @@
                     {% endif %}
                 {% endif %}
 
-                                                <!-- ⚖️ Menu Professionisti (Avvocato, Mediatore, Consulente) -->
+                <!-- ⚖️ Menu Professionisti (Avvocato, Mediatore, Consulente) -->
                 {% if user.profile.is_professional %}
                     <li class="nav-item">
-                        {% if request.session.active_family_id %}
-                            {# ✅ DENTRO il contesto: Pannello di controllo della famiglia specifica #}
-                            <a class="nav-link {% if request.resolver_match.url_name == 'professional_dashboard' %}active{% endif %}"
-                               href="{% url 'families:family_dashboard' %}?family_id={{ request.session.active_family_id }}">
-                                📊 Pannello Famiglia
-                            </a>
-                        {% else %}
-                            {# ✅ FUORI dal contesto: Pannello di controllo generale (Home Studio) #}
+                        {# ✅ FUORI dal contesto: Dashboard professionale con routing intelligente #}
                             <a class="nav-link {% if request.resolver_match.url_name == 'professional_dashboard' %}active{% endif %}"
                                href="{% url 'families:professional_dashboard' %}">
-                                📊 Pannello di Controllo
+                                📊 Pannello Studio
                             </a>
 
-                        {% endif %}
                     </li>
+
+                    {% if user.is_authenticated and user.profile.role in 'lawyer,mediator,consultant' %}
+                        <!-- 📅 Calendario Studio -->
+                        <li class="nav-item dropdown me-2">
+                            <a class="nav-link dropdown-toggle" href="#" id="calDropdownPro" role="button" data-bs-toggle="dropdown">
+                                📅 Calendario Studio
+                            </a>
+                            <ul class="dropdown-menu dropdown-menu-end">
+                                <li><a class="dropdown-item" href="{% url 'calendar:professional_calendar_full' %}">🗓️ Vista Calendario</a></li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li><a class="dropdown-item" href="{% url 'calendar:professional_event_create' %}">➕ Nuovo Evento</a></li>
+                            </ul>
+                        </li>
+
+                        <!-- 💬 Chat Studio -->
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'professional_chat' %}active{% endif %}"
+                               href="{% url 'chat:professional_chat' %}">
+                                💬 Chat Studio
+                            </a>
+                        </li>
+                    {% endif %}
                 {% endif %}
+
+
+
+
+
 
                 <!-- 💳 Piano & Impostazioni -->
                 {% if user.is_authenticated %}
@@ -309,11 +326,11 @@
                 <button class="btn btn-sm btn-outline-primary dropdown-toggle" type="button" data-bs-toggle="dropdown">
                     ⚖️ {{ lawyer_nav_families|length }} Famiglie
                 </button>
-                <ul class="dropdown-menu dropdown-menu-end shadow" style="min-width:260px; max-height:350px; overflow-y:auto;">
+                <ul class="dropdown-menu dropdown-menu-end shadow" style="min-width:260px; max-height:350px; overflow-y:auto; z-index: 1060 !important;">
                     {% for item in lawyer_nav_families %}
                         <li>
                             <a class="dropdown-item small"
-                               href="{% url 'families:professional_dashboard' %}?family_id={{ item.family.id }}">
+                               href="{% url 'families:family_dashboard' %}?family_id={{ item.family.id }}">
                                 <strong>{{ item.family.name }}</strong>
                                 {% if item.client %}<br><span class="text-muted">→ {{ item.client.first_name }}</span>{% endif %}
                             </a>
@@ -326,19 +343,171 @@
 </div>
 {% endif %}
 
+{# ============================================ #}
+{# 🎯 BARRA WIDGET PROFESSIONISTI (persistente) #}
+{# ============================================ #}
+{% if user.is_authenticated and user.profile.is_professional and request.session.active_family_id %}
+<div class="bg-white border-bottom shadow-sm py-3 sticky-top" style="top: 0; z-index: 1020;">
+    <div class="container">
+        <!-- Header con info famiglia -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="mb-0 fw-bold text-primary">
+                <i class="bi bi-speedometer2 me-2"></i>
+                Strumenti Rapidi
+            </h6>
+            <span class="badge bg-light text-dark border px-3 py-2">
+                👨‍👩‍👧
+                {% for membership in request.user.family_memberships.all %}
+                    {% if membership.family.id == request.session.active_family_id %}
+                        {{ membership.family.name }}
+                    {% endif %}
+                {% endfor %}
+            </span>
+        </div>
+
+        <div class="row g-2">
+            <!-- 📊 Pannello Famiglia (PRIMO WIDGET) -->
+            <div class="col-6 col-md-4 col-lg-2">
+                <a href="{% url 'families:family_dashboard' %}?family_id={{ request.session.active_family_id }}"
+                   class="text-decoration-none">
+                    <div class="card border-0 shadow-sm h-100 widget-card" style="border-left: 4px solid #dc3545 !important; border-radius: 8px;">
+                        <div class="card-body py-2 px-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fs-4 mb-0">📊</span>
+                                <div>
+                                    <div class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">Pannello</div>
+                                    <div class="fw-bold small">Famiglia</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+            <!-- 👶 Figli -->
+            <div class="col-6 col-md-4 col-lg-2">
+                <a href="{% url 'children:children_list' %}?family_id={{ request.session.active_family_id }}"
+                   class="text-decoration-none">
+                    <div class="card border-0 shadow-sm h-100 widget-card" style="border-left: 4px solid #0dcaf0 !important; border-radius: 8px;">
+                        <div class="card-body py-2 px-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fs-4 mb-0">👶</span>
+                                <div>
+                                    <div class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">Figli</div>
+                                    <div class="fw-bold small">Visualizza</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- 💰 Spese -->
+            <div class="col-6 col-md-4 col-lg-2">
+                <a href="{% url 'expenses:expenses_list' %}?family_id={{ request.session.active_family_id }}"
+                   class="text-decoration-none">
+                    <div class="card border-0 shadow-sm h-100 widget-card" style="border-left: 4px solid #198754 !important; border-radius: 8px;">
+                        <div class="card-body py-2 px-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fs-4 mb-0">💰</span>
+                                <div>
+                                    <div class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">Spese</div>
+                                    <div class="fw-bold small">Visualizza</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- 💬 Chat -->
+            <div class="col-6 col-md-4 col-lg-2">
+                <a href="{% url 'chat:chat_home' %}?family_id={{ request.session.active_family_id }}"
+                   class="text-decoration-none">
+                    <div class="card border-0 shadow-sm h-100 widget-card" style="border-left: 4px solid #ffc107 !important; border-radius: 8px;">
+                        <div class="card-body py-2 px-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fs-4 mb-0">💬</span>
+                                <div>
+                                    <div class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">Chat</div>
+                                    <div class="fw-bold small">Apri</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- 📁 Documenti -->
+            <div class="col-6 col-md-4 col-lg-2">
+                <a href="{% url 'documents:documents_list' %}?family_id={{ request.session.active_family_id }}"
+                   class="text-decoration-none">
+                    <div class="card border-0 shadow-sm h-100 widget-card" style="border-left: 4px solid #6f42c1 !important; border-radius: 8px;">
+                        <div class="card-body py-2 px-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fs-4 mb-0">📁</span>
+                                <div>
+                                    <div class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">Documenti</div>
+                                    <div class="fw-bold small">Archivio</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- 📅 Eventi -->
+            <div class="col-6 col-md-4 col-lg-2">
+                <a href="{% url 'calendar:calendar_view' %}?family_id={{ request.session.active_family_id }}"
+                   class="text-decoration-none">
+                    <div class="card border-0 shadow-sm h-100 widget-card" style="border-left: 4px solid #0d6efd !important; border-radius: 8px;">
+                        <div class="card-body py-2 px-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fs-4 mb-0">📅</span>
+                                <div>
+                                    <div class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">Eventi</div>
+                                    <div class="fw-bold small">Calendario</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- ⚙️ Impostazioni -->
+            <div class="col-6 col-md-4 col-lg-2">
+                <a href="{% url 'families:family_settings' %}?family_id={{ request.session.active_family_id }}"
+                   class="text-decoration-none">
+                    <div class="card border-0 shadow-sm h-100 widget-card" style="border-left: 4px solid #6c757d !important; border-radius: 8px;">
+                        <div class="card-body py-2 px-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="fs-4 mb-0">⚙️</span>
+                                <div>
+                                    <div class="text-muted text-uppercase" style="font-size: 0.65rem; letter-spacing: 0.5px;">Impostazioni</div>
+                                    <div class="fw-bold small">Famiglia</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* ✅ Hover effect per widget */
+    .widget-card {
+        transition: all 0.2s ease;
+    }
+    .widget-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1) !important;
+    }
+</style>
+{% endif %}
 <!-- 🔹 MAIN CONTENT -->
 <main class="py-4">
     <div class="container">
-
-      <!--   {# ✅ NUOVO: Blocco per visualizzare i messaggi di Django (success, error, warning, info) #}
-        {% if messages %}
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-                </div>
-            {% endfor %}
-        {% endif %} -->
 
         {% block content %}{% endblock %}
     </div>

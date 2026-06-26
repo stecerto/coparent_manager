@@ -225,9 +225,31 @@ def _parse_local_dt(dt_str):
 
 @login_required
 def family_calendar_view(request):
-    family = get_family_of_user(request.user, request=request)
-    if not family:
-        return render(request, "calendar_app/no_family.html")
+    user = request.user
+    profile = getattr(user, 'profile', None) or getattr(user, 'userprofile', None)
+
+    # ✅ NUOVO: Gestione professionisti con family_id
+    family_id = request.GET.get('family_id') or request.session.get('active_family_id')
+    is_professional = profile and profile.role in ['lawyer_a', 'lawyer_b', 'mediator', 'consultant']
+
+    if is_professional and family_id:
+        family = get_object_or_404(Family, id=family_id)
+
+        # Verifica accesso
+        membership = FamilyMember.objects.filter(
+            family=family,
+            user=user,
+            role__in=['lawyer_a', 'lawyer_b', 'mediator', 'consultant']
+        ).first()
+
+        if not membership:
+            messages.error(request, "⚠️ Non hai accesso a questa famiglia")
+            return redirect('families:lawyer_dashboard')
+    else:
+        # Logica esistente per genitori
+        family = get_family_of_user(user, request=request)
+        if not family:
+            return render(request, "calendar_app/no_family.html")
 
     if request.method == "POST":
         title = request.POST.get("title", "").strip()
@@ -250,13 +272,13 @@ def family_calendar_view(request):
         event_id = request.POST.get("event_id")
         if event_id:
             event = get_object_or_404(CalendarEvent, pk=event_id, family=family)
-            update_event(event, request.user, {
+            update_event(event, user, {
                 "title": title, "description": description, "event_type": event_type,
                 "start_time": start_time, "end_time": end_time, "children": children,
             })
         else:
             create_event(family=family, title=title, start_time=start_time, end_time=end_time,
-                         created_by=request.user, description=description, event_type=event_type, children=children)
+                         created_by=user, description=description, event_type=event_type, children=children)
         return redirect("calendar:calendar_view")
 
     return render(request, "calendar_app/calendar_view.html", {
@@ -321,6 +343,15 @@ def delete_event_view(request, event_id):
 
 @login_required
 def event_form_view(request, event_id=None):
+    user = request.user
+    profile = getattr(user, 'profile', None) or getattr(user, 'userprofile', None)
+
+    # ✅ BLOCCO PROFESSIONISTI: Solo i genitori possono creare/modificare eventi
+    if profile and profile.role in ['lawyer_a', 'lawyer_b', 'mediator', 'consultant']:
+        messages.error(request,
+                       "⚠️ Solo i genitori possono creare o modificare eventi. I professionisti hanno accesso in sola lettura.")
+        return redirect("calendar:calendar_view")
+
     family = get_family_of_user(request.user, request=request)
     if not family: return render(request, "calendar_app/no_family.html")
 
