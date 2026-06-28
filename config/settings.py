@@ -202,9 +202,9 @@ if DEBUG:
         },
     }
 else:
-    # 🚀 IN PRODUZIONE: Logga su file e avvisa gli admin per errori critici
+    # 🚀 IN PRODUZIONE
     LOG_DIR = BASE_DIR / 'logs'
-    LOG_DIR.mkdir(exist_ok=True)  # Crea la cartella 'logs' automaticamente se non esiste
+    LOG_DIR.mkdir(exist_ok=True)
 
     LOGGING = {
         'version': 1,
@@ -216,6 +216,9 @@ else:
             },
         },
         'handlers': {
+            'console': {
+                'class': 'logging.StreamHandler',
+            },
             'file': {
                 'level': 'ERROR',
                 'class': 'logging.FileHandler',
@@ -226,10 +229,9 @@ else:
                 'level': 'ERROR',
                 'class': 'django.utils.log.AdminEmailHandler',
             },
-
         },
         'root': {
-            'handlers': ['console'],
+            'handlers': ['console', 'file'],
             'level': 'INFO',
         },
         'loggers': {
@@ -239,17 +241,16 @@ else:
                 'propagate': False,
             },
             'chat': {
-                'handlers': ['console'],
-                'level': 'DEBUG',
+                'handlers': ['console', 'file'],
+                'level': 'INFO',
                 'propagate': False,
             },
             'notifications': {
-                'handlers': ['console'],
-                'level': 'DEBUG',
+                'handlers': ['console', 'file'],
+                'level': 'INFO',
                 'propagate': False,
             },
-
-            'families': {  # Cattura tutti i log che iniziano con 'families.'
+            'families': {
                 'handlers': ['file'],
                 'level': 'INFO',
                 'propagate': False,
