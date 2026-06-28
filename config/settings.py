@@ -134,9 +134,9 @@ DATABASES = {
     }
 }
 '''
-# DATABASES dinamico (sqlite in locale, postgres in produzione)
-if os.environ.get("PRODUCTION"):
-    # ✅ Usa DATABASE_URL automatica di Render
+# ✅ Database: PostgreSQL su Render, SQLite in locale
+if os.environ.get("RENDER") or os.environ.get("DATABASE_URL") or os.environ.get("PRODUCTION"):
+    # Produzione: usa DATABASE_URL automatica di Render
     DATABASES = {
         'default': dj_database_url.config(
             default=os.getenv('DATABASE_URL'),
@@ -145,12 +145,14 @@ if os.environ.get("PRODUCTION"):
         )
     }
 else:
+    # Locale: SQLite
     DATABASES = {
         "default": {
             "ENGINE": "django.db.backends.sqlite3",
             "NAME": BASE_DIR / "db.sqlite3",
         }
     }
+
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / "media" #os.path.join(BASE_DIR, 'media')
