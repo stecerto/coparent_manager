@@ -134,15 +134,21 @@ DATABASES = {
     }
 }
 '''
-# ✅ Database: PostgreSQL su Render, SQLite in locale
-if os.environ.get("RENDER") or os.environ.get("DATABASE_URL") or os.environ.get("PRODUCTION"):
-    # Produzione: usa DATABASE_URL automatica di Render
+## ✅ Database: PostgreSQL su Render, SQLite in locale
+if os.environ.get("RENDER") or os.environ.get("PRODUCTION"):
+    # Produzione: usa le variabili DB_* impostate su Render
     DATABASES = {
-        'default': dj_database_url.config(
-            default=os.getenv('DATABASE_URL'),
-            conn_max_age=600,
-            ssl_require=True
-        )
+        "default": {
+            "ENGINE": "django.db.backends.postgresql",
+            "NAME": os.environ.get("DB_NAME"),
+            "USER": os.environ.get("DB_USER"),
+            "PASSWORD": os.environ.get("DB_PASSWORD"),
+            "HOST": os.environ.get("DB_HOST"),
+            "PORT": os.environ.get("DB_PORT", "5432"),
+            "OPTIONS": {
+                "sslmode": "require",
+            },
+        }
     }
 else:
     # Locale: SQLite
