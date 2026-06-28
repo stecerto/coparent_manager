@@ -1,0 +1,321 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Centro Assistenza - CoParent Manager{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* 🎨 BACKGROUND GRADIENT */
+    .help-container {
+        min-height: 100vh;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        padding: 3rem 1rem 5rem;
+    }
+
+    .help-hero {
+        text-align: center;
+        margin-bottom: 2.5rem;
+        color: white;
+    }
+    .help-hero h1 { font-weight: 700; font-size: 2.2rem; margin-bottom: 0.5rem; text-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+    .help-hero p { font-size: 1.1rem; opacity: 0.9; max-width: 600px; margin: 0 auto; }
+
+    /* 📦 CONTENT WRAPPER */
+    .help-wrapper {
+        max-width: 800px;
+        margin: 0 auto;
+        background: white;
+        border-radius: 20px;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        padding: 2rem;
+    }
+
+    /* 📖 ACCORDION */
+    .accordion-item {
+        border: 1px solid #e2e8f0;
+        border-radius: 12px !important;
+        margin-bottom: 0.75rem;
+        overflow: hidden;
+    }
+    .accordion-button {
+        font-weight: 600;
+        color: #2d3748;
+        padding: 1.25rem;
+        background-color: #f8fafc;
+        border-radius: 12px !important;
+    }
+    .accordion-button:not(.collapsed) {
+        background-color: #edf2f7;
+        color: #667eea;
+        box-shadow: none;
+    }
+    .accordion-button:focus {
+        box-shadow: none;
+        border-color: #cbd5e0;
+    }
+    .accordion-body {
+        padding: 1.5rem;
+        color: #4a5568;
+        line-height: 1.6;
+    }
+    .accordion-body ul { padding-left: 1.25rem; }
+    .accordion-body li { margin-bottom: 0.5rem; }
+
+    /* 📱 INSTALL GUIDE BOXES */
+    .install-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-top: 1rem; }
+    .install-card {
+        background: #f0f4ff;
+        border: 1px solid #c3dafe;
+        border-radius: 10px;
+        padding: 1rem;
+        text-align: center;
+    }
+    .install-card i { font-size: 1.8rem; color: #667eea; margin-bottom: 0.5rem; display: block; }
+    .install-card h6 { font-weight: 700; margin-bottom: 0.25rem; color: #2d3748; }
+    .install-card p { font-size: 0.85rem; margin: 0; color: #4a5568; }
+
+    /* 🛣️ ROADMAP */
+    .roadmap-section {
+        max-width: 800px;
+        margin: 2.5rem auto 0;
+        background: rgba(255,255,255,0.1);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.2);
+        border-radius: 20px;
+        padding: 2rem;
+        color: white;
+    }
+    .roadmap-title { text-align: center; font-weight: 700; margin-bottom: 1.5rem; }
+    .roadmap-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
+    .roadmap-item {
+        background: rgba(255,255,255,0.15);
+        border-radius: 12px;
+        padding: 1rem;
+        display: flex; align-items: center; gap: 0.75rem;
+    }
+    .roadmap-badge {
+        background: #ed8936; color: white; font-size: 0.7rem; font-weight: 700;
+        padding: 0.2rem 0.5rem; border-radius: 6px; white-space: nowrap;
+    }
+    .roadmap-text { font-size: 0.95rem; }
+
+    /* 🆘 SUPPORT BOX */
+    .support-box {
+        max-width: 800px; margin: 2rem auto 0; text-align: center;
+    }
+    .support-box a {
+        display: inline-block; background: white; color: #667eea;
+        padding: 0.9rem 2rem; border-radius: 12px; font-weight: 600;
+        text-decoration: none; transition: all 0.3s ease;
+        box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    }
+    .support-box a:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
+
+    /* 📱 RESPONSIVE */
+    @media (max-width: 576px) {
+        .help-hero h1 { font-size: 1.8rem; }
+        .help-wrapper { padding: 1.5rem; }
+        .accordion-button { padding: 1rem; }
+    }
+</style>
+{% endblock extra_css %}
+
+{% block content %}
+<div class="help-container">
+    <div class="help-hero">
+        <img src="{% static 'images/logo-coparent.svg' %}" alt="Logo" style="height: 60px; margin-bottom: 1rem; filter: brightness(0) invert(1);">
+        <h1>Centro Assistenza</h1>
+        <p>Tutto quello che devi sapere per utilizzare CoParent Manager al meglio. Semplice, sicuro, pensato per te.</p>
+    </div>
+
+    <div class="help-wrapper">
+        <div class="accordion" id="helpAccordion">
+            
+            <!-- 0️⃣ FUNZIONI PRINCIPALI -->
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#sec0">
+                        🎯 0. Funzioni Principali dell'App
+                    </button>
+                </h2>
+                <div id="sec0" class="accordion-collapse collapse show" data-bs-parent="#helpAccordion">
+                    <div class="accordion-body">
+                        <p>CoParent Manager è una piattaforma progettata per semplificare la genitorialità condivisa. Ecco le funzionalità core:</p>
+                        <ul>
+                            <li><strong>💬 Chat Criptata:</strong> Comunicazioni sicure, cronologia completa e allegati condivisi.</li>
+                            <li><strong>💰 Gestione Spese:</strong> Registro trasparente, calcolo automatico delle quote e approvazione in 1 click.</li>
+                            <li><strong>📅 Calendario Familiare:</strong> Eventi, visite, attività scolastiche e scadenze in un unico posto.</li>
+                            <li><strong>🔔 Notifiche Push:</strong> Aggiornamenti in tempo reale su chat, spese e appuntamenti.</li>
+                            <li><strong>👥 Ruoli Flessibili:</strong> Gestione granulare di genitori, mediatori e consulenti.</li>
+                            <li><strong>📁 Archivio Documenti:</strong> Conservazione sicura di buste paga, documenti legali e ricevute.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 1️⃣ INSTALLAZIONE APP -->
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sec1">
+                        📲 1. Come Installare l'App (PWA)
+                    </button>
+                </h2>
+                <div id="sec1" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                    <div class="accordion-body">
+                        <p>CoParent Manager è una <strong>Progressive Web App (PWA)</strong>. Non serve scaricarla dagli store: si installa direttamente dal browser e funziona come un'app nativa.</p>
+                        
+                        <div class="install-grid">
+                            <div class="install-card">
+                                <i class="bi bi-android2"></i>
+                                <h6>Android (Chrome)</h6>
+                                <p>Menu (⋮) → <em>"Aggiungi a schermata Home"</em> o segui il banner in basso.</p>
+                            </div>
+                            <div class="install-card">
+                                <i class="bi bi-apple"></i>
+                                <h6>iOS (Safari)</h6>
+                                <p>Condividi (↑) → <em>"Aggiungi alla schermata Home"</em>.</p>
+                            </div>
+                            <div class="install-card">
+                                <i class="bi bi-display"></i>
+                                <h6>Desktop</h6>
+                                <p>Clicca sull'icona 📥 nella barra degli indirizzi (Chrome/Edge).</p>
+                            </div>
+                        </div>
+
+                        <hr class="my-3">
+                        <p><strong>🎯 Come funziona dopo l'installazione:</strong></p>
+                        <ul>
+                            <li>L'icona appare sulla home come qualsiasi app.</li>
+                            <li>Le notifiche push arrivano in background con badge rosso (stile WhatsApp).</li>
+                            <li>Cliccando una notifica, l'app si apre direttamente nella sezione interessata.</li>
+                            <li>Funziona offline per la lettura di chat e spese già caricate.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2️⃣ RUOLO MEDIATORE -->
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sec2">
+                        ⚖️ 2. Ruolo del Mediatore
+                    </button>
+                </h2>
+                <div id="sec2" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                    <div class="accordion-body">
+                        <p>Il mediatore familiare è una figura neutrale invitata da uno o entrambi i genitori per facilitare il dialogo.</p>
+                        <ul>
+                            <li><strong>👁️ Accesso:</strong> Visualizza chat, spese e calendario in modalità <em>sola lettura</em>.</li>
+                            <li><strong>📝 Commento:</strong> Può lasciare note private o suggerimenti visibili a tutti.</li>
+                            <li><strong>🔒 Limitazioni:</strong> Non può approvare spese, modificare dati finanziari o inviare messaggi a nome dei genitori.</li>
+                            <li><strong>🎯 Obiettivo:</strong> Ridurre i conflitti, garantire trasparenza e supportare decisioni consensuali.</li>
+                        </ul>
+                        <p class="text-muted small">*Il mediatore può essere rimosso in qualsiasi momento dal genitore che lo ha invitato.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 3️⃣ RUOLO CONSULENTE -->
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sec3">
+                        🎓 3. Ruolo del Consulente
+                    </button>
+                </h2>
+                <div id="sec3" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                    <div class="accordion-body">
+                        <p>I consulenti (legali, finanziari, psicologici) vengono invitati per supportare aspetti specifici della separazione.</p>
+                        <ul>
+                            <li><strong>🔐 Accesso Selettivo:</strong> Vedono solo le sezioni autorizzate (es. solo spese legali, solo documenti finanziari).</li>
+                            <li><strong>📊 Reportistica:</strong> Possono esportare dati strutturati per perizie o consulenze tecniche.</li>
+                            <li><strong>📝 Note Riservate:</strong> I commenti del consulente sono visibili solo al genitore che lo ha invitato (opzionale).</li>
+                            <li><strong>⏱️ Temporaneo:</strong> L'accesso ha una scadenza automatica configurabile.</li>
+                        </ul>
+                        <p class="text-muted small">*Tutti i dati sono crittografati e conformi al GDPR. Il consenso è revocabile in qualsiasi momento.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4️⃣ SPESE ORDINARIE VS STRAORDINARIE -->
+            <div class="accordion-item">
+                <h2 class="accordion-header">
+                    <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sec4">
+                        💳 4. Spese Ordinarie vs Straordinarie
+                    </button>
+                </h2>
+                <div id="sec4" class="accordion-collapse collapse" data-bs-parent="#helpAccordion">
+                    <div class="accordion-body">
+                        <div class="row">
+                            <div class="col-md-6 mb-3">
+                                <div class="p-3 bg-light rounded border-start border-4 border-primary">
+                                    <h6 class="fw-bold text-primary">🟦 Spese Ordinarie</h6>
+                                    <p class="small mb-0">Ricorrenti e prevedibili. Esempi:</p>
+                                    <ul class="small mt-2 mb-0">
+                                        <li>Retta scolastica / asilo</li>
+                                        <li>Attività extrascolastiche fisse</li>
+                                        <li>Visite mediche di routine</li>
+                                        <li>Abbigliamento stagionale</li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <div class="p-3 bg-light rounded border-start border-4 border-warning">
+                                    <h6 class="fw-bold text-warning">🟨 Spese Straordinarie</h6>
+                                    <p class="small mb-0>Impreviste o di importo significativo. Esempi:</p>
+                                    <ul class="small mt-2 mb-0">
+                                        <li>Cure odontoiatriche / terapie</li>
+                                        <li>Vacanze scolastiche</li>
+                                        <li>Riparazioni urgenti</li>
+                                        <li>Attività sportive costose</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <p><strong>⚙️ Come funziona in app:</strong></p>
+                        <ul>
+                            <li>Le <strong>ordinarie</strong> possono essere impostate con approvazione automatica o a soglia.</li>
+                            <li>Le <strong>straordinarie</strong> richiedono sempre approvazione esplicita dell'altro genitore prima del pagamento.</li>
+                            <li>Il calcolo della ripartizione (%) si adatta automaticamente in base al profilo del figlio e alle sentenze attive.</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- 🛣️ ROADMAP / PROSSIMI AGGIORNAMENTI -->
+    <div class="roadmap-section">
+        <h3 class="roadmap-title">🚀 Cosa stiamo costruendo</h3>
+        <div class="roadmap-grid">
+            <div class="roadmap-item">
+                <span class="roadmap-badge">IN SVILUPPO</span>
+                <span class="roadmap-text">📄 Modelli di lettere personalizzati</span>
+            </div>
+            <div class="roadmap-item">
+                <span class="roadmap-badge">IN SVILUPPO</span>
+                <span class="roadmap-text">🔄 Sync Google/Outlook Calendar</span>
+            </div>
+            <div class="roadmap-item">
+                <span class="roadmap-badge">PIANIFICATO</span>
+                <span class="roadmap-text">💾 Backup automatico crittografato</span>
+            </div>
+            <div class="roadmap-item">
+                <span class="roadmap-badge">PIANIFICATO</span>
+                <span class="roadmap-text">💳 Integrazione Stripe Payments</span>
+            </div>
+            <div class="roadmap-item">
+                <span class="roadmap-badge">PIANIFICATO</span>
+                <span class="roadmap-text">🌐 Landing Page SEO Ottimizzata</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🆘 SUPPORTO -->
+    <div class="support-box">
+        <a href="mailto:support@coparentmanager.com">
+            <i class="bi bi-headset me-2"></i>Hai bisogno di aiuto? Contattaci
+        </a>
+    </div>
+</div>
+{% endblock content %}

@@ -229,3 +229,30 @@ media/
 /families/tests.py
 /notifications/tests.py
 /.idea/vcs.xml
+# ✅ Python
+
+.venv/
+
+# ✅ Django
+db.sqlite3
+db.sqlite3-journal
+/media/
+/static_root/
+
+# ✅ Environment
+.env.local
+.env.production
+*.env
+
+# ✅ IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ✅ OS
+Thumbs.db
+
+# ✅ Render
+.render/
+
