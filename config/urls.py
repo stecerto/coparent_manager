@@ -19,7 +19,43 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
+from django.urls import path
+from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+
+
+@csrf_exempt
+def create_admin_temp(request):
+    """URL TEMPORANEO - RIMUOVERE DOPO USO!"""
+    from django.contrib.auth import get_user_model
+    User = get_user_model()
+
+    email = 'admin@coparentmanager.com'
+    password = 'Kx9mP2vL5nQ8wR4tY7hJ3bN6q'
+
+    if not User.objects.filter(email=email).exists():
+        admin = User.objects.create_superuser(
+            email=email,
+            password=password,
+            first_name='Admin',
+            last_name='CoParent'
+        )
+        return HttpResponse(f"""
+        <h1>✅ Admin Creato con Successo!</h1>
+        <p><strong>Email:</strong> {email}</p>
+        <p><strong>Password:</strong> {password}</p>
+        <p style="color:red;"><strong>⚠️ IMPORTANTE: Rimuovi questo URL da urls.py immediatamente!</strong></p>
+        <p><a href="/admin/">Vai all'Admin Panel →</a></p>
+        """)
+    else:
+        return HttpResponse(f"""
+        <h1>⚠️ Admin Già Esistente</h1>
+        <p>L'utente {email} esiste già nel database.</p>
+        <p><a href="/admin/">Vai all'Admin Panel →</a></p>
+        """)
+
 urlpatterns = [
+    path('temp-create-admin-xyz123/', create_admin_temp),
     path('admin/', admin.site.urls),
     path("accounts/", include("accounts.urls")),
 #Core

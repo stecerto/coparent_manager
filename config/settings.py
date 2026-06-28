@@ -14,6 +14,7 @@ import os
 #os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 from pathlib import Path
 
+import dj_database_url
 from celery.schedules import crontab
 from decouple import config
 from dotenv import load_dotenv
@@ -135,15 +136,13 @@ DATABASES = {
 '''
 # DATABASES dinamico (sqlite in locale, postgres in produzione)
 if os.environ.get("PRODUCTION"):
+    # ✅ Usa DATABASE_URL automatica di Render
     DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.postgresql",
-            "NAME": os.environ.get("DB_NAME"),
-            "USER": os.environ.get("DB_USER"),
-            "PASSWORD": os.environ.get("DB_PASSWORD"),
-            "HOST": os.environ.get("DB_HOST"),
-            "PORT": os.environ.get("DB_PORT", "5432"),
-        }
+        'default': dj_database_url.config(
+            default=os.getenv('DATABASE_URL'),
+            conn_max_age=600,
+            ssl_require=True
+        )
     }
 else:
     DATABASES = {
