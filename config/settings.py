@@ -83,7 +83,8 @@ MIDDLEWARE = [
     'core.middleware.SubscriptionMiddleware',
 ]
 
-ROOT_URLCONF = 'coparent_manager.urls' #'config.urls'
+ROOT_URLCONF = 'config.urls'
+WSGI_APPLICATION = 'config.wsgi.application'
 
 TEMPLATES = [
     {
@@ -107,7 +108,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'coparent_manager.wsgi.application' #'config.wsgi.application'
+
 
 
 # Database
