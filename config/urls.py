@@ -23,36 +23,71 @@ from django.urls import path
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 
+from django.urls import path
+from django.http import HttpResponse
+from django.views.decorators.csrf import csrf_exempt
+import traceback
+
 
 @csrf_exempt
 def create_admin_temp(request):
     """URL TEMPORANEO - RIMUOVERE DOPO USO!"""
-    from django.contrib.auth import get_user_model
-    User = get_user_model()
+    output = []
 
-    email = 'admin@coparentmanager.com'
-    password = 'Kx9mP2vL5nQ8wR4tY7hJ3bN6q'
+    try:
+        output.append("<h2>🔍 Debug Info</h2>")
 
-    if not User.objects.filter(email=email).exists():
+        # Importa il modello User
+        from django.contrib.auth import get_user_model
+        User = get_user_model()
+        output.append(f"<p>✅ User model: {User.__name__}</p>")
+        output.append(f"<p>✅ Campi User: {[f.name for f in User._meta.get_fields()]}</p>")
+
+        email = 'admin@coparentmanager.com'
+        password = 'Kx9mP2vL5nQ8wR4tY7hJ3bN6q'
+
+        # Controlla se l'utente esiste già
+        if User.objects.filter(email=email).exists():
+            return HttpResponse(f"""
+            <h1>⚠️ Admin Già Esistente</h1>
+            <p>L'utente {email} esiste già nel database.</p>
+            <p><a href="/admin/">Vai all'Admin Panel →</a></p>
+            """)
+
+        output.append("<p>✅ Utente non esiste, procedo con creazione...</p>")
+
+        # Prova a creare l'admin con solo email e password
         admin = User.objects.create_superuser(
             email=email,
-            password=password,
-            first_name='Admin',
-            last_name='CoParent'
+            password=password
         )
+
+        output.append(f"<p>✅ Admin creato: {admin.email}</p>")
+
         return HttpResponse(f"""
         <h1>✅ Admin Creato con Successo!</h1>
         <p><strong>Email:</strong> {email}</p>
         <p><strong>Password:</strong> {password}</p>
         <p style="color:red;"><strong>⚠️ IMPORTANTE: Rimuovi questo URL da urls.py immediatamente!</strong></p>
         <p><a href="/admin/">Vai all'Admin Panel →</a></p>
+        <hr>
+        <h3>Debug Info:</h3>
+        {''.join(output)}
         """)
-    else:
+
+    except Exception as e:
+        error_msg = traceback.format_exc()
         return HttpResponse(f"""
-        <h1>⚠️ Admin Già Esistente</h1>
-        <p>L'utente {email} esiste già nel database.</p>
-        <p><a href="/admin/">Vai all'Admin Panel →</a></p>
-        """)
+        <h1>❌ Errore</h1>
+        <p><strong>Tipo:</strong> {type(e).__name__}</p>
+        <p><strong>Messaggio:</strong> {str(e)}</p>
+        <hr>
+        <h3>Debug Info:</h3>
+        {''.join(output) if output else 'Nessuna info'}
+        <hr>
+        <h3>Traceback Completo:</h3>
+        <pre style="background:#f4f4f4;padding:10px;overflow:auto;font-size:12px;">{error_msg}</pre>
+        """, status=500)
 
 urlpatterns = [
     path('temp-create-admin-xyz123/', create_admin_temp),
