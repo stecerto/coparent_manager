@@ -52,9 +52,24 @@ class RegisterForm(UserCreationForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        # ✅ Placeholder in italiano
+        self.fields['first_name'].widget.attrs.update({
+            "class": "form-control",
+            "placeholder": "Nome"
+        })
+        self.fields['last_name'].widget.attrs.update({
+            "class": "form-control",
+            "placeholder": "Cognome"
+        })
+        self.fields['email'].widget.attrs.update({
+            "class": "form-control",
+            "placeholder": "Email"
+        })
+
         for field_name, field in self.fields.items():
             # ✅ Aggiungi 'plan' alle eccezioni per non sovrascrivere la classe form-select
-            if field_name not in ('password1', 'password2', 'role', 'plan'):
+            if field_name not in ('password1', 'password2', 'role', 'plan', 'first_name', 'last_name', 'email'):
                 field.widget.attrs.update({"class": "form-control"})
 
         if self.initial.get("email"):
@@ -122,6 +137,13 @@ class UserProfileForm(forms.ModelForm):
     class Meta:
         model = UserProfile
         fields = ['firm_name', 'address', 'phone', 'birth_place', 'partita_iva']
+        labels = {
+            'first_name': 'Nome',
+            'last_name': 'Cognome',
+            'email': 'Email',
+            'password1': 'Password',
+            'password2': 'Conferma Password',
+        }
         widgets = {
             'firm_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome del tuo studio legale'}),
             'address': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Indirizzo completo'}),
