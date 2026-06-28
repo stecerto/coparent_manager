@@ -298,16 +298,21 @@ EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 MAILJET_API_KEY = os.getenv("MAILJET_API_KEY")
 MAILJET_SECRET_KEY = os.getenv("MAILJET_SECRET_KEY")
 
-EMAIL_HOST = "smtp.gmail.com" #"in-v3.mailjet.com"
-EMAIL_PORT = 587
-EMAIL_USE_TLS = True
-EMAIL_USE_SSL = False
+EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "True") == "True"
+EMAIL_USE_SSL = os.getenv("EMAIL_USE_SSL", "False") == "True"
 
-EMAIL_HOST_USER = config("EMAIL_HOST_USER")    #os.getenv("MAILJET_API_KEY")
-EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD") #os.getenv("MAILJET_SECRET_KEY")
+
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")    #os.getenv("MAILJET_API_KEY")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD") #os.getenv("MAILJET_SECRET_KEY")
 #DEFAULT_FROM_EMAIL = "no-reply@mailjet.com"
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
-SERVER_EMAIL = EMAIL_HOST_USER
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER or "noreply@coparentmanager.com"
+SERVER_EMAIL = EMAIL_HOST_USER or "noreply@coparentmanager.com"
+
+# ✅ Se non ci sono credenziali email, usa console backend
+if not EMAIL_HOST_USER:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 #SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')  produzione
 # Sicurezza extra
 
@@ -365,7 +370,7 @@ else:
     CELERY_TASK_ALWAYS_EAGER = True
     CELERY_TASK_EAGER_PROPAGATES = True
 
-    
+
 PRIVACY_VERSION = "1.0"  # Incrementa a "1.1", "2.0" quando aggiorni la policy
 ENCRYPTION_KEY=os.environ.get("ENCRYPTION_KEY")
 
