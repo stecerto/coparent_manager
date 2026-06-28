@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Account Attivato - CoParent Manager{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm border-0" style="border-radius: 16px;">
+                <div class="card-body p-5 text-center">
+                    
+                    <!-- Icona Successo -->
+                    <div class="mb-4">
+                        <div style="width: 100px; height: 100px; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; box-shadow: 0 8px 24px rgba(40, 167, 69, 0.3);">
+                            <i class="bi bi-check-circle-fill text-white" style="font-size: 3.5rem;"></i>
+                        </div>
+                    </div>
+
+                    <!-- Titolo -->
+                    <h1 class="h2 fw-bold mb-3" style="color: #2d3748;">
+                        🎉 Congratulazioni!
+                    </h1>
+                    
+                    <p class="text-muted mb-4" style="font-size: 1.1rem;">
+                        Il tuo account è stato attivato con successo.
+                    </p>
+
+                    <!-- Info Email -->
+                    <div class="alert alert-light border mb-4" style="border-radius: 12px;">
+                        <i class="bi bi-envelope-check-fill text-success me-2"></i>
+                        <strong>Email:</strong> {{ email }}
+                    </div>
+
+                    <!-- Prossimi Passi -->
+                    <div class="text-start mb-4">
+                        <h6 class="fw-bold mb-3">
+                            <i class="bi bi-list-check text-primary me-2"></i>
+                            Prossimi Passi:
+                        </h6>
+                        <ol class="list-unstyled">
+                            <li class="mb-2">
+                                <i class="bi bi-check-circle-fill text-success me-2"></i>
+                                <strong>Effettua il login</strong> con le tue credenziali
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-arrow-right-circle text-primary me-2"></i>
+                                <strong>Completa il setup</strong> del tuo profilo
+                            </li>
+                            <li class="mb-2">
+                                <i class="bi bi-people-fill text-primary me-2"></i>
+                                <strong>Invita familiari</strong> o professionisti
+                            </li>
+                            <li class="mb-0">
+                                <i class="bi bi-rocket-takeoff-fill text-primary me-2"></i>
+                                <strong>Inizia a usare</strong> tutte le funzionalità!
+                            </li>
+                        </ol>
+                    </div>
+
+                    <!-- Pulsanti -->
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'accounts:login' %}" class="btn btn-primary btn-lg">
+                            <i class="bi bi-box-arrow-in-right me-2"></i>
+                            Vai al Login
+                        </a>
+                        <a href="{% url 'landing' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-house-door me-2"></i>
+                            Torna alla Home
+                        </a>
+                    </div>
+
+                </div>
+            </div>
+
+            <!-- Messaggio Extra -->
+            <div class="text-center mt-4">
+                <small class="text-muted">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Non ricordi la password? 
+                    <a href="{% url 'accounts:password_reset' %}" class="text-decoration-none">
+                        Resetta qui
+                    </a>
+                </small>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}
