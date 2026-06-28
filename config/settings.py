@@ -248,15 +248,15 @@ else:
                 'level': 'DEBUG',
                 'propagate': False,
             },
-            'loggers': {
-                'families': {  # Cattura tutti i log che iniziano con 'families.'
-                    'handlers': ['file'],
-                    'level': 'INFO',
-                    'propagate': True,
-                },
+
+            'families': {  # Cattura tutti i log che iniziano con 'families.'
+                'handlers': ['file'],
+                'level': 'INFO',
+                'propagate': False,
             },
         },
     }
+
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
