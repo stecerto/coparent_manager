@@ -22,20 +22,27 @@ from django.conf.global_settings import EMAIL_USE_SSL
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-AUTH_USER_MODEL = "users.User"
+
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config("SECRET_KEY")
+SECRET_KEY = os.getenv("SECRET_KEY", 'fallback-dev-key-change-in-production')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
-CSRF_TRUSTED_ORIGINS = ["https://*.herokuapp.com"]
+#CSRF_TRUSTED_ORIGINS = ["https://*.herokuapp.com"]
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.onrender.com",
+    "https://coparentmanager.com",
+    "https://www.coparentmanager.com",
+]
 
-ALLOWED_HOSTS = [".herokuapp.com", "localhost", "127.0.0.1"]
+
+# ✅ HOSTS (Render usa .onrender.com)
+ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
 
 if os.getenv("ENV") == "production":
     FRONTEND_DOMAIN = "https://tuodominio.com"
@@ -69,6 +76,7 @@ MIDDLEWARE = [
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -264,10 +272,22 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 AUTH_USER_MODEL = 'accounts.User'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_DIRS = [BASE_DIR, "static"]
+
+
+
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / "static"]
+
+# ✅ WhiteNoise per static files in produzione
+STORAGES = {
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
+
+
 LOGIN_URL = '/accounts/login'
 LOGIN_REDIRECT_URL = "/"
 LOGOUT_REDIRECT_URL = "/"
@@ -310,35 +330,42 @@ else:
 
 
 # ⚡ CONFIGURAZIONE CELERY
-CELERY_BROKER_URL = "redis://localhost:6379/0"  # Broker standard (Redis)
-CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
-CELERY_ACCEPT_CONTENT = ["json"]
-CELERY_TASK_SERIALIZER = "json"
-CELERY_RESULT_SERIALIZER = "json"
-CELERY_TIMEZONE = TIME_ZONE  # Usa il tuo fuso orario già definito
+if DEBUG:
+    CELERY_BROKER_URL = "redis://localhost:6379/0"  # Broker standard (Redis)
+    CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
+    CELERY_ACCEPT_CONTENT = ["json"]
+    CELERY_TASK_SERIALIZER = "json"
+    CELERY_RESULT_SERIALIZER = "json"
+    CELERY_TIMEZONE = TIME_ZONE  # Usa il tuo fuso orario già definito
 
-# 🧪 FALLBACK SVILUPPO (se NON hai Redis installato):
-# Esegue i task in modo sincrono, senza bisogno di broker/worker
-CELERY_TASK_ALWAYS_EAGER = False
-CELERY_BEAT_SCHEDULE = {
-    'send-event-reminders-every-5-minutes': {
-        'task': 'calendar_app.tasks.send_event_reminder',
-        'schedule': crontab(minute='*/20'),  # ogni 20 minuti
-        'options': {'expires': 1200},  # evita accavallamenti se il worker è lento
-    },
-    'check-document-expirations-daily': {
-        'task': 'notifications.tasks.check_document_expirations',
-        'schedule': crontab(hour=8, minute=0), # Ogni giorno alle 08:00
-    },
-    'check-pending-agreements-daily': {
-        'task': 'notifications.tasks.check_pending_agreements',
-        'schedule': crontab(hour=9, minute=0), # Ogni giorno alle 09:00
-    },
-    'check-imminent-events-hourly': {
-        'task': 'notifications.tasks.check_imminent_events',
-        'schedule': crontab(minute=0), # Ogni ora, al minuto 0
-    },
-}
+    # 🧪 FALLBACK SVILUPPO (se NON hai Redis installato):
+    # Esegue i task in modo sincrono, senza bisogno di broker/worker
+    CELERY_TASK_ALWAYS_EAGER = False
+    CELERY_BEAT_SCHEDULE = {
+        'send-event-reminders-every-5-minutes': {
+            'task': 'calendar_app.tasks.send_event_reminder',
+            'schedule': crontab(minute='*/20'),  # ogni 20 minuti
+            'options': {'expires': 1200},  # evita accavallamenti se il worker è lento
+        },
+        'check-document-expirations-daily': {
+            'task': 'notifications.tasks.check_document_expirations',
+            'schedule': crontab(hour=8, minute=0), # Ogni giorno alle 08:00
+        },
+        'check-pending-agreements-daily': {
+            'task': 'notifications.tasks.check_pending_agreements',
+            'schedule': crontab(hour=9, minute=0), # Ogni giorno alle 09:00
+        },
+        'check-imminent-events-hourly': {
+            'task': 'notifications.tasks.check_imminent_events',
+            'schedule': crontab(minute=0), # Ogni ora, al minuto 0
+        },
+    }
+else:
+    # Produzione: esegui task in modo sincrono (senza Redis)
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_EAGER_PROPAGATES = True
+
+    
 PRIVACY_VERSION = "1.0"  # Incrementa a "1.1", "2.0" quando aggiorni la policy
 ENCRYPTION_KEY=os.environ.get("ENCRYPTION_KEY")
 
@@ -347,7 +374,11 @@ ENCRYPTION_KEY=os.environ.get("ENCRYPTION_KEY")
 # ========================================
 GOOGLE_CALENDAR_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', default='')
 GOOGLE_CALENDAR_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', default='')
-GOOGLE_CALENDAR_REDIRECT_URI = 'http://localhost:8000/calendar/oauth/google/callback/'
+#GOOGLE_CALENDAR_REDIRECT_URI = 'http://localhost:8000/calendar/oauth/google/callback/'
+if DEBUG:
+    GOOGLE_CALENDAR_REDIRECT_URI = 'http://localhost:8000/calendar/oauth/google/callback/'
+else:
+    GOOGLE_CALENDAR_REDIRECT_URI = 'https://coparentmanager.com/calendar/oauth/google/callback/'
 GOOGLE_CALENDAR_SCOPES = [
     'https://www.googleapis.com/auth/calendar.events',
     'https://www.googleapis.com/auth/calendar',
