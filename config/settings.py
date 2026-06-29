@@ -146,7 +146,7 @@ else:
 
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / "media" #os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = BASE_DIR / "media" 
 #DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"   online
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
