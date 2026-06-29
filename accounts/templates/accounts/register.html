@@ -386,6 +386,83 @@ document.addEventListener('DOMContentLoaded', () => {
         const modal = bootstrap.Modal.getInstance(modalEl);
         if (modal) modal.hide();
     };
+// ✅ NUOVO: Aggiorna il banner del piano quando cambia il select
+    const planSelect = document.getElementById('id_plan');
+
+    if (planSelect) {
+        planSelect.addEventListener('change', function() {
+            updatePlanBanner(this.value);
+        });
+    }
+
+    function updatePlanBanner(selectedPlan) {
+        // 1. Aggiorna il banner principale (alert in alto)
+        const bannerContainer = document.querySelector('.alert-success, .alert-info');
+
+        if (bannerContainer && bannerContainer.innerHTML.includes('Piano')) {
+            if (selectedPlan === 'starter') {
+                bannerContainer.className = 'alert alert-info d-flex align-items-center mb-3';
+                bannerContainer.style.borderRadius = '10px';
+                bannerContainer.innerHTML = `
+                    <i class="bi bi-info-circle-fill me-3 fs-5 text-primary"></i>
+                    <div class="flex-grow-1">
+                        <strong>Piano Starter selezionato</strong><br>
+                        <small>Perfetto per iniziare. Puoi sempre passare a Pro più tardi.</small>
+                    </div>
+                `;
+            } else if (selectedPlan === 'pro') {
+                bannerContainer.className = 'alert alert-success d-flex align-items-center mb-3';
+                bannerContainer.style.borderRadius = '10px';
+                bannerContainer.style.background = 'linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)';
+                bannerContainer.style.border = '2px solid #28a745';
+                bannerContainer.innerHTML = `
+                    <i class="bi bi-gift-fill me-3 fs-4 text-success"></i>
+                    <div class="flex-grow-1">
+                        <strong class="d-block">🎁 Hai scelto il piano Pro!</strong>
+                        <small class="d-block mt-1">
+                            Avrai <strong>15 giorni gratis</strong> per provarlo.
+                            <a href="{% url 'landing' %}#pricing" class="text-decoration-underline">Cambia piano →</a>
+                        </small>
+                    </div>
+                    <span class="badge bg-success fs-6 px-3 py-2">Pro</span>
+                `;
+            } else if (selectedPlan === 'enterprise') {
+                bannerContainer.className = 'alert alert-success d-flex align-items-center mb-3';
+                bannerContainer.style.borderRadius = '10px';
+                bannerContainer.style.background = 'linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%)';
+                bannerContainer.style.border = '2px solid #dc3545';
+                bannerContainer.innerHTML = `
+                    <i class="bi bi-rocket-takeoff-fill me-3 fs-4 text-danger"></i>
+                    <div class="flex-grow-1">
+                        <strong class="d-block">🚀 Hai scelto il piano Enterprise!</strong>
+                        <small class="d-block mt-1">
+                            Soluzione personalizzata per le tue esigenze.
+                            <a href="mailto:support@coparentmanager.com" class="text-decoration-underline">Contattaci →</a>
+                        </small>
+                    </div>
+                    <span class="badge bg-danger fs-6 px-3 py-2">Enterprise</span>
+                `;
+            }
+        }
+
+        // 2. Aggiorna il badge nella sezione "Piano di abbonamento"
+        const planBadge = document.querySelector('.plan-badge');
+        if (planBadge) {
+            planBadge.className = 'plan-badge'; // Reset classi
+
+            if (selectedPlan === 'starter') {
+                planBadge.classList.add('plan-badge-starter');
+                planBadge.innerHTML = '🌱 Starter';
+            } else if (selectedPlan === 'pro') {
+                planBadge.classList.add('plan-badge-pro');
+                planBadge.innerHTML = '⭐ Pro';
+            } else if (selectedPlan === 'enterprise') {
+                planBadge.classList.add('plan-badge-enterprise');
+                planBadge.innerHTML = '🚀 Enterprise';
+            }
+        }
+    }
 });
 </script>
+
 {% endblock extra_js %}
