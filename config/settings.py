@@ -36,17 +36,24 @@ DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 #CSRF_TRUSTED_ORIGINS = ["https://*.herokuapp.com"]
 CSRF_TRUSTED_ORIGINS = [
-    "https://*.onrender.com",
     "https://coparentmanager.com",
     "https://www.coparentmanager.com",
+	"https://*.coparentmanager.com",
 ]
+
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 
 # ✅ HOSTS (Render usa .onrender.com)
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = [
+	"coparentmanager.com",
+    "www.coparentmanager.com",
+	"coparent-manager.onrender.com",
+	".coparentmanager.com",
+]
 
 if os.getenv("ENV") == "production":
-    FRONTEND_DOMAIN = "https://tuodominio.com"
+    FRONTEND_DOMAIN = "https://coparentmanager.com"
 else:
     FRONTEND_DOMAIN = "http://127.0.0.1:8000"
 # Application definition
@@ -109,31 +116,6 @@ TEMPLATES = [
     },
 ]
 
-
-
-
-# Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
-#DATABASES = {
-#    'default': {
-#        'ENGINE': 'django.db.backends.sqlite3',
-#        'NAME': BASE_DIR / 'db.sqlite3',
-#    }}
-
-'''
-# Database PostgreSQL
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME'),
-        'USER': config('DB_USER'),
-        'PASSWORD': config('DB_PASSWORD'),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
-    }
-}
-'''
 ## ✅ Database: PostgreSQL su Render, SQLite in locale
 if os.environ.get("RENDER") or os.environ.get("PRODUCTION"):
     # Produzione: usa le variabili DB_* impostate su Render
@@ -161,7 +143,7 @@ else:
 
 X_FRAME_OPTIONS = 'SAMEORIGIN'
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / "media" #os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = BASE_DIR / "media" 
 #DEFAULT_FILE_STORAGE = "storages.backends.s3boto3.S3Boto3Storage"   online
 # Password validation
 # https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
@@ -341,6 +323,7 @@ else:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000  # 1 anno
+	
 
 
 # ⚡ CONFIGURAZIONE CELERY
