@@ -41,10 +41,7 @@ CSRF_TRUSTED_ORIGINS = [
 	"https://*.coparentmanager.com",
 ]
 
-SECURE_PROXY_SSL_HEADER = (
-    "HTTP_X_FORWARDED_PROTO",
-    "https"
-)
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 
 # ✅ HOSTS (Render usa .onrender.com)
