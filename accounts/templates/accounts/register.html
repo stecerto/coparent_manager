@@ -23,7 +23,7 @@
         border-radius: 12px;
         box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
         padding: 2.5rem;
-        max-width: 550px; /* Leggermente più larga per i form di registrazione */
+        max-width: 550px;
         width: 100%;
         animation: slideUp 0.5s ease;
     }
@@ -142,7 +142,7 @@
         .register-title { font-size: 1.5rem; }
     }
 
-        /* 🎁 BANNER PIANO PRE-SELEZIONATO */
+    /* 🎁 BANNER PIANO */
     .plan-badge {
         display: inline-block;
         padding: 0.5rem 1rem;
@@ -174,8 +174,8 @@
 
 {% block content %}
 <div class="register-container">
-        <div class="register-card">
-        <!-- 🎯 LOGO AZIENDALE (Sostituisce l'icona generica) -->
+    <div class="register-card">
+        <!-- 🎯 LOGO AZIENDALE -->
         <div class="register-icon" style="background: #ffffff; padding: 15px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.15);">
             <img src="{% static 'images/logo-coparent.svg' %}" alt="CoParent Manager Logo" style="max-width: 80px; height: auto; object-fit: contain;">
         </div>
@@ -194,66 +194,50 @@
                 </div>
             </div>
         {% endif %}
-        <!-- 🎯 PIANO PRE-SELEZIONATO (dalla Landing Page) -->
-        {% if selected_plan and selected_plan != 'starter' %}
-        <div class="alert alert-success d-flex align-items-center mb-3" style="border-radius: 10px; background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%); border: 2px solid #28a745;">
-            <i class="bi bi-gift-fill me-3 fs-4 text-success"></i>
-            <div class="flex-grow-1">
-                <strong class="d-block">🎁 Hai scelto il piano {{ selected_plan|title }}!</strong>
-                <small class="d-block mt-1">
-                    Avrai <strong>15 giorni gratis</strong> per provarlo.
-                    <a href="{% url 'landing' %}#pricing" class="text-decoration-underline">Cambia piano →</a>
-                </small>
-            </div>
-            <span class="badge bg-success fs-6 px-3 py-2">{{ selected_plan|title }}</span>
-        </div>
-        {% elif selected_plan == 'starter' %}
-        <div class="alert alert-info d-flex align-items-center mb-3" style="border-radius: 10px;">
-            <i class="bi bi-info-circle-fill me-3 fs-5 text-primary"></i>
-            <div class="flex-grow-1">
-                <strong>Piano Starter selezionato</strong><br>
-                <small>Perfetto per iniziare. Puoi sempre passare a Pro più tardi.</small>
-            </div>
-        </div>
-        {% endif %}
 
+        <!-- ❌ RIMOSSO: Banner pre-selezionato duplicato -->
 
         <!-- 📝 FORM REGISTRAZIONE -->
-        <form method="POST" novalidate>
-            {% csrf_token %}
+<form method="POST" novalidate>
+    {% csrf_token %}
 
-            <!-- ✅ CORRETTO: Chiusura div corretta (era "3>" per errore) -->
-            <div class="mb-3">
-                {{ form|crispy }}
-            </div>
+    <!-- ✅ Renderizza tutti i campi TRANNNE 'plan' (che ha la sua sezione dedicata) -->
+    <div class="mb-3">
+        {% for field in form %}
+            {% if field.name != 'plan' %}
+                {% load crispy_forms_tags %}
+                {{ field|as_crispy_field }}
+            {% endif %}
+        {% endfor %}
+    </div>
 
-            <!-- 📦 SCELTA PIANO -->
-            <div class="section-box">
-                <div class="section-title">
-                    <i class="bi bi-box-seam-fill text-primary"></i> Piano di abbonamento
-                </div>
-                 <!-- Badge visivo del piano selezionato -->
-                {% if selected_plan %}
-                <div class="mb-3 text-center">
-                    <span class="plan-badge plan-badge-{{ selected_plan }}">
-                        {% if selected_plan == 'starter' %}🌱 Starter{% elif selected_plan == 'pro' %}⭐ Pro{% elif selected_plan == 'enterprise' %}🚀 Enterprise{% endif %}
-                    </span>
-                </div>
-                {% endif %}
+    <!-- 📦 SCELTA PIANO (unica sezione dedicata) -->
+    <div class="section-box">
+        <div class="section-title">
+            <i class="bi bi-box-seam-fill text-primary"></i> Piano di abbonamento
+        </div>
 
-                <label for="{{ form.plan.id_for_label }}" class="form-label small text-muted mb-1">
-                    Seleziona il piano più adatto alle tue esigenze
-                </label>
-                {{ form.plan }}
+        <!-- Badge visivo del piano selezionato (aggiornato da JS) -->
+        <div class="mb-3 text-center">
+            <span id="plan-badge" class="plan-badge plan-badge-{{ selected_plan|default:'starter' }}">
+                {% if selected_plan == 'pro' %}⭐ Pro
+                {% elif selected_plan == 'enterprise' %}🚀 Enterprise
+                {% else %}🌱 Starter{% endif %}
+            </span>
+        </div>
 
-                <small class="text-muted d-block mt-2" style="font-size: 0.8rem;">
-                    <i class="bi bi-info-circle me-1"></i>
-                    <strong>15 giorni gratis</strong> su tutti i piani. Nessuna carta richiesta.
-                    Puoi cambiare o annullare in qualsiasi momento dalle Impostazioni.
-                    <a href="{% url 'landing' %}#pricing" target="_blank" class="register-link">Confronta i piani →</a>
-                </small>
+        <label for="{{ form.plan.id_for_label }}" class="form-label small text-muted mb-1">
+            Seleziona il piano più adatto alle tue esigenze
+        </label>
+        {{ form.plan }}
 
-            </div>
+        <small class="text-muted d-block mt-2" style="font-size: 0.8rem;">
+            <i class="bi bi-info-circle me-1"></i>
+            <strong>15 giorni gratis</strong> su tutti i piani. Nessuna carta richiesta.
+            Puoi cambiare o annullare in qualsiasi momento dalle Impostazioni.
+            <a href="{% url 'landing' %}#pricing" target="_blank" class="register-link">Confronta i piani →</a>
+        </small>
+    </div>
 
             <!-- 🔒 CONSENSO PRIVACY (GDPR) -->
             <div class="section-box" style="background: #fff; border-color: #cbd5e0;">
@@ -261,12 +245,11 @@
                     <i class="bi bi-shield-lock-fill text-success"></i> Sicurezza e Privacy
                 </div>
 
-                <!-- Informativa Breve -->
                 <div class="privacy-alert">
                     <h6><i class="bi bi-check-circle-fill me-1"></i> Tutele Rafforzate</h6>
                     <ul class="mb-0 ps-3">
                         <li>Crittografia end-to-end per documenti e note sensibili</li>
- <li>Server esclusivamente in UE (GDPR compliant)</li>
+                        <li>Server esclusivamente in UE (GDPR compliant)</li>
                         <li>Zero profilazione, zero pubblicità, zero vendita dati</li>
                     </ul>
                     <p class="small mb-0 mt-2">
@@ -274,7 +257,6 @@
                     </p>
                 </div>
 
-                <!-- Checkbox e Bottone -->
                 <div class="form-check mb-2">
                     <input class="form-check-input" type="checkbox" id="privacyConsent" name="privacy_accept" required disabled>
                     <label class="form-check-label small fw-bold" for="privacyConsent">
@@ -317,7 +299,6 @@
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body p-4">
-                <!-- STEP 1: Leggi -->
                 <div id="step1">
                     <h6 class="fw-bold mb-3 text-primary">Come proteggiamo i tuoi dati</h6>
                     <ul class="list-unstyled mb-4">
@@ -333,7 +314,6 @@
                     </button>
                 </div>
 
-                <!-- STEP 2: Accetta -->
                 <div id="step2" style="display:none;">
                     <div class="alert alert-warning small mb-3 d-flex align-items-start">
                         <i class="bi bi-exclamation-triangle-fill me-2 mt-1"></i>
@@ -353,7 +333,6 @@
         </div>
     </div>
 </div>
-<!-- FINE MODALE -->
 
 {% endblock content %}
 
@@ -361,18 +340,16 @@
 <script src="{% static 'js/coparentmanager.js' %}"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
-    // Logica per il modale a 2 step
+    // Modale a 2 step
     window.goToStep = (step) => {
         document.getElementById('step1').style.display = step === 1 ? 'block' : 'none';
         document.getElementById('step2').style.display = step === 2 ? 'block' : 'none';
     };
 
-    // Abilita il bottone di accettazione solo se la checkbox è spuntata
     document.getElementById('modalPrivacyCheck').addEventListener('change', function() {
         document.getElementById('acceptBtn').disabled = !this.checked;
     });
 
-    // Azione finale: abilita form e chiudi modale
     window.acceptAndClose = () => {
         const formCheck = document.getElementById('privacyConsent');
         formCheck.checked = true;
@@ -380,89 +357,46 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const registerBtn = document.getElementById('registerBtn');
         registerBtn.disabled = false;
-        registerBtn.classList.remove('btn-outline-secondary'); // Rimuovi eventuali classi di stato
+        registerBtn.classList.remove('btn-outline-secondary');
 
         const modalEl = document.getElementById('privacyOnboardingModal');
         const modal = bootstrap.Modal.getInstance(modalEl);
         if (modal) modal.hide();
     };
-// ✅ NUOVO: Aggiorna il banner del piano quando cambia il select
-    const planSelect = document.getElementById('id_plan');
 
-    if (planSelect) {
+    // ✅ Aggiorna il badge del piano quando cambia il select
+    const planSelect = document.getElementById('id_plan');
+    const planBadge = document.getElementById('plan-badge');
+
+    if (planSelect && planBadge) {
+        // Inizializza al caricamento con il valore attuale del select
+        updatePlanBadge(planSelect.value);
+
+        // Ascolta i cambi
         planSelect.addEventListener('change', function() {
-            updatePlanBanner(this.value);
+            updatePlanBadge(this.value);
         });
     }
 
-    function updatePlanBanner(selectedPlan) {
-        // 1. Aggiorna il banner principale (alert in alto)
-        const bannerContainer = document.querySelector('.alert-success, .alert-info');
+    function updatePlanBadge(selectedPlan) {
+        // Reset classi
+        planBadge.className = 'plan-badge';
 
-        if (bannerContainer && bannerContainer.innerHTML.includes('Piano')) {
-            if (selectedPlan === 'starter') {
-                bannerContainer.className = 'alert alert-info d-flex align-items-center mb-3';
-                bannerContainer.style.borderRadius = '10px';
-                bannerContainer.innerHTML = `
-                    <i class="bi bi-info-circle-fill me-3 fs-5 text-primary"></i>
-                    <div class="flex-grow-1">
-                        <strong>Piano Starter selezionato</strong><br>
-                        <small>Perfetto per iniziare. Puoi sempre passare a Pro più tardi.</small>
-                    </div>
-                `;
-            } else if (selectedPlan === 'pro') {
-                bannerContainer.className = 'alert alert-success d-flex align-items-center mb-3';
-                bannerContainer.style.borderRadius = '10px';
-                bannerContainer.style.background = 'linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%)';
-                bannerContainer.style.border = '2px solid #28a745';
-                bannerContainer.innerHTML = `
-                    <i class="bi bi-gift-fill me-3 fs-4 text-success"></i>
-                    <div class="flex-grow-1">
-                        <strong class="d-block">🎁 Hai scelto il piano Pro!</strong>
-                        <small class="d-block mt-1">
-                            Avrai <strong>15 giorni gratis</strong> per provarlo.
-                            <a href="{% url 'landing' %}#pricing" class="text-decoration-underline">Cambia piano →</a>
-                        </small>
-                    </div>
-                    <span class="badge bg-success fs-6 px-3 py-2">Pro</span>
-                `;
-            } else if (selectedPlan === 'enterprise') {
-                bannerContainer.className = 'alert alert-success d-flex align-items-center mb-3';
-                bannerContainer.style.borderRadius = '10px';
-                bannerContainer.style.background = 'linear-gradient(135deg, #f8d7da 0%, #f5c6cb 100%)';
-                bannerContainer.style.border = '2px solid #dc3545';
-                bannerContainer.innerHTML = `
-                    <i class="bi bi-rocket-takeoff-fill me-3 fs-4 text-danger"></i>
-                    <div class="flex-grow-1">
-                        <strong class="d-block">🚀 Hai scelto il piano Enterprise!</strong>
-                        <small class="d-block mt-1">
-                            Soluzione personalizzata per le tue esigenze.
-                            <a href="mailto:support@coparentmanager.com" class="text-decoration-underline">Contattaci →</a>
-                        </small>
-                    </div>
-                    <span class="badge bg-danger fs-6 px-3 py-2">Enterprise</span>
-                `;
-            }
-        }
-
-        // 2. Aggiorna il badge nella sezione "Piano di abbonamento"
-        const planBadge = document.querySelector('.plan-badge');
-        if (planBadge) {
-            planBadge.className = 'plan-badge'; // Reset classi
-
-            if (selectedPlan === 'starter') {
-                planBadge.classList.add('plan-badge-starter');
-                planBadge.innerHTML = '🌱 Starter';
-            } else if (selectedPlan === 'pro') {
-                planBadge.classList.add('plan-badge-pro');
-                planBadge.innerHTML = '⭐ Pro';
-            } else if (selectedPlan === 'enterprise') {
-                planBadge.classList.add('plan-badge-enterprise');
-                planBadge.innerHTML = '🚀 Enterprise';
-            }
+        if (selectedPlan === 'starter') {
+            planBadge.classList.add('plan-badge-starter');
+            planBadge.innerHTML = '🌱 Starter';
+        } else if (selectedPlan === 'pro') {
+            planBadge.classList.add('plan-badge-pro');
+            planBadge.innerHTML = '⭐ Pro';
+        } else if (selectedPlan === 'enterprise') {
+            planBadge.classList.add('plan-badge-enterprise');
+            planBadge.innerHTML = '🚀 Enterprise';
+        } else {
+            // Fallback
+            planBadge.classList.add('plan-badge-starter');
+            planBadge.innerHTML = '🌱 Starter';
         }
     }
 });
 </script>
-
 {% endblock extra_js %}
