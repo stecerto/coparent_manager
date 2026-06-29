@@ -36,14 +36,24 @@ DEBUG = os.getenv('DEBUG', 'False') == 'True'
 
 #CSRF_TRUSTED_ORIGINS = ["https://*.herokuapp.com"]
 CSRF_TRUSTED_ORIGINS = [
-    "https://*.onrender.com",
     "https://coparentmanager.com",
     "https://www.coparentmanager.com",
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://coparentmanager.it",
+    "https://www.coparentmanager.it",
+]
+
+SECURE_PROXY_SSL_HEADER = (
+    "HTTP_X_FORWARDED_PROTO",
+    "https"
+)
+
 
 # ✅ HOSTS (Render usa .onrender.com)
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = ["coparentmanager.it",
+    "www.coparentmanager.it",]
 
 if os.getenv("ENV") == "production":
     FRONTEND_DOMAIN = "https://tuodominio.com"
