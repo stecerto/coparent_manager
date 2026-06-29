@@ -38,11 +38,7 @@ DEBUG = os.getenv('DEBUG', 'False') == 'True'
 CSRF_TRUSTED_ORIGINS = [
     "https://coparentmanager.com",
     "https://www.coparentmanager.com",
-]
-
-CSRF_TRUSTED_ORIGINS = [
-    "https://coparentmanager.it",
-    "https://www.coparentmanager.it",
+	"https://*.coparentmanager.com",
 ]
 
 SECURE_PROXY_SSL_HEADER = (
@@ -52,11 +48,15 @@ SECURE_PROXY_SSL_HEADER = (
 
 
 # ✅ HOSTS (Render usa .onrender.com)
-ALLOWED_HOSTS = ["coparentmanager.it",
-    "www.coparentmanager.it",]
+ALLOWED_HOSTS = [
+	"coparentmanager.com",
+    "www.coparentmanager.com",
+	"coparent-manager.onrender.com",
+	".coparentmanager.com",
+]
 
 if os.getenv("ENV") == "production":
-    FRONTEND_DOMAIN = "https://tuodominio.com"
+    FRONTEND_DOMAIN = "https://coparentmanager.com"
 else:
     FRONTEND_DOMAIN = "http://127.0.0.1:8000"
 # Application definition
@@ -119,31 +119,6 @@ TEMPLATES = [
     },
 ]
 
-
-
-
-# Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
-
-#DATABASES = {
-#    'default': {
-#        'ENGINE': 'django.db.backends.sqlite3',
-#        'NAME': BASE_DIR / 'db.sqlite3',
-#    }}
-
-'''
-# Database PostgreSQL
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': config('DB_NAME'),
-        'USER': config('DB_USER'),
-        'PASSWORD': config('DB_PASSWORD'),
-        'HOST': config('DB_HOST', default='localhost'),
-        'PORT': config('DB_PORT', default='5432'),
-    }
-}
-'''
 ## ✅ Database: PostgreSQL su Render, SQLite in locale
 if os.environ.get("RENDER") or os.environ.get("PRODUCTION"):
     # Produzione: usa le variabili DB_* impostate su Render
@@ -351,6 +326,7 @@ else:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000  # 1 anno
+	SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
 
 # ⚡ CONFIGURAZIONE CELERY
