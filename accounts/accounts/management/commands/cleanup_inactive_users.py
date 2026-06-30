@@ -9,14 +9,14 @@ logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
-    help = 'Elimina account inattivi più vecchi di 30 giorni'
+    help = 'Elimina account inattivi (fallita registrazione) dopo 15 giorni'
 
     def add_arguments(self, parser):
         parser.add_argument(
             '--days',
             type=int,
-            default=30,
-            help='Numero di giorni di inattività (default: 30)'
+            default=15,
+            help='Numero di giorni di inattività (default: 15)'
         )
         parser.add_argument(
             '--dry-run',
@@ -30,7 +30,7 @@ class Command(BaseCommand):
 
         cutoff_date = timezone.now() - timedelta(days=days)
 
-        # Trova utenti inattivi vecchi
+        # Trova utenti inattivi (is_active=False) più vecchi di 15 giorni
         inactive_users = User.objects.filter(
             is_active=False,
             date_joined__lt=cutoff_date
@@ -39,20 +39,41 @@ class Command(BaseCommand):
         count = inactive_users.count()
 
         if count == 0:
-            self.stdout.write(self.style.SUCCESS('✅ Nessun account inattivo da eliminare'))
+            self.stdout.write(self.style.SUCCESS(
+                f'✅ Nessun account inattivo da eliminare (più vecchi di {days} giorni)'
+            ))
             return
+
+        self.stdout.write(self.style.WARNING(
+            f'🔍 Trovati {count} account inattivi più vecchi di {days} giorni'
+        ))
 
         if dry_run:
             self.stdout.write(self.style.WARNING(
-                f'🔍 [DRY RUN] Verrebbero eliminati {count} account inattivi:'
+                f'🔍 [DRY RUN] Verrebbero eliminati {count} account:'
             ))
-            for user in inactive_users[:10]:
-                self.stdout.write(f'  - {user.email} (registrato il {user.date_joined})')
-            if count > 10:
-                self.stdout.write(f'  ... e altri {count - 10}')
+            for user in inactive_users[:20]:
+                days_old = (timezone.now() - user.date_joined).days
+                self.stdout.write(
+                    f'  - {user.email} (registrato {days_old} giorni fa)'
+                )
+            if count > 20:
+                self.stdout.write(f'  ... e altri {count - 20}')
         else:
-            inactive_users.delete()
+            # Elimina anche i profili associati
+            for user in inactive_users:
+                # Elimina profilo se esiste
+                if hasattr(user, 'userprofile'):
+                    user.userprofile.delete()
+
+                # Elimina inviti pendenti
+                if hasattr(user, 'sent_invitations'):
+                    user.sent_invitations.filter(status='pending').delete()
+
+                # Elimina utente
+                user.delete()
+                logger.info(f"🗑️ Eliminato account inattivo: {user.email}")
+
             self.stdout.write(self.style.SUCCESS(
                 f'✅ Eliminati {count} account inattivi più vecchi di {days} giorni'
             ))
-            logger.info(f"🗑️ Cleanup: eliminati {count} account inattivi")
