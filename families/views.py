@@ -285,6 +285,7 @@ def export_expenses_csv(expenses_qs, family):
 def setup_view(request):
     user = request.user
     profile, _ = UserProfile.objects.get_or_create(user=user)
+    
 
     # ✅ CORRETTO: usa is_professional (True per lawyer, mediator, consultant)
     is_professional = profile.role in [RoleChoices.LAWYER, RoleChoices.MEDIATOR, RoleChoices.CONSULTANT]

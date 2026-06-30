@@ -62,8 +62,11 @@ class UserProfile(models.Model):
 
     # Dati personali
     address = models.CharField(max_length=255, blank=True)
-    birth_date = models.DateField(default=timezone.now)
+    birth_date = models.DateField(null=True, blank=True)
     birth_place = models.CharField(max_length=255, blank=True)
+    birth_place_code = models.CharField(max_length=10, blank=True)
+    gender = models.CharField(max_length=1, choices=[("M", "M"), ("F", "F")])
+    codice_fiscale = models.CharField(max_length=16, blank=True, null=True)
     phone = PhoneNumberField(null=True, blank=True)
 
     firm_name = models.CharField(max_length=100, blank=True)
@@ -72,6 +75,17 @@ class UserProfile(models.Model):
         blank=True,
         verbose_name="Partita IVA",
         help_text="Obbligatoria per avvocati e professionisti"
+    )
+
+    cf_status = models.CharField(
+        max_length=20,
+        choices=[
+            ("pending", "Da calcolare"),
+            ("calculated", "Calcolato"),
+            ("manual", "Manuale"),
+            ("invalid", "Non valido"),
+        ],
+        default="pending"
     )
 
     # ✅ PIANO ABBONAMENTO

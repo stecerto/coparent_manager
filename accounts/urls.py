@@ -1,11 +1,14 @@
 from django.urls import path
-from .views import register_view, login_view, logout_view, activate_account, resend_activation, delete_account
+from .views import register_view, login_view, logout_view, activate_account, resend_activation, delete_account, calculate_cf_api,recalc_cf_view
 from django.contrib.auth import views as auth_views
 from . import views
+
 
 app_name = "accounts"
 
 urlpatterns = [
+    path("profile/cf/recalculate/", recalc_cf_view, name="recalc_cf"),
+    path("profile/cf/calculate/", calculate_cf_api, name="calculate_cf_api"),
     path("register/", register_view, name="register"),
     path("login/", login_view, name="login"),
     path("logout/", logout_view, name="logout"),

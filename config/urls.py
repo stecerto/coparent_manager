@@ -29,7 +29,7 @@ from django.views.decorators.csrf import csrf_exempt
 import traceback
 
 urlpatterns = [
-    path('temp-create-admin-xyz123/', create_admin_temp),
+
     path('admin/', admin.site.urls),
     path("accounts/", include("accounts.urls")),
 #Core

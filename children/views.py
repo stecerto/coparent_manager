@@ -4,23 +4,17 @@ import json
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
-from django.http import FileResponse
 from django.shortcuts import render, redirect
 
-
-from children.models import ChildSupport
+from children.forms import ChildSupportForm, ChildForm
 from children.services.child_service import (
     create_child,
     update_child,
     archive_child
 )
-
 from children.utils import calculate_expense_shares, get_child_split_pct
-from expenses.models import Expense
 from expenses.services.expences_service import calculate_monthly_net_balance
 from families.models import FamilyMember
-
-from children.forms import ChildSupportForm, ChildForm
 from .notifications.services_notification import notify_other_parent
 from .services.child_service import update_child_support
 
@@ -34,7 +28,6 @@ def children_list(request):
     today = date.today()
     # ✅ Prefetcha relazioni per evitare query N+1
     children = list(family.children.filter(is_active=True).prefetch_related('supports', 'expenses'))
-    from children.models import ChildSupport
 
     # ✅ MIGRATO A SpouseSupportAgreement
     from families.models import SpouseSupportAgreement

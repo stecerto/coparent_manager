@@ -184,21 +184,55 @@ form + .card.border-danger {
         </div>
 
         <!-- DATI PROFILO -->
-        <div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
-            <div class="card-header bg-white border-bottom border-start border-1 border-secondary d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
-                <i class="bi bi-person-badge fs-3 text-secondary me-3"></i>
-                <h5 class="mb-0 fw-bold">Profilo</h5>
-            </div>
-            <div class="card-body p-4">
-                <div class="child-form">
-                    {% for field in form_profile %}
-                        {% if field.name and field.field %}
-                            {{ field|as_crispy_field }}
-                        {% endif %}
-                    {% endfor %}
+<div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
+    <div class="card-header bg-white border-bottom border-start border-1 border-secondary d-flex align-items-center py-3" style="border-radius: 12px 12px 0 0 !important;">
+        <i class="bi bi-person-badge fs-3 text-secondary me-3"></i>
+        <h5 class="mb-0 fw-bold">Profilo</h5>
+    </div>
+    <div class="card-body p-4">
+        <div class="child-form">
+            {% for field in form_profile %}
+                {{ field|as_crispy_field }}
+            {% endfor %}
+
+            <!-- ✅ CAMPO CODICE FISCALE (readonly, auto-calcolato) -->
+            <div class="mt-4 p-3 bg-light rounded" style="border-left: 4px solid #667eea;">
+                <label class="form-label fw-bold">
+                    <i class="bi bi-calculator me-2"></i>
+                    Codice Fiscale
+                    <span id="cf-status-badge" class="badge bg-secondary ms-2" style="display: none;">
+                        In attesa
+                    </span>
+                </label>
+                <div class="input-group">
+                    <input
+                        type="text"
+                        id="codice_fiscale_display"
+                        class="form-control font-monospace"
+                        readonly
+                        placeholder="In compilazione automatica..."
+                        value="{{ form_profile.instance.codice_fiscale|default:'' }}"
+                        style="text-transform: uppercase; letter-spacing: 1px;"
+                    >
+                    <button
+                        type="button"
+                        class="btn btn-outline-secondary"
+                        id="btn-recalc-cf"
+                        title="Ricalcola manualmente"
+                    >
+                        <i class="bi bi-arrow-clockwise"></i>
+                    </button>
                 </div>
+                <small class="text-muted mt-1 d-block">
+                    <i class="bi bi-info-circle me-1"></i>
+                    Il codice fiscale viene calcolato automaticamente appena inserisci data di nascita, comune e genere
+                </small>
             </div>
+
         </div>
+    </div>
+</div>
+
 
         <!-- 🔗 INTEGRAZIONE GOOGLE CALENDAR -->
         <div class="card shadow-sm mb-4 border-0" style="border-radius: 12px;">
@@ -465,4 +499,137 @@ form + .card.border-danger {
 
 {% block extra_js %}
 <script src="{% static 'js/pages/setup.js' %}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const cfDisplay = document.getElementById('codice_fiscale_display');
+    const cfStatusBadge = document.getElementById('cf-status-badge');
+    const btnRecalc = document.getElementById('btn-recalc-cf');
+
+    // ✅ Campi da monitorare (incluso gender)
+    const fieldsToWatch = [
+        { id: 'id_first_name', name: 'first_name' },
+        { id: 'id_last_name', name: 'last_name' },
+        { id: 'id_birth_date', name: 'birth_date' },
+        { id: 'id_birth_place_code', name: 'birth_place_code' },
+        { id: 'id_gender', name: 'gender' }
+    ];
+
+    let debounceTimer = null;
+
+    function collectData() {
+        const data = {};
+        let allFilled = true;
+
+        fieldsToWatch.forEach(field => {
+            const element = document.getElementById(field.id);
+            if (element) {
+                const value = element.value.trim();
+                data[field.name] = value;
+                if (!value) allFilled = false;
+            }
+        });
+
+        return { data, allFilled };
+    }
+
+    function updateStatus(status, message = null) {
+        if (!cfStatusBadge) return;
+
+        cfStatusBadge.style.display = 'inline-block';
+
+        switch(status) {
+            case 'calculating':
+                cfStatusBadge.className = 'badge bg-warning text-dark ms-2';
+                cfStatusBadge.innerHTML = '<i class="bi bi-hourglass-split"></i> Calcolo...';
+                break;
+            case 'calculated':
+                cfStatusBadge.className = 'badge bg-success ms-2';
+                cfStatusBadge.innerHTML = '<i class="bi bi-check-circle"></i> Calcolato';
+                break;
+            case 'invalid':
+                cfStatusBadge.className = 'badge bg-danger ms-2';
+                cfStatusBadge.innerHTML = '<i class="bi bi-x-circle"></i> Non valido';
+                break;
+            case 'incomplete':
+                cfStatusBadge.className = 'badge bg-secondary ms-2';
+                cfStatusBadge.innerHTML = '<i class="bi bi-hourglass"></i> In attesa';
+                break;
+        }
+    }
+
+    async function calculateCF() {
+        const { data, allFilled } = collectData();
+
+        if (!allFilled) {
+            updateStatus('incomplete');
+            if (cfDisplay) cfDisplay.value = '';
+            return;
+        }
+
+        updateStatus('calculating');
+
+        try {
+            const response = await fetch('{% url "accounts:calculate_cf_api" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
+                },
+                body: JSON.stringify(data)
+            });
+
+            const result = await response.json();
+
+            if (result.success && result.cf) {
+                if (cfDisplay) cfDisplay.value = result.cf;
+                updateStatus('calculated');
+            } else {
+                if (cfDisplay) cfDisplay.value = '';
+                updateStatus('invalid', result.message);
+            }
+
+        } catch (error) {
+            console.error('Errore calcolo CF:', error);
+            updateStatus('invalid', 'Errore di connessione');
+        }
+    }
+
+    // ✅ Aggiungi event listener a tutti i campi
+    fieldsToWatch.forEach(field => {
+        const element = document.getElementById(field.id);
+        if (element) {
+            // Usa 'change' per select/date, 'blur' per text
+            const eventType = (field.id === 'id_birth_date' || field.id === 'id_gender' || field.id === 'id_birth_place_code')
+                ? 'change'
+                : 'blur';
+
+            element.addEventListener(eventType, function() {
+                clearTimeout(debounceTimer);
+                debounceTimer = setTimeout(calculateCF, 500);
+            });
+
+            // Per campi text, calcola anche su input
+            if (eventType === 'blur') {
+                element.addEventListener('input', function() {
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(calculateCF, 500);
+                });
+            }
+        }
+    });
+
+    // Bottone ricalcolo manuale
+    if (btnRecalc) {
+        btnRecalc.addEventListener('click', calculateCF);
+    }
+
+    // Calcolo iniziale se i dati sono già presenti
+    const { allFilled } = collectData();
+    if (allFilled) {
+        calculateCF();
+    } else {
+        updateStatus('incomplete');
+    }
+});
+</script>
 {% endblock %}

@@ -200,7 +200,7 @@ def register_view(request):
             )
 
         # Email di attivazione
-        from accounts.services.email_service import send_activation_email  # Assicurati che l'import sia corretto per il tuo progetto
+          # Assicurati che l'import sia corretto per il tuo progetto
         send_activation_email(request, user)
         # ✅ Reindirizza al login con un messaggio chiaro, senza pagina intermedia inutile
         messages.success(
@@ -365,6 +365,9 @@ def delete_account(request):
 # =========================
 # LOGIN
 # =========================
+# =========================
+# LOGIN
+# =========================
 @ratelimit(key='ip', rate='5/10m', method='POST', block=True)
 def login_view(request):
     url_token = request.GET.get("invite_token")
@@ -382,151 +385,159 @@ def login_view(request):
 
     if request.method == "POST":
         form = AuthenticationForm(request, data=request.POST)
-        if form.is_valid():
-            user = form.get_user()
 
-            # ✅ CONTROLLO: Account attivo?
-            if not user.is_active:
-                # Account inattivo: redirect a pagina riattivazione
+        # ✅ CONTROLLO SPECIALE: Se il form non è valido, controlla se è per account inattivo
+        if not form.is_valid():
+            # Estrai email dalla form
+            email = request.POST.get("username", "").strip()
+
+            # Cerca utente con questa email
+            user = User.objects.filter(email=email).first()
+
+            # Se l'utente esiste ma è inattivo → redirect a pagina dedicata
+            if user and not user.is_active:
                 request.session['inactive_user_email'] = user.email
                 messages.warning(
                     request,
-                    "⚠️ Il tuo account non è ancora attivato. Controlla la tua email o richiedi un nuovo link."
+                    "⚠️ Il tuo account non è ancora attivato. "
+                    "Controlla la tua email o richiedi un nuovo link di attivazione."
                 )
                 return redirect('accounts:account_inactive')
 
-            # ✅ 2. LOGIN PRIMA DEL CONTROLLO
-            login(request, user)
-            # ✅ RESETTA il contatore dei tentativi falliti al login riuscito
-            if 'failed_login_attempts' in request.session:
-                del request.session['failed_login_attempts']
-
-            # ✅ 3. CONTROLLO STATO ABBONAMENTO (Robusto: controlla sia profile che subscription)
-            profile = getattr(user, 'profile', None)
-            subscription = getattr(user, 'subscription', None)
-
-            is_suspended = False
-            is_expired = False
-            days_left = 0
-
-            # Priorità al nuovo modello UserProfile
-            if profile:
-                is_suspended = getattr(profile, 'is_suspended', False) or getattr(profile, 'payment_status',
-                                                                                  '') == 'suspended'
-                is_expired = getattr(profile, 'is_expired', False)
-                if hasattr(profile, 'days_until_expiration') and profile.days_until_expiration is not None:
-                    days_left = profile.days_until_expiration
-            # Fallback al modello PaymentSubscription (se ancora in uso)
-            elif subscription:
-                is_suspended = subscription.status == 'suspended'
-                is_expired = subscription.is_expired
-                if subscription.grace_period_end:
-                    days_left = max(0, (subscription.grace_period_end - timezone.now()).days)
-
-            # Se sospeso o scaduto, reindirizza alla pagina prezzi con messaggio
-            if is_suspended:
-                messages.error(
-                    request,
-                    "🚫 Il tuo account è sospeso per mancato pagamento. Rinnova l'abbonamento per riattivare l'accesso."
-                )
-                return redirect('core:pricing')
-
-            elif is_expired:
-                messages.warning(
-                    request,
-                    f"⏰ Il tuo abbonamento è scaduto. Hai ancora {days_left} giorni di periodo di grazia prima della sospensione. Rinnova ora."
-                )
-                return redirect('core:pricing')
-
-            # 🔑 GESTIONE INVITO PENDENTE (priorità massima!)
-            pending_token = request.session.pop("pending_invite_token", None)
-            pending_token = request.session.pop("pending_invite_token", None)
-            if pending_token:
-                from families.models import Invitation
-                from families.services.invitation_service import accept_invitation
-
-                try:
-                    invitation = Invitation.objects.select_related('family').get(
-                        token=pending_token,
-                        status="pending"
-                    )
-
-                    # ✅ Accetta l'invito (local import per evitare dipendenza circolare a livello di modulo)
-                    accept_invitation(invitation, user)
-
-                    # Messaggio appropriato
-                    if invitation.family:
-                        messages.success(request,
-                                         f"✅ Sei stato aggiunto a '{invitation.family.name}' come {invitation.get_role_display()}")
-                    else:
-                        messages.success(request,
-                                         f"✅ Invito accettato! La tua famiglia è stata creata.")
-
-                    # ✅ REDIRECT IMMEDIATO alla home corretta
-                    profile = getattr(user, 'profile', None)
-                    if profile and profile.role in ['lawyer', 'mediator', 'consultant']:
-                        return redirect('lawyer_home')
-                    return redirect('home')
-
-                except Invitation.DoesNotExist:
-                    messages.warning(request, "⚠️ Invito non valido o già utilizzato")
-                except Exception as e:
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.error(f"Errore accettazione invito {pending_token}: {e}")
-                    messages.error(request, "⚠️ Si è verificato un errore tecnico. Contatta il supporto.")
-
-            # ✅ SE NON C'È INVITO PENDENTE, procedi con i controlli normali
-            profile = getattr(user, 'profile', None)
-            if not profile:
-                return redirect('families:setup')
-
-            # ✅ APPLICA RUOLO/PIANO DA SESSIONE se il profilo è incompleto
-            saved_role = request.session.pop("registration_role", None)
-            saved_plan = request.session.pop("registration_plan", None)
-
-            if saved_role and not profile.role:
-                role_map = {
-                    "parent": "parent_a",
-                    "lawyer": "lawyer_a",
-                    "mediator": "mediator",
-                    "consultant": "consultant",
-                }
-                profile.role = role_map.get(saved_role, "parent_a")
-
-            if saved_plan and hasattr(profile, "plan"):
-                profile.plan = saved_plan
-                profile.plan_started_at = timezone.now()
-                profile.save()
-
-            # 🎯 1. AVVOCATI / MEDIATORI / CONSULENTI
-            if profile.role in ['lawyer', 'mediator', 'consultant']:
-                if profile.setup_complete:
-                    return redirect('home')
-                return redirect('families:summary')
-
-            # 🎯 2. GENITORI
-            # ✅ RIMOSSO: logica famiglia (get_family_of_user)
-            # Il redirect a 'home' gestirà il routing corretto
-            # La view home o family_dashboard deciderà dove mandare l'utente
-
-            if not profile.setup_complete:
-                return redirect('families:summary')
-
-            # ✅ Tutto ok → redirect alla home (che smisterà in base al ruolo)
-            return redirect('home')
-
-        else:
-            # ❌ FORM NON VALIDO: Incrementa il contatore in sessione
+            # Altrimenti → credenziali davvero sbagliate
             attempts = request.session.get('failed_login_attempts', 0) + 1
             request.session['failed_login_attempts'] = attempts
             messages.error(request, "Credenziali non valide. Riprova.")
+            context = {
+                "form": form,
+                "failed_attempts": attempts
+            }
+            return render(request, "accounts/login.html", context)
 
-        # ⚠️ Se il form NON è valido, il codice CONTINUA qui sotto
+        # Form valido → procedi con login normale
+        user = form.get_user()
+
+        # ✅ 2. LOGIN PRIMA DEL CONTROLLO
+        login(request, user)
+
+        # ✅ RESETTA il contatore dei tentativi falliti al login riuscito
+        if 'failed_login_attempts' in request.session:
+            del request.session['failed_login_attempts']
+
+        # ✅ 3. CONTROLLO STATO ABBONAMENTO (Robusto: controlla sia profile che subscription)
+        profile = getattr(user, 'profile', None)
+        subscription = getattr(user, 'subscription', None)
+
+        is_suspended = False
+        is_expired = False
+        days_left = 0
+
+        # Priorità al nuovo modello UserProfile
+        if profile:
+            is_suspended = getattr(profile, 'is_suspended', False) or getattr(profile, 'payment_status',
+                                                                              '') == 'suspended'
+            is_expired = getattr(profile, 'is_expired', False)
+            if hasattr(profile, 'days_until_expiration') and profile.days_until_expiration is not None:
+                days_left = profile.days_until_expiration
+        # Fallback al modello PaymentSubscription (se ancora in uso)
+        elif subscription:
+            is_suspended = subscription.status == 'suspended'
+            is_expired = subscription.is_expired
+            if subscription.grace_period_end:
+                days_left = max(0, (subscription.grace_period_end - timezone.now()).days)
+
+        # Se sospeso o scaduto, reindirizza alla pagina prezzi con messaggio
+        if is_suspended:
+            messages.error(
+                request,
+                "🚫 Il tuo account è sospeso per mancato pagamento. Rinnova l'abbonamento per riattivare l'accesso."
+            )
+            return redirect('core:pricing')
+
+        elif is_expired:
+            messages.warning(
+                request,
+                f"⏰ Il tuo abbonamento è scaduto. Hai ancora {days_left} giorni di periodo di grazia prima della sospensione. Rinnova ora."
+            )
+            return redirect('core:pricing')
+
+        # 🔑 GESTIONE INVITO PENDENTE (priorità massima!)
+        pending_token = request.session.pop("pending_invite_token", None)
+        if pending_token:
+            from families.models import Invitation
+            from families.services.invitation_service import accept_invitation
+
+            try:
+                invitation = Invitation.objects.select_related('family').get(
+                    token=pending_token,
+                    status="pending"
+                )
+
+                # ✅ Accetta l'invito (local import per evitare dipendenza circolare a livello di modulo)
+                accept_invitation(invitation, user)
+
+                # Messaggio appropriato
+                if invitation.family:
+                    messages.success(request,
+                                     f"✅ Sei stato aggiunto a '{invitation.family.name}' come {invitation.get_role_display()}")
+                else:
+                    messages.success(request,
+                                     f"✅ Invito accettato! La tua famiglia è stata creata.")
+
+                # ✅ REDIRECT IMMEDIATO alla home corretta
+                profile = getattr(user, 'profile', None)
+                if profile and profile.role in ['lawyer', 'mediator', 'consultant']:
+                    return redirect('lawyer_home')
+                return redirect('home')
+
+            except Invitation.DoesNotExist:
+                messages.warning(request, "⚠️ Invito non valido o già utilizzato")
+            except Exception as e:
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(f"Errore accettazione invito {pending_token}: {e}")
+                messages.error(request, "⚠️ Si è verificato un errore tecnico. Contatta il supporto.")
+
+        # ✅ SE NON C'È INVITO PENDENTE, procedi con i controlli normali
+        profile = getattr(user, 'profile', None)
+        if not profile:
+            return redirect('families:setup')
+
+        # ✅ APPLICA RUOLO/PIANO DA SESSIONE se il profilo è incompleto
+        saved_role = request.session.pop("registration_role", None)
+        saved_plan = request.session.pop("registration_plan", None)
+
+        if saved_role and not profile.role:
+            role_map = {
+                "parent": "parent_a",
+                "lawyer": "lawyer_a",
+                "mediator": "mediator",
+                "consultant": "consultant",
+            }
+            profile.role = role_map.get(saved_role, "parent_a")
+
+        if saved_plan and hasattr(profile, "plan"):
+            profile.plan = saved_plan
+            profile.plan_started_at = timezone.now()
+            profile.save()
+
+        # 🎯 1. AVVOCATI / MEDIATORI / CONSULENTI
+        if profile.role in ['lawyer', 'mediator', 'consultant']:
+            if profile.setup_complete:
+                return redirect('home')
+            return redirect('families:summary')
+
+        # 🎯 2. GENITORI
+        if not profile.setup_complete:
+            return redirect('families:summary')
+
+        # ✅ Tutto ok → redirect alla home (che smisterà in base al ruolo)
+        return redirect('home')
 
     else:
         form = AuthenticationForm()
-        # ✅ PASSA il contatore al template
+
+    # ✅ PASSA il contatore al template
     context = {
         "form": form,
         "failed_attempts": request.session.get('failed_login_attempts', 0)
@@ -686,6 +697,101 @@ def account_inactive_view(request):
 
     return render(request, "accounts/account_inactive.html", {
         "email": email,
+    })
+
+
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_protect
+from accounts.utils import generate_cf
+import json
+
+
+@require_POST
+@csrf_protect
+def calculate_cf_api(request):
+    """API endpoint per calcolo codice fiscale in tempo reale"""
+    try:
+        data = json.loads(request.body)
+
+        first_name = data.get('first_name', '').strip()
+        last_name = data.get('last_name', '').strip()
+        birth_date = data.get('birth_date', '').strip()
+        birth_place_code = data.get('birth_place_code', '').strip()  # ← codice catastale
+        gender = data.get('gender', '').strip()
+
+        if not all([first_name, last_name, birth_date, birth_place_code, gender]):
+            return JsonResponse({
+                'success': False,
+                'message': 'Dati incompleti',
+                'cf': None
+            })
+
+        cf = generate_cf(
+            first_name=first_name,
+            last_name=last_name,
+            birth_date=birth_date,
+            birth_place_code=birth_place_code,  # ← codice, non nome
+            gender=gender
+        )
+
+        if cf:
+            return JsonResponse({
+                'success': True,
+                'cf': cf,
+                'status': 'calculated'
+            })
+        else:
+            return JsonResponse({
+                'success': False,
+                'message': 'Impossibile calcolare il codice fiscale',
+                'cf': None,
+                'status': 'invalid'
+            })
+
+    except Exception as e:
+        return JsonResponse({
+            'success': False,
+            'message': f'Errore: {str(e)}',
+            'cf': None,
+            'status': 'error'
+        }, status=400)
+
+
+from django.http import JsonResponse
+from django.contrib.auth.decorators import login_required
+from accounts.utils import generate_cf
+from accounts.models import UserProfile
+
+@login_required
+def recalc_cf_view(request):
+    user = request.user
+    profile = UserProfile.objects.get(user=user)
+
+    cf = generate_cf(
+        profile.user.first_name,
+        profile.user.last_name,
+        profile.birth_date,
+        profile.birth_place,
+        profile.gender
+    )
+
+    if cf:
+        profile.codice_fiscale = cf
+        profile.cf_status = "calculated"
+        profile.save()
+
+        return JsonResponse({
+            "success": True,
+            "cf": cf
+        })
+
+    profile.cf_status = "invalid"
+    profile.save()
+
+    return JsonResponse({
+        "success": False,
+        "error": "Dati insufficienti per calcolare il codice fiscale"
     })
 
 # =========================
