@@ -11,6 +11,7 @@ urlpatterns = [
     path("logout/", logout_view, name="logout"),
     path("activate/", activate_account, name="activate"),
     path("activate/resend/", resend_activation, name="resend_activation"),
+    path('account-inactive/', views.account_inactive_view, name='account_inactive'),
     path("delete-account/", delete_account, name="delete_account"),
 
     path("password_reset/",

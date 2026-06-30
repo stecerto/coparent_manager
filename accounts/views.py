@@ -102,6 +102,48 @@ def register_view(request):
             return render(request, "accounts/register.html", {"form": form})
 
         # Crea utente
+        # ✅ CONTROLLO: Email già esistente ma account inattivo?
+        existing_user = User.objects.filter(email=form.cleaned_data["email"], is_active=False).first()
+
+        if existing_user:
+            # Account inattivo trovato: reinvia email di attivazione
+            logger.info(f"🔄 Reinvio attivazione per email esistente inattiva: {existing_user.email}")
+
+            # Aggiorna password se diversa
+            existing_user.set_password(form.cleaned_data['password1'])
+            existing_user.first_name = form.cleaned_data.get('first_name', existing_user.first_name)
+            existing_user.last_name = form.cleaned_data.get('last_name', existing_user.last_name)
+            existing_user.save()
+
+            # Aggiorna profilo se necessario
+            profile, _ = UserProfile.objects.get_or_create(user=existing_user)
+            profile.role = form.cleaned_data.get("role", profile.role)
+            profile.save()
+
+            # Reinvia email di attivazione
+            send_activation_email(request, existing_user)
+
+            messages.success(
+                request,
+                f"📧 Abbiamo trovato un account non attivato con questa email. "
+                f"Ti abbiamo inviato un nuovo link di attivazione!"
+            )
+
+            return render(request, "accounts/confirm_email.html", {
+                "email": existing_user.email,
+                "invitation": invitation,
+                "reactivated": True,
+            })
+
+        # Email esistente ma account ATTIVO → errore
+        if User.objects.filter(email=form.cleaned_data["email"], is_active=True).exists():
+            messages.error(
+                request,
+                "❌ Esiste già un account attivo con questa email. Effettua il login o recupera la password."
+            )
+            return render(request, "accounts/register.html", {"form": form})
+
+        # Crea nuovo utente
         user = form.save(commit=False)
         user.is_active = False  # Attivazione via email
         user.save()
@@ -342,7 +384,18 @@ def login_view(request):
         form = AuthenticationForm(request, data=request.POST)
         if form.is_valid():
             user = form.get_user()
-            # ✅ 2. LOGIN PRIMA DEL CONTROLLO (così i messaggi e la sessione funzionano correttamente)
+
+            # ✅ CONTROLLO: Account attivo?
+            if not user.is_active:
+                # Account inattivo: redirect a pagina riattivazione
+                request.session['inactive_user_email'] = user.email
+                messages.warning(
+                    request,
+                    "⚠️ Il tuo account non è ancora attivato. Controlla la tua email o richiedi un nuovo link."
+                )
+                return redirect('accounts:account_inactive')
+
+            # ✅ 2. LOGIN PRIMA DEL CONTROLLO
             login(request, user)
             # ✅ RESETTA il contatore dei tentativi falliti al login riuscito
             if 'failed_login_attempts' in request.session:
@@ -603,6 +656,37 @@ def resend_activation(request):
 
     return redirect("accounts:login")
 
+
+# =========================
+# ACCOUNT INATTIVO (Reinvio Token)
+# =========================
+def account_inactive_view(request):
+    """Pagina per utenti che provano a loginare con account non attivato."""
+    email = request.session.get('inactive_user_email') or request.GET.get('email', '')
+
+    if request.method == "POST":
+        email = request.POST.get("email", "").strip().lower()
+        user = User.objects.filter(email=email, is_active=False).first()
+
+        if user:
+            send_activation_email(request, user)
+            messages.success(
+                request,
+                f"✅ Nuovo link di attivazione inviato a {email}. Controlla la tua email!"
+            )
+            return render(request, "accounts/confirm_email.html", {
+                "email": email,
+                "reactivated": True,
+            })
+        else:
+            messages.error(
+                request,
+                "❌ Nessun account inattivo trovato con questa email. Registrati o controlla l'indirizzo."
+            )
+
+    return render(request, "accounts/account_inactive.html", {
+        "email": email,
+    })
 
 # =========================
 # LOGOUT
