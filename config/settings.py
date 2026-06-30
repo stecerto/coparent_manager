@@ -356,11 +356,42 @@ if DEBUG:
             'task': 'notifications.tasks.check_imminent_events',
             'schedule': crontab(minute=0), # Ogni ora, al minuto 0
         },
+		'cleanup-inactive-users-daily': {
+	        'task': 'accounts.tasks.cleanup_inactive_users_task',
+	        'schedule': crontab(hour=3, minute=0),  # Ogni giorno alle 3:00
+    	},
     }
 else:
     # Produzione: esegui task in modo sincrono (senza Redis)
     CELERY_TASK_ALWAYS_EAGER = True
     CELERY_TASK_EAGER_PROPAGATES = True
+    
+    # ⚠️ IMPORTANTE: Anche in produzione serve il beat schedule
+    # Con CELERY_TASK_ALWAYS_EAGER=True, i task vengono eseguiti sincronamente
+    # ma Celery Beat deve comunque girare per schedularli
+    CELERY_BEAT_SCHEDULE = {
+        'send-event-reminders-every-20-minutes': {
+            'task': 'calendar_app.tasks.send_event_reminder',
+            'schedule': crontab(minute='*/20'),
+            'options': {'expires': 1200},
+        },
+        'check-document-expirations-daily': {
+            'task': 'notifications.tasks.check_document_expirations',
+            'schedule': crontab(hour=8, minute=0),
+        },
+        'check-pending-agreements-daily': {
+            'task': 'notifications.tasks.check_pending_agreements',
+            'schedule': crontab(hour=9, minute=0),
+        },
+        'check-imminent-events-hourly': {
+            'task': 'notifications.tasks.check_imminent_events',
+            'schedule': crontab(minute=0),
+        },
+        'cleanup-inactive-users-daily': {
+            'task': 'accounts.tasks.cleanup_inactive_users_task',
+            'schedule': crontab(hour=3, minute=0),
+        },
+    }
 
 
 PRIVACY_VERSION = "1.0"  # Incrementa a "1.1", "2.0" quando aggiorni la policy
