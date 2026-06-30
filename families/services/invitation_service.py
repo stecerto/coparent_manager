@@ -13,7 +13,7 @@ from families.utils import get_user_role_in_family, can_lawyer_add_family
 
 User = get_user_model()
 
-BASE_URL = "http://127.0.0.1:8000" #"https://yourdomain.com"
+BASE_URL = "https://coparentmanager.com" #"https://yourdomain.com"
 #domain = request.get_host()
 def create_invitation(
     family,
