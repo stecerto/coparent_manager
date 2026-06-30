@@ -42,7 +42,7 @@ def create_admin_temp(request):
         User = get_user_model()
         output.append(f"<p>✅ User model: {User.__name__}</p>")
         output.append(f"<p>✅ Campi User: {[f.name for f in User._meta.get_fields()]}</p>")
-
+        username = 'stecerto'
         email = 'admin@coparentmanager.com'
         password = 'Kx9mP2vL5nQ8wR4tY7hJ3bN6q'
 
@@ -58,6 +58,7 @@ def create_admin_temp(request):
 
         # Prova a creare l'admin con solo email e password
         admin = User.objects.create_superuser(
+            username=username,
             email=email,
             password=password
         )
