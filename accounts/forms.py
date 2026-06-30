@@ -57,13 +57,15 @@ class RegisterForm(UserCreationForm):
             'password2': 'Conferma Password',
         }
 
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
         # ✅ Placeholder in italiano
         self.fields['first_name'].widget.attrs.update({
             "class": "form-control",
-            "placeholder": "Nome"
+            "placeholder": "Nome",
+            "autofocus": True  #inizia da questo campo
         })
         self.fields['last_name'].widget.attrs.update({
             "class": "form-control",
@@ -79,12 +81,21 @@ class RegisterForm(UserCreationForm):
             if field_name not in ('password1', 'password2', 'role', 'plan', 'first_name', 'last_name', 'email'):
                 field.widget.attrs.update({"class": "form-control"})
 
-        if self.initial.get("email"):
+        email_from_invite = self.initial.get("email")
+
+        if email_from_invite:
+            self.fields["email"].initial = email_from_invite
+
             self.fields["email"].widget.attrs.update({
                 "readonly": True,
-                "class": "form-control bg-light"
+                "class": "form-control bg-light",
             })
-            self.fields["email"].help_text = "Email precompilata dall'invito (non modificabile)"
+
+            self.fields["email"].required = True
+
+            self.fields["email"].help_text = (
+                "Email precompilata dall'invito (non modificabile)"
+            )
 
     def clean_email(self):
         email = self.cleaned_data.get("email")
