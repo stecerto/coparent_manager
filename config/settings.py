@@ -371,9 +371,9 @@ ENCRYPTION_KEY=os.environ.get("ENCRYPTION_KEY")
 # ========================================
 GOOGLE_CALENDAR_CLIENT_ID = os.getenv('GOOGLE_CLIENT_ID', default='')
 GOOGLE_CALENDAR_CLIENT_SECRET = os.getenv('GOOGLE_CLIENT_SECRET', default='')
-#GOOGLE_CALENDAR_REDIRECT_URI = 'http://localhost:8000/calendar/oauth/google/callback/'
+#GOOGLE_CALENDAR_REDIRECT_URI = 'https://coparentmanager.com/calendar/oauth/google/callback/'
 if DEBUG:
-    GOOGLE_CALENDAR_REDIRECT_URI = 'http://localhost:8000/calendar/oauth/google/callback/'
+    GOOGLE_CALENDAR_REDIRECT_URI = 'https://coparentmanager.com/calendar/oauth/google/callback/'
 else:
     GOOGLE_CALENDAR_REDIRECT_URI = 'https://coparentmanager.com/calendar/oauth/google/callback/'
 GOOGLE_CALENDAR_SCOPES = [
