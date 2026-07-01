@@ -58,6 +58,13 @@ else:
     FRONTEND_DOMAIN = "http://127.0.0.1:8000"
 # Application definition
 
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "cf-cache",
+    }
+} 
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
