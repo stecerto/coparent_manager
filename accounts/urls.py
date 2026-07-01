@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import register_view, login_view, logout_view, activate_account, resend_activation, delete_account
+from .views import register_view, login_view, logout_view, activate_account, account_inactive_view, resend_activation, delete_account
 from django.contrib.auth import views as auth_views
 from . import views
 
@@ -11,7 +11,7 @@ urlpatterns = [
     path("logout/", logout_view, name="logout"),
     path("activate/", activate_account, name="activate"),
     path("activate/resend/", resend_activation, name="resend_activation"),
-    path('account-inactive/', views.account_inactive_view, name='account_inactive'),
+    path('account-inactive/', account_inactive_view, name='account_inactive'),
     path("delete-account/", delete_account, name="delete_account"),
 
     path("password_reset/",
