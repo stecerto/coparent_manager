@@ -21,14 +21,6 @@ logger = logging.getLogger(__name__)
 def send_activation_email(request, user, subject_prefix=""):
     """
     Invia email di attivazione account con link sicuro.
-
-    Args:
-        request: Django request per build_absolute_uri
-        user: User instance da attivare
-        subject_prefix: Prefisso opzionale per l'oggetto (es. "Nuovo ")
-
-    Returns:
-        bool: True se inviata, False altrimenti
     """
     if not user or not hasattr(user, 'email') or not user.email:
         logger.error(f"❌ Impossibile inviare email: user={user}")
@@ -47,39 +39,92 @@ def send_activation_email(request, user, subject_prefix=""):
             "token": token,
         })
 
-
-        # ✅ Link coerente con la view di attivazione
         activation_link = (
             f"{request.scheme}://{request.get_host()}/accounts/activate/?{params}"
-
         )
 
         context = {
             "user": user,
             "activation_link": activation_link,
             "site_name": getattr(settings, "SITE_NAME", "CoParentManager"),
-            "is_resend": subject_prefix != ""  # utile nel template se vuoi mostrare un messaggio diverso
+            "is_resend": subject_prefix != ""
         }
 
         html_content = render_to_string("emails/activation_email.html", context)
         text_content = strip_tags(html_content)
 
-        send_mail(
-            subject=f"{subject_prefix}Attiva il tuo account - CoParentManager",
-            message=f"Ciao {user.first_name or user.email},\n\n"
-                    f"Clicca sul link per attivare il tuo account:\n{activation_link}\n\n"
-                    f"Se non hai richiesto questa registrazione, ignora questa email.",
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-            html_message=html_content,  # ✅ Corretto: html_content, non text_content!
-            fail_silently=False
+        subject = f"{subject_prefix}Attiva il tuo account - CoParentManager"
+        message = f"Ciao {user.first_name or user.email},\n\nClicca sul link per attivare il tuo account:\n{activation_link}\n\nSe non hai richiesto questa registrazione, ignora questa email."
+
+        # ✅ SOSTITUISCI send_mail() CON QUESTA CHIAMATA API
+        return send_mailjet_api(
+            to_email=user.email,
+            to_name=f"{user.first_name} {user.last_name}".strip() or user.email,
+            subject=subject,
+            html_content=html_content,
+            text_content=text_content
         )
-        logger.info(f"📧 Email di attivazione {subject_prefix.lower().strip()}inviata a {user.email}")
-        return True
 
     except Exception as e:
         logger.error(f"❌ Errore invio attivazione a {user.email}: {e}")
         if settings.DEBUG:
             import traceback
             traceback.print_exc()
+        return False
+
+
+# ✅ AGGIUNGI QUESTA FUNZIONE
+def send_mailjet_api(to_email, to_name, subject, html_content, text_content=None):
+    """
+    Invia email usando Mailjet API v3.1 (non SMTP).
+    Più affidabile su Render perché usa HTTPS invece di SMTP.
+    """
+    try:
+        import requests
+        import os
+
+        api_key = os.getenv('MAILJET_API_KEY')
+        api_secret = os.getenv('MAILJET_SECRET_KEY')
+        from_email = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@coparentmanager.com')
+
+        if not api_key or not api_secret:
+            logger.error("❌ Credenziali Mailjet mancanti")
+            return False
+
+        url = "https://api.mailjet.com/v3.1/send"
+
+        payload = {
+            "Messages": [{
+                "From": {
+                    "Email": from_email,
+                    "Name": "CoParentManager"
+                },
+                "To": [{
+                    "Email": to_email,
+                    "Name": to_name
+                }],
+                "Subject": subject,
+                "HTMLPart": html_content,
+            }]
+        }
+
+        if text_content:
+            payload["Messages"][0]["TextPart"] = text_content
+
+        response = requests.post(
+            url,
+            auth=(api_key, api_secret),
+            json=payload,
+            timeout=10  # ← Timeout 10 secondi (non infinito come SMTP)
+        )
+
+        if response.status_code == 200:
+            logger.info(f"📧 Email inviata con successo a {to_email}")
+            return True
+        else:
+            logger.error(f"❌ Errore Mailjet API: {response.status_code} - {response.text}")
+            return False
+
+    except Exception as e:
+        logger.error(f"❌ Errore invio email Mailjet: {e}", exc_info=True)
         return False
