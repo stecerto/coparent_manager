@@ -699,100 +699,36 @@ def account_inactive_view(request):
         "email": email,
     })
 
-
+import json
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST
-from django.views.decorators.csrf import csrf_protect
-from accounts.utils import generate_cf
-import json
+from django.contrib.auth.decorators import login_required
+
+from accounts.services.fiscal_code import generate_cf
 
 
+@login_required
 @require_POST
-@csrf_protect
 def calculate_cf_api(request):
-    """API endpoint per calcolo codice fiscale in tempo reale"""
     try:
         data = json.loads(request.body)
 
-        first_name = data.get('first_name', '').strip()
-        last_name = data.get('last_name', '').strip()
-        birth_date = data.get('birth_date', '').strip()
-        birth_place_code = data.get('birth_place_code', '').strip()  # ← codice catastale
-        gender = data.get('gender', '').strip()
-
-        if not all([first_name, last_name, birth_date, birth_place_code, gender]):
-            return JsonResponse({
-                'success': False,
-                'message': 'Dati incompleti',
-                'cf': None
-            })
-
         cf = generate_cf(
-            first_name=first_name,
-            last_name=last_name,
-            birth_date=birth_date,
-            birth_place_code=birth_place_code,  # ← codice, non nome
-            gender=gender
+            first_name=data.get("first_name"),
+            last_name=data.get("last_name"),
+            birth_date=data.get("birth_date"),
+            birth_place_code=data.get("birth_place_code"),
+            gender=data.get("gender"),
         )
 
-        if cf:
-            return JsonResponse({
-                'success': True,
-                'cf': cf,
-                'status': 'calculated'
-            })
-        else:
-            return JsonResponse({
-                'success': False,
-                'message': 'Impossibile calcolare il codice fiscale',
-                'cf': None,
-                'status': 'invalid'
-            })
+        if not cf:
+            return JsonResponse({"success": False, "message": "Dati incompleti"})
+
+        return JsonResponse({"success": True, "cf": cf})
 
     except Exception as e:
-        return JsonResponse({
-            'success': False,
-            'message': f'Errore: {str(e)}',
-            'cf': None,
-            'status': 'error'
-        }, status=400)
+        return JsonResponse({"success": False, "message": str(e)})
 
-
-from django.http import JsonResponse
-from django.contrib.auth.decorators import login_required
-from accounts.utils import generate_cf
-from accounts.models import UserProfile
-
-@login_required
-def recalc_cf_view(request):
-    user = request.user
-    profile = UserProfile.objects.get(user=user)
-
-    cf = generate_cf(
-        profile.user.first_name,
-        profile.user.last_name,
-        profile.birth_date,
-        profile.birth_place,
-        profile.gender
-    )
-
-    if cf:
-        profile.codice_fiscale = cf
-        profile.cf_status = "calculated"
-        profile.save()
-
-        return JsonResponse({
-            "success": True,
-            "cf": cf
-        })
-
-    profile.cf_status = "invalid"
-    profile.save()
-
-    return JsonResponse({
-        "success": False,
-        "error": "Dati insufficienti per calcolare il codice fiscale"
-    })
 
 # =========================
 # LOGOUT
@@ -800,5 +736,72 @@ def recalc_cf_view(request):
 def logout_view(request):
     logout(request)
     return redirect("accounts:login")
+
+
+# accounts/views.py - SOSTITUISCI la funzione search_comuni_ajax
+
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
+import json
+import os
+from django.conf import settings
+from pathlib import Path
+
+
+@require_GET
+def search_comuni_ajax(request):
+    """Endpoint AJAX per ricerca comuni (usato da Select2)"""
+    query = request.GET.get('q', '').strip().lower()
+
+    logger.info(f"🔍 Ricerca comuni: query='{query}'")
+
+    if len(query) < 2:
+        return JsonResponse({'results': []})
+
+    try:
+        # ✅ Percorso al file JSON
+        json_path = Path(settings.BASE_DIR) / "accounts" / "data" / "comuni_cf.json"
+
+        logger.info(f"📂 Path JSON: {json_path}")
+
+        if not os.path.exists(json_path):
+            logger.error(f"❌ File non trovato: {json_path}")
+            return JsonResponse({
+                'results': [],
+                'error': 'File comuni non trovato'
+            })
+
+        with open(json_path, 'r', encoding='utf-8') as f:
+            comuni_data = json.load(f)
+
+        logger.info(f"✅ Caricati {len(comuni_data)} comuni")
+
+        # Filtra comuni che contengono la query
+        results = []
+        for comune in comuni_data:
+            nome = comune.get('nome', '').lower()
+            codice = comune.get('codice_catastale', '').lower()
+            provincia = comune.get('provincia', '').lower()
+
+            if query in nome or query in codice or query in provincia:
+                results.append({
+                    'id': comune['codice_catastale'],
+                    'text': f"{comune['nome']} ({comune['codice_catastale']}) - {comune.get('provincia', '')}"
+                })
+
+                # Limita a 50 risultati per performance
+                if len(results) >= 50:
+                    break
+
+        logger.info(f"✅ Trovati {len(results)} risultati per '{query}'")
+
+        return JsonResponse({'results': results})
+
+    except Exception as e:
+        logger.error(f"❌ Errore ricerca comuni: {e}", exc_info=True)
+        return JsonResponse({
+            'results': [],
+            'error': str(e)
+        }, status=500)
 
 

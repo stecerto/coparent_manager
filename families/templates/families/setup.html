@@ -5,6 +5,9 @@
 {% block title %}Setup Profilo{% endblock %}
 
 {% block extra_css %}
+<!--  Media CSS di Select2 -->
+{{ form_profile.media.css }}
+
 <style>
 /* Animazione sottile per la progress bar */
 .progress-bar-animated {
@@ -56,10 +59,58 @@
 form + .card.border-danger {
     margin-top: 3rem !important;
 }
+
+.select2-container {
+    width: 100% !important;
+}
+
+.select2-container .select2-selection--single {
+    height: 38px;
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+    padding-top: 0.375rem;
+    padding-left: 0.75rem;
+}
+
+.select2-container .select2-selection--single .select2-selection__rendered {
+    line-height: 36px;
+    color: #495057;
+}
+
+.select2-container .select2-selection--single .select2-selection__arrow {
+    height: 36px;
+}
+
+.select2-dropdown {
+    border: 1px solid #ced4da;
+    border-radius: 0.375rem;
+    box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+}
+
+.select2-search__field {
+    border: 1px solid #ced4da;
+    border-radius: 0.25rem;
+}
+
+.select2-results__option {
+    padding: 0.5rem 0.75rem;
+}
+
+.select2-results__option--highlighted[aria-selected] {
+    background-color: #007bff;
+}
 </style>
 {% endblock %}
 
 {% block content %}
+<!-- 1. jQuery PRIMA DI TUTTO -->
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+
+<!-- 2. Select2 -->
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.full.min.js"></script>
+
+<!-- 3. django-select2 -->
+<script src="{% static 'django_select2/django_select2.js' %}"></script>
 <div class="container py-4">
 
     <!-- 📌 HEADER -->
@@ -495,141 +546,59 @@ form + .card.border-danger {
     </div>
 
 </div>
+<script src="{% static 'js/pages/setup.js' %}"></script>
 {% endblock %}
 
 {% block extra_js %}
-<script src="{% static 'js/pages/setup.js' %}"></script>
+{{ form_profile.media.js }}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const cfDisplay = document.getElementById('codice_fiscale_display');
-    const cfStatusBadge = document.getElementById('cf-status-badge');
-    const btnRecalc = document.getElementById('btn-recalc-cf');
+    document.addEventListener("DOMContentLoaded", function () {
 
-    // ✅ Campi da monitorare (incluso gender)
-    const fieldsToWatch = [
-        { id: 'id_first_name', name: 'first_name' },
-        { id: 'id_last_name', name: 'last_name' },
-        { id: 'id_birth_date', name: 'birth_date' },
-        { id: 'id_birth_place_code', name: 'birth_place_code' },
-        { id: 'id_gender', name: 'gender' }
-    ];
+    async function requestCF() {
+        const data = {
+            first_name: document.getElementById("id_first_name")?.value,
+            last_name: document.getElementById("id_last_name")?.value,
+            birth_date: document.getElementById("id_birth_date")?.value,
+            birth_place_code: document.getElementById("id_birth_place_code")?.value,
+            gender: document.getElementById("id_gender")?.value,
+        };
 
-    let debounceTimer = null;
-
-    function collectData() {
-        const data = {};
-        let allFilled = true;
-
-        fieldsToWatch.forEach(field => {
-            const element = document.getElementById(field.id);
-            if (element) {
-                const value = element.value.trim();
-                data[field.name] = value;
-                if (!value) allFilled = false;
-            }
+        const res = await fetch("/accounts/profile/cf/calculate/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+            },
+            body: JSON.stringify(data)
         });
 
-        return { data, allFilled };
-    }
+        const json = await res.json();
 
-    function updateStatus(status, message = null) {
-        if (!cfStatusBadge) return;
-
-        cfStatusBadge.style.display = 'inline-block';
-
-        switch(status) {
-            case 'calculating':
-                cfStatusBadge.className = 'badge bg-warning text-dark ms-2';
-                cfStatusBadge.innerHTML = '<i class="bi bi-hourglass-split"></i> Calcolo...';
-                break;
-            case 'calculated':
-                cfStatusBadge.className = 'badge bg-success ms-2';
-                cfStatusBadge.innerHTML = '<i class="bi bi-check-circle"></i> Calcolato';
-                break;
-            case 'invalid':
-                cfStatusBadge.className = 'badge bg-danger ms-2';
-                cfStatusBadge.innerHTML = '<i class="bi bi-x-circle"></i> Non valido';
-                break;
-            case 'incomplete':
-                cfStatusBadge.className = 'badge bg-secondary ms-2';
-                cfStatusBadge.innerHTML = '<i class="bi bi-hourglass"></i> In attesa';
-                break;
+        if (json.success) {
+            const cfField = document.getElementById("codice_fiscale_display");
+            if (cfField) cfField.value = json.cf;
         }
     }
 
-    async function calculateCF() {
-        const { data, allFilled } = collectData();
+    const fields = [
+        "id_first_name",
+        "id_last_name",
+        "id_birth_date",
+        "id_birth_place_code",
+        "id_gender"
+    ];
 
-        if (!allFilled) {
-            updateStatus('incomplete');
-            if (cfDisplay) cfDisplay.value = '';
-            return;
-        }
-
-        updateStatus('calculating');
-
-        try {
-            const response = await fetch('{% url "accounts:calculate_cf_api" %}', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value
-                },
-                body: JSON.stringify(data)
+    fields.forEach(id => {
+        const el = document.getElementById(id);
+        if (el) {
+            el.addEventListener("change", () => {
+                setTimeout(requestCF, 400);
             });
-
-            const result = await response.json();
-
-            if (result.success && result.cf) {
-                if (cfDisplay) cfDisplay.value = result.cf;
-                updateStatus('calculated');
-            } else {
-                if (cfDisplay) cfDisplay.value = '';
-                updateStatus('invalid', result.message);
-            }
-
-        } catch (error) {
-            console.error('Errore calcolo CF:', error);
-            updateStatus('invalid', 'Errore di connessione');
-        }
-    }
-
-    // ✅ Aggiungi event listener a tutti i campi
-    fieldsToWatch.forEach(field => {
-        const element = document.getElementById(field.id);
-        if (element) {
-            // Usa 'change' per select/date, 'blur' per text
-            const eventType = (field.id === 'id_birth_date' || field.id === 'id_gender' || field.id === 'id_birth_place_code')
-                ? 'change'
-                : 'blur';
-
-            element.addEventListener(eventType, function() {
-                clearTimeout(debounceTimer);
-                debounceTimer = setTimeout(calculateCF, 500);
-            });
-
-            // Per campi text, calcola anche su input
-            if (eventType === 'blur') {
-                element.addEventListener('input', function() {
-                    clearTimeout(debounceTimer);
-                    debounceTimer = setTimeout(calculateCF, 500);
-                });
-            }
         }
     });
 
-    // Bottone ricalcolo manuale
-    if (btnRecalc) {
-        btnRecalc.addEventListener('click', calculateCF);
-    }
-
-    // Calcolo iniziale se i dati sono già presenti
-    const { allFilled } = collectData();
-    if (allFilled) {
-        calculateCF();
-    } else {
-        updateStatus('incomplete');
-    }
 });
 </script>
+
+
 {% endblock %}

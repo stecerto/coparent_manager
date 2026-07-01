@@ -45,6 +45,7 @@ from families.utils import (
     get_lawyer_limits,
     get_family_of_user
 )
+from accounts.utils import generate_cf
 
 
 @login_required
@@ -329,6 +330,19 @@ def setup_view(request):
             else:
                 messages.success(request, "✅ Dati personali salvati!")
             #salvo il profilo
+
+
+            # FORZA CF SOLO SE DATI PRESENTI
+            if profile.birth_place_code and profile.birth_date:
+                profile.codice_fiscale = generate_cf(
+                    profile.user.first_name,
+                    profile.user.last_name,
+                    profile.birth_date,
+                    profile.birth_place_code,
+                    profile.gender
+                )
+                profile.cf_status = "calculated"
+
             profile.setup_complete = True
             profile.save()
             messages.success(request, "✅ Dati personali salvati!")

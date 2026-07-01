@@ -137,15 +137,13 @@ class UserForm(forms.ModelForm):
         # 🔒 Blocca i dati anagrafici DOPO la prima registrazione
         if self.instance.pk:
             for field in ["last_name", "first_name", "email"]:
-                self.fields[field].widget.attrs['readonly'] = True
+                self.fields[field].widget.attrs['readonly'] = False
                 self.fields[field].help_text = "Non modificabile"
 
 
 from django import forms
 from django_select2.forms import Select2Widget
 from .models import UserProfile
-import json
-import os
 import logging
 
 logger = logging.getLogger(__name__)
@@ -182,10 +180,14 @@ class UserProfileForm(forms.ModelForm):
                 choices=[('', 'Seleziona...'), ('M', 'Maschio'), ('F', 'Femmina')],
                 attrs={'class': 'form-select'}
             ),
+            # ✅ MODIFICATO: Select2Widget con URL AJAX
             'birth_place_code': Select2Widget(
                 attrs={
                     'data-placeholder': 'Digita per cercare il comune...',
                     'data-minimum-input-length': 2,
+                    'data-ajax--url': '/accounts/api/comuni/search/',
+                    'data-ajax--delay': 250,
+                    'data-theme': 'default',
                 }
             ),
             'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+39 123 456789'}),
@@ -209,51 +211,8 @@ class UserProfileForm(forms.ModelForm):
 
         logger.info(f"🔍 UserProfileForm: role = '{role}'")
 
-        # =========================
-        # 🏙️ CARICA COMUNI DAL FILE JSON
-        # =========================
-        comuni_choices = [('', 'Cerca e seleziona comune...')]
-
-        try:
-            # Percorso al file JSON
-            json_path = os.path.join(
-                os.path.dirname(__file__),
-                'data',
-                'comuni_cf.json'
-            )
-
-            with open(json_path, 'r', encoding='utf-8') as f:
-                comuni_data = json.load(f)
-
-            # Ordina per nome
-            sorted_comuni = sorted(comuni_data, key=lambda x: x['nome'])
-
-            for comune in sorted_comuni:
-                label = f"{comune['nome']} ({comune['codice_catastale']})"
-                comuni_choices.append((comune['codice_catastale'], label))
-
-        except FileNotFoundError:
-            logger.error(f"File comuni.json non trovato: {json_path}")
-            # Fallback comuni principali
-            comuni_choices.extend([
-                ('H501', 'Roma (H501)'),
-                ('F205', 'Milano (F205)'),
-                ('F839', 'Napoli (F839)'),
-                ('L219', 'Torino (L219)'),
-                ('A662', 'Bari (A662)'),
-                ('G273', 'Palermo (G273)'),
-            ])
-        except Exception as e:
-            logger.error(f"Errore caricamento comuni: {e}")
-            comuni_choices.extend([
-                ('H501', 'Roma (H501)'),
-                ('F205', 'Milano (F205)'),
-            ])
-
-        # ✅ Applica choices al campo birth_place_code
-        if 'birth_place_code' in self.fields:
-            self.fields['birth_place_code'].choices = comuni_choices
-            self.fields['birth_place_code'].label = "Comune di nascita"
+        # ✅ RIMOSSO: Caricamento statico 7902 comuni (troppo pesante)
+        # Select2 ora usa AJAX per caricare dinamicamente
 
         # =========================
         # 👔 LOGICA PER RUOLO
@@ -261,10 +220,8 @@ class UserProfileForm(forms.ModelForm):
         is_professional = role in ['lawyer', 'mediator', 'consultant']
 
         if is_professional:
-            # PROFESSIONISTI
             if 'birth_place' in self.fields:
                 del self.fields['birth_place']
-                logger.info("🔍 birth_place RIMOSSO per professionista")
 
             self.fields['firm_name'].required = True
             self.fields['partita_iva'].required = True
@@ -281,7 +238,6 @@ class UserProfileForm(forms.ModelForm):
             self.fields['phone'].help_text = "Per contatti urgenti con assistiti"
 
         else:
-            # GENITORI
             if 'firm_name' in self.fields:
                 del self.fields['firm_name']
             if 'partita_iva' in self.fields:
@@ -301,7 +257,6 @@ class UserProfileForm(forms.ModelForm):
         # 🎨 AGGIUNGI CLASSI CSS
         # =========================
         for name, field in self.fields.items():
-            # Salta Select2Widget
             if isinstance(field.widget, Select2Widget):
                 continue
 
@@ -312,3 +267,16 @@ class UserProfileForm(forms.ModelForm):
             value = self.initial.get(name) or (getattr(self.instance, name, None) if self.instance else None)
             if value:
                 field.widget.attrs["class"] += " profile-complete"
+
+    def clean_birth_place_code(self):
+        value = self.cleaned_data.get("birth_place_code")
+
+        if not value:
+            raise forms.ValidationError("Comune di nascita obbligatorio")
+
+        value = str(value).upper().strip()
+
+        if len(value) != 4:
+            raise forms.ValidationError("Codice catastale non valido")
+
+        return value

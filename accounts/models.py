@@ -213,6 +213,16 @@ class UserProfile(models.Model):
     @property
     def is_consultant(self):
         return RoleChoices.is_consultant(self.role)
+
+    def clean(self):
+        super().clean()
+
+        if self.birth_date and not self.birth_place_code:
+            raise ValidationError("Il codice catastale è obbligatorio per il codice fiscale.")
+
+        if self.birth_place_code and len(self.birth_place_code) != 4:
+            raise ValidationError("Il codice catastale non è valido.")
+
 '''
     def clean(self):
         """🔒 Blocca modifica del telefono dopo la creazione"""
