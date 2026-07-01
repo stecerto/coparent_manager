@@ -670,32 +670,47 @@ def resend_activation(request):
 
     return redirect("accounts:login")
 
-
+import traceback
 # =========================
 # ACCOUNT INATTIVO (Reinvio Token)
 # =========================
 def account_inactive_view(request):
-    """Pagina per utenti che provano a loginare con account non attivato."""
+    """Pagina per utenti non attivati"""
+
     email = request.session.get('inactive_user_email') or request.GET.get('email', '')
+    email = (email or '').strip().lower()
 
     if request.method == "POST":
         email = request.POST.get("email", "").strip().lower()
+
+        if not email:
+            messages.error(request, "Inserisci una email valida.")
+            return render(request, "accounts/account_inactive.html", {"email": email})
+
         user = User.objects.filter(email=email, is_active=False).first()
 
         if user:
-            send_activation_email(request, user)
-            messages.success(
-                request,
-                f"✅ Nuovo link di attivazione inviato a {email}. Controlla la tua email!"
-            )
-            return render(request, "accounts/confirm_email.html", {
-                "email": email,
-                "reactivated": True,
-            })
+            try:
+                send_activation_email(request, user)
+
+                messages.success(
+                    request,
+                    f"✅ Nuovo link di attivazione inviato a {email}!"
+                )
+
+                return render(request, "accounts/confirm_email.html", {
+                    "email": email,
+                    "reactivated": True,
+                })
+
+            except Exception as e:
+                logger.error(f"Errore invio email attivazione: {e}")
+                messages.error(request, "Errore invio email. Riprova più tardi.")
+                logger.error(traceback.format_exc())
         else:
             messages.error(
                 request,
-                "❌ Nessun account inattivo trovato con questa email. Registrati o controlla l'indirizzo."
+                "❌ Nessun account inattivo trovato con questa email."
             )
 
     return render(request, "accounts/account_inactive.html", {
