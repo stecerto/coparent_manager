@@ -1,19 +1,12 @@
-import profile
-
-from django.contrib.auth import get_user_model
-
+# accounts/forms.py
 # accounts/forms.py
 import re
+
 from django import forms
-from django.contrib.auth.forms import UserCreationForm
-# accounts/forms.py
-import re
-from django import forms
-from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import get_user_model
+from django.contrib.auth.forms import UserCreationForm
 
 from core.choices import RoleChoices
-from .models import UserProfile
 
 User = get_user_model()
 
@@ -148,91 +141,173 @@ class UserForm(forms.ModelForm):
                 self.fields[field].help_text = "Non modificabile"
 
 
-# =========================
-# 🔹 PROFILO UTENTE (UserProfile)
-# =========================
+from django import forms
+from django_select2.forms import Select2Widget
+from .models import UserProfile
+import json
+import os
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 class UserProfileForm(forms.ModelForm):
     class Meta:
         model = UserProfile
-        fields = ['firm_name', 'address', 'phone', 'birth_place', 'partita_iva']
+        fields = [
+            'address',
+            'birth_date',
+            'birth_place',
+            'birth_place_code',
+            'gender',
+            'phone',
+            'firm_name',
+            'partita_iva'
+        ]
         labels = {
-            'first_name': 'Nome',
-            'last_name': 'Cognome',
-            'email': 'Email',
-            'password1': 'Password',
-            'password2': 'Conferma Password',
+            'birth_place': 'Luogo di nascita',
+            'birth_date': 'Data di nascita',
+            'birth_place_code': 'Comune di nascita',
+            'gender': 'Sesso',
+            'phone': 'Telefono',
+            'firm_name': 'Nome studio/ditta',
+            'partita_iva': 'Partita IVA',
+            'address': 'Indirizzo',
         }
         widgets = {
-            'firm_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome del tuo studio legale'}),
             'address': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Indirizzo completo'}),
+            'birth_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'birth_place': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Luogo di nascita'}),
+            'gender': forms.Select(
+                choices=[('', 'Seleziona...'), ('M', 'Maschio'), ('F', 'Femmina')],
+                attrs={'class': 'form-select'}
+            ),
+            'birth_place_code': Select2Widget(
+                attrs={
+                    'data-placeholder': 'Digita per cercare il comune...',
+                    'data-minimum-input-length': 2,
+                }
+            ),
             'phone': forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+39 123 456789'}),
+            'firm_name': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nome del tuo studio legale'}),
             'partita_iva': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'IT12345678901'}),
         }
 
-    def __init__(self, *args, role=None, **kwargs):
-        # 1. Estrai role PRIMA di chiamare super()
+    def __init__(self, *args, **kwargs):
+        # 1. Estrai role PRIMA di super()
         role = kwargs.pop('role', None)
 
+        # 2. CHIAMA super() SUBITO
         super().__init__(*args, **kwargs)
 
-        # ✅ BLINDATURA: se role non è passato, prendilo dall'istanza
+        # Blindatura: se role non è passato, prendilo dall'istanza
         if not role and self.instance and hasattr(self.instance, 'role'):
             role = self.instance.role
 
-        # Normalizza il ruolo (rimuovi eventuali suffissi _a/_b)
+        # Normalizza il ruolo
         role = str(role).strip().lower().replace('_a', '').replace('_b', '') if role else ''
 
-        import logging
-        logger = logging.getLogger(__name__)
         logger.info(f"🔍 UserProfileForm: role = '{role}'")
 
-        # ✅ CORRETTO: Controlla se è un PROFESSIONISTA (lawyer, mediator, consultant)
+        # =========================
+        # 🏙️ CARICA COMUNI DAL FILE JSON
+        # =========================
+        comuni_choices = [('', 'Cerca e seleziona comune...')]
+
+        try:
+            # Percorso al file JSON
+            json_path = os.path.join(
+                os.path.dirname(__file__),
+                'data',
+                'comuni_cf.json'
+            )
+
+            with open(json_path, 'r', encoding='utf-8') as f:
+                comuni_data = json.load(f)
+
+            # Ordina per nome
+            sorted_comuni = sorted(comuni_data, key=lambda x: x['nome'])
+
+            for comune in sorted_comuni:
+                label = f"{comune['nome']} ({comune['codice_catastale']})"
+                comuni_choices.append((comune['codice_catastale'], label))
+
+        except FileNotFoundError:
+            logger.error(f"File comuni.json non trovato: {json_path}")
+            # Fallback comuni principali
+            comuni_choices.extend([
+                ('H501', 'Roma (H501)'),
+                ('F205', 'Milano (F205)'),
+                ('F839', 'Napoli (F839)'),
+                ('L219', 'Torino (L219)'),
+                ('A662', 'Bari (A662)'),
+                ('G273', 'Palermo (G273)'),
+            ])
+        except Exception as e:
+            logger.error(f"Errore caricamento comuni: {e}")
+            comuni_choices.extend([
+                ('H501', 'Roma (H501)'),
+                ('F205', 'Milano (F205)'),
+            ])
+
+        # ✅ Applica choices al campo birth_place_code
+        if 'birth_place_code' in self.fields:
+            self.fields['birth_place_code'].choices = comuni_choices
+            self.fields['birth_place_code'].label = "Comune di nascita"
+
+        # =========================
+        # 👔 LOGICA PER RUOLO
+        # =========================
         is_professional = role in ['lawyer', 'mediator', 'consultant']
 
         if is_professional:
-            # PROFESSIONISTI (lawyer, mediator, consultant):
-            # Mostra firm_name e partita_iva, nascondi birth_place
+            # PROFESSIONISTI
             if 'birth_place' in self.fields:
                 del self.fields['birth_place']
                 logger.info("🔍 birth_place RIMOSSO per professionista")
 
-            # Rendi obbligatori i 4 campi professionali
             self.fields['firm_name'].required = True
             self.fields['partita_iva'].required = True
             self.fields['phone'].required = True
             self.fields['address'].required = True
 
-            # Label con asterisco
             self.fields['firm_name'].label = "Ragione sociale / Nome studio *"
             self.fields['partita_iva'].label = "Partita IVA *"
             self.fields['phone'].label = "Numero di telefono *"
             self.fields['address'].label = "Indirizzo *"
 
-            # Help text
             self.fields['firm_name'].help_text = "Obbligatorio per fatturazione"
             self.fields['partita_iva'].help_text = "Formato: IT + 11 cifre"
             self.fields['phone'].help_text = "Per contatti urgenti con assistiti"
 
         else:
-            # GENITORI: nascondi firm_name e partita_iva, mostra birth_place
+            # GENITORI
             if 'firm_name' in self.fields:
                 del self.fields['firm_name']
             if 'partita_iva' in self.fields:
                 del self.fields['partita_iva']
 
-            # birth_place obbligatorio per genitori
-            if 'birth_place' in self.fields:
-                self.fields['birth_place'].required = True
-                self.fields['birth_place'].label = "Luogo di nascita *"
+            if 'birth_place_code' in self.fields:
+                self.fields['birth_place_code'].required = True
+                self.fields['birth_place_code'].label = "Comune di nascita *"
 
-            # phone e address obbligatori
             self.fields['phone'].required = True
             self.fields['address'].required = True
 
-        # 4. Aggiungi classe CSS a tutti i campi
+            if 'birth_place' in self.fields:
+                del self.fields['birth_place']
+
+        # =========================
+        # 🎨 AGGIUNGI CLASSI CSS
+        # =========================
         for name, field in self.fields.items():
-            field.widget.attrs["class"] = "form-control"
+            # Salta Select2Widget
+            if isinstance(field.widget, Select2Widget):
+                continue
+
+            current_class = field.widget.attrs.get("class", "")
+            if "form-control" not in current_class:
+                field.widget.attrs["class"] = (current_class + " form-control").strip()
 
             value = self.initial.get(name) or (getattr(self.instance, name, None) if self.instance else None)
             if value:
