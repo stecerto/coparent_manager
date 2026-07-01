@@ -67,6 +67,37 @@ def validate_cf(cf):
     except Exception:
         return False
 
+import json
+import os
+from django.conf import settings
+
+COMUNI_CACHE = None
+
+
+def load_comuni_json():
+    """
+    Carica il file comuni_cf.json UNA SOLA VOLTA (cache in memoria)
+    """
+    global COMUNI_CACHE
+
+    if COMUNI_CACHE is not None:
+        return COMUNI_CACHE
+
+    path = os.path.join(
+        settings.BASE_DIR,
+        "accounts",
+        "data",
+        "comuni_cf.json"
+    )
+
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            COMUNI_CACHE = json.load(f)
+            return COMUNI_CACHE
+    except Exception as e:
+        print(f"Errore caricamento comuni: {e}")
+        COMUNI_CACHE = []
+        return []
 
 def search_municipality(query):
     """

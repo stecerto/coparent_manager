@@ -280,3 +280,14 @@ class UserProfileForm(forms.ModelForm):
             raise forms.ValidationError("Codice catastale non valido")
 
         return value
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        code = cleaned_data.get("birth_place_code")
+        if not code:
+            raise forms.ValidationError("Comune di nascita obbligatorio")
+
+        cleaned_data["birth_place_code"] = code.upper().strip()
+
+        return cleaned_data

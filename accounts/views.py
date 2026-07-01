@@ -704,7 +704,7 @@ from django.http import JsonResponse
 from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required
 
-from accounts.services.fiscal_code import generate_cf
+from accounts.utils import generate_cf
 
 
 @login_required
@@ -736,6 +736,27 @@ def calculate_cf_api(request):
 def logout_view(request):
     logout(request)
     return redirect("accounts:login")
+
+
+
+from accounts.utils import load_comuni_json
+
+
+def get_comune_name(code):
+    """
+    Ritorna il nome del comune dato il codice catastale
+    """
+    comuni = load_comuni_json()
+
+    code = (code or "").upper().strip()
+
+    for c in comuni:
+        if c.get("codice_catastale", "").upper() == code:
+            return c.get("nome", "")
+
+    return ""
+
+
 
 
 # accounts/views.py - SOSTITUISCI la funzione search_comuni_ajax

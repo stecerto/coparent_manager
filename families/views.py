@@ -46,6 +46,7 @@ from families.utils import (
     get_family_of_user
 )
 from accounts.utils import generate_cf
+from accounts.views import search_comuni_ajax
 
 
 @login_required
@@ -282,6 +283,19 @@ def export_expenses_csv(expenses_qs, family):
 
     return response
 
+
+# accounts/views.py - SOSTITUISCI la funzione search_comuni_ajax
+
+from accounts.utils import load_comuni_json
+
+def get_comune_name(code):
+    comuni = load_comuni_json()  # tuo file 7900 comuni
+    for c in comuni:
+        if c["codice_catastale"] == code:
+            return c["nome"]
+    return ""
+
+
 @login_required
 def setup_view(request):
     user = request.user
@@ -330,7 +344,10 @@ def setup_view(request):
             else:
                 messages.success(request, "✅ Dati personali salvati!")
             #salvo il profilo
-
+            if profile.birth_place_code:
+                profile.birth_place = get_comune_name(profile.birth_place_code)  # opzionale
+            else:
+                profile.birth_place = ""
 
             # FORZA CF SOLO SE DATI PRESENTI
             if profile.birth_place_code and profile.birth_date:
