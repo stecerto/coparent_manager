@@ -366,7 +366,7 @@ def delete_account(request):
 # LOGIN
 # =========================
 
-@ratelimit(key='ip', rate='5/10m', method='POST', block=True)
+@ratelimit(key='ip', rate='10m', method='POST', block=True)
 def login_view(request):
     url_token = request.GET.get("invite_token")
     if url_token:
