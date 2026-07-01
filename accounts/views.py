@@ -386,33 +386,38 @@ def login_view(request):
     if request.method == "POST":
         form = AuthenticationForm(request, data=request.POST)
 
-        # ✅ CONTROLLO SPECIALE: Se il form non è valido, controlla se è per account inattivo
-        if not form.is_valid():
-            # Estrai email dalla form
-            email = request.POST.get("username", "").strip()
+        # 👉 prima separiamo login valido vs non valido
+        if form.is_valid():
+            user = form.get_user()
 
-            # Cerca utente con questa email
-            user = User.objects.filter(email=email).first()
+            login(request, user)
+            return redirect("dashboard")
 
-            # Se l'utente esiste ma è inattivo → redirect a pagina dedicata
-            if user and not user.is_active:
-                request.session['inactive_user_email'] = user.email
-                messages.warning(
-                    request,
-                    "⚠️ Il tuo account non è ancora attivato. "
-                    "Controlla la tua email o richiedi un nuovo link di attivazione."
-                )
-                return redirect('accounts:account_inactive')
+        # ❗ SOLO QUI siamo sicuri che login è fallito
 
-            # Altrimenti → credenziali davvero sbagliate
-            attempts = request.session.get('failed_login_attempts', 0) + 1
-            request.session['failed_login_attempts'] = attempts
-            messages.error(request, "Credenziali non valide. Riprova.")
-            context = {
-                "form": form,
-                "failed_attempts": attempts
-            }
-            return render(request, "accounts/login.html", context)
+        email = request.POST.get("username", "").strip()
+        user = User.objects.filter(email=email).first()
+
+        # ✔ CASO 1: utente esiste ma NON attivo
+        if user and not user.is_active:
+            request.session['inactive_user_email'] = user.email
+
+            messages.warning(
+                request,
+                "⚠️ Il tuo account non è attivo. Controlla la tua email o richiedi nuovo link."
+            )
+            return redirect('accounts:account_inactive')
+
+        # ✔ CASO 2: credenziali sbagliate REALI
+        messages.error(request, "Credenziali non valide. Riprova.")
+
+        context = {
+            "form": form,
+            "failed_attempts": request.session.get('failed_login_attempts', 0) + 1
+        }
+        request.session['failed_login_attempts'] = context["failed_attempts"]
+
+        return render(request, "accounts/login.html", context)
 
         # Form valido → procedi con login normale
         user = form.get_user()
