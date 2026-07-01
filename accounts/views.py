@@ -389,7 +389,7 @@ def login_view(request):
             user = form.get_user()
 
             login(request, user)
-            return redirect("dashboard")
+            return redirect("home")
 
         # ❗ SOLO QUI siamo sicuri che login è fallito
 

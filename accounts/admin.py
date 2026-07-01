@@ -32,7 +32,7 @@ class RoleListFilter(admin.SimpleListFilter):
 
     def queryset(self, request, queryset):
         if self.value():
-            return queryset.filter(userprofile__role=self.value())
+            return queryset.filter(profile__role=self.value())
         return queryset
 
 
@@ -50,7 +50,7 @@ class PlanListFilter(admin.SimpleListFilter):
 
     def queryset(self, request, queryset):
         if self.value():
-            return queryset.filter(userprofile__plan=self.value())
+            return queryset.filter(profile__plan=self.value())
         return queryset
 
 
@@ -67,9 +67,9 @@ class SetupCompleteListFilter(admin.SimpleListFilter):
 
     def queryset(self, request, queryset):
         if self.value() == 'yes':
-            return queryset.filter(userprofile__setup_complete=True)
+            return queryset.filter(profile__setup_complete=True)
         if self.value() == 'no':
-            return queryset.filter(userprofile__setup_complete=False)
+            return queryset.filter(profile__setup_complete=False)
         return queryset
 
 
@@ -103,8 +103,8 @@ class UserProfileInline(admin.StackedInline):
     readonly_fields = ('codice_fiscale', 'privacy_accepted_at')
 
     def get_readonly_fields(self, request, obj=None):
-        if obj:  # Editing existing object
-            return self.readonly_fields + ('role',)  # Blocca modifica ruolo dopo creazione
+        if obj:
+            return self.readonly_fields + ('role',)
         return self.readonly_fields
 
 
@@ -118,7 +118,10 @@ class UserAdmin(BaseUserAdmin):
 
     inlines = (UserProfileInline,)
 
-    # ✅ LISTA PRINCIPALE
+    def get_queryset(self, request):
+        qs = super().get_queryset(request).select_related('profile')
+        return qs
+
     list_display = (
         'email',
         'first_name',
@@ -131,31 +134,27 @@ class UserAdmin(BaseUserAdmin):
         'get_setup_status'
     )
 
-    # ✅ FILTRI (con filtri custom)
     list_filter = (
         'is_active',
         'is_staff',
-        RoleListFilter,  # ← Filtro custom
-        PlanListFilter,  # ← Filtro custom
-        SetupCompleteListFilter,  # ← Filtro custom
+        RoleListFilter,
+        PlanListFilter,
+        SetupCompleteListFilter,
         'date_joined',
         'last_login'
     )
 
-    # ✅ RICERCA
     search_fields = (
         'email',
         'first_name',
         'last_name',
-        'userprofile__codice_fiscale',
-        'userprofile__phone',
-        'userprofile__firm_name'
+        'profile__codice_fiscale',
+        'profile__phone',
+        'profile__firm_name'
     )
 
-    # ✅ ORDINAMENTO
     ordering = ('-date_joined',)
 
-    # ✅ AZIONI MASSIVE
     actions = [
         'export_users_csv',
         'export_active_users_csv',
@@ -164,7 +163,6 @@ class UserAdmin(BaseUserAdmin):
         'deactivate_users'
     ]
 
-    # ✅ FIELDSETS (sezioni dettagliate)
     fieldsets = (
         ('🔐 Credenziali', {
             'fields': ('email', 'username', 'password')
@@ -191,12 +189,17 @@ class UserAdmin(BaseUserAdmin):
 
     readonly_fields = ('date_joined', 'last_login')
 
-    # ✅ CUSTOM METHODS
+    # ✅ CORRETTO: format_html con argomenti
 
     def get_role_badge(self, obj):
         """Badge colorato per ruolo utente"""
         try:
-            role = obj.userprofile.role
+            profile = getattr(obj, 'profile', None)
+            if not profile:
+                # ✅ CORRETTO: usa mark_safe o format_html con args
+                return format_html('<span class="badge bg-secondary">{}</span>', 'N/A')
+
+            role = profile.role
             role_colors = {
                 'parent_a': 'primary',
                 'parent_b': 'primary',
@@ -206,55 +209,54 @@ class UserAdmin(BaseUserAdmin):
                 'consultant': 'info'
             }
             color = role_colors.get(role, 'secondary')
-            return format_html(
-                '<span class="badge bg-{}">{}</span>',
-                color,
-                role.replace('_', ' ').title()
-            )
-        except:
-            return format_html('<span class="badge bg-secondary">N/A</span>')
+            display_role = role.replace('_', ' ').title() if role else 'N/A'
+            return format_html('<span class="badge bg-{}">{}</span>', color, display_role)
+        except Exception:
+            return format_html('<span class="badge bg-secondary">{}</span>', 'N/A')
 
     get_role_badge.short_description = '👔 Ruolo'
-    get_role_badge.admin_order_field = 'userprofile__role'
 
     def get_plan_badge(self, obj):
         """Badge colorato per piano abbonamento"""
         try:
-            plan = obj.userprofile.plan
+            profile = getattr(obj, 'profile', None)
+            if not profile:
+                return format_html('<span class="badge bg-secondary">{}</span>', 'N/A')
+
+            plan = profile.plan
             plan_colors = {
                 'starter': 'secondary',
                 'pro': 'success',
                 'enterprise': 'warning'
             }
             color = plan_colors.get(plan, 'secondary')
-            return format_html(
-                '<span class="badge bg-{}">{}</span>',
-                color,
-                plan.upper()
-            )
-        except:
-            return format_html('<span class="badge bg-secondary">N/A</span>')
+            display_plan = plan.upper() if plan else 'N/A'
+            return format_html('<span class="badge bg-{}">{}</span>', color, display_plan)
+        except Exception:
+            return format_html('<span class="badge bg-secondary">{}</span>', 'N/A')
 
     get_plan_badge.short_description = '💰 Piano'
-    get_plan_badge.admin_order_field = 'userprofile__plan'
 
     def get_setup_status(self, obj):
         """Status completamento setup"""
         try:
-            if obj.userprofile.setup_complete:
-                return format_html('<span class="badge bg-success">✓ Completo</span>')
+            profile = getattr(obj, 'profile', None)
+            if not profile:
+                return format_html('<span class="badge bg-secondary">{}</span>', 'N/A')
+
+            if profile.setup_complete:
+                return format_html('<span class="badge bg-success">{}</span>', '✓ Completo')
             else:
-                return format_html('<span class="badge bg-warning">⚠ Incompleto</span>')
-        except:
-            return format_html('<span class="badge bg-secondary">N/A</span>')
+                return format_html('<span class="badge bg-warning">{}</span>', '⚠ Incompleto')
+        except Exception:
+            return format_html('<span class="badge bg-secondary">{}</span>', 'N/A')
 
     get_setup_status.short_description = '✅ Setup'
-    get_setup_status.admin_order_field = 'userprofile__setup_complete'
-
-    # ✅ AZIONI MASSIVE
 
     def export_users_csv(self, request, queryset):
         """Export tutti utenti in CSV"""
+        queryset = queryset.select_related('profile')
+
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = 'attachment; filename="utenti_coparentmanager.csv"'
 
@@ -267,28 +269,40 @@ class UserAdmin(BaseUserAdmin):
 
         for user in queryset:
             try:
-                profile = user.userprofile
+                profile = getattr(user, 'profile', None)
+                if profile:
+                    writer.writerow([
+                        user.email,
+                        user.first_name,
+                        user.last_name,
+                        profile.role or 'N/A',
+                        profile.plan or 'N/A',
+                        'Sì' if user.is_active else 'No',
+                        'Sì' if profile.setup_complete else 'No',
+                        user.date_joined.strftime('%d/%m/%Y %H:%M'),
+                        profile.codice_fiscale or '',
+                        profile.phone or '',
+                        profile.firm_name or ''
+                    ])
+                else:
+                    writer.writerow([
+                        user.email,
+                        user.first_name,
+                        user.last_name,
+                        'N/A', 'N/A',
+                        'Sì' if user.is_active else 'No',
+                        'N/A',
+                        user.date_joined.strftime('%d/%m/%Y %H:%M'),
+                        '', '', ''
+                    ])
+            except Exception:
                 writer.writerow([
                     user.email,
                     user.first_name,
                     user.last_name,
-                    profile.role,
-                    profile.plan,
+                    'ERROR', 'ERROR',
                     'Sì' if user.is_active else 'No',
-                    'Sì' if profile.setup_complete else 'No',
-                    user.date_joined.strftime('%d/%m/%Y %H:%M'),
-                    profile.codice_fiscale or '',
-                    profile.phone or '',
-                    profile.firm_name or ''
-                ])
-            except:
-                writer.writerow([
-                    user.email,
-                    user.first_name,
-                    user.last_name,
-                    'N/A', 'N/A',
-                    'Sì' if user.is_active else 'No',
-                    'N/A',
+                    'ERROR',
                     user.date_joined.strftime('%d/%m/%Y %H:%M'),
                     '', '', ''
                 ])
@@ -307,7 +321,7 @@ class UserAdmin(BaseUserAdmin):
     def export_professionals_csv(self, request, queryset):
         """Export solo professionisti"""
         professionals = queryset.filter(
-            userprofile__role__in=['lawyer_a', 'lawyer_b', 'mediator', 'consultant']
+            profile__role__in=['lawyer_a', 'lawyer_b', 'mediator', 'consultant']
         )
         return self.export_users_csv(request, professionals)
 
@@ -369,6 +383,8 @@ class UserProfileAdmin(admin.ModelAdmin):
     user_email.short_description = '📧 Email'
     user_email.admin_order_field = 'user__email'
 
+    # ✅ CORRETTO: format_html con argomenti
+
     def get_role_badge(self, obj):
         role_colors = {
             'parent_a': 'primary',
@@ -379,14 +395,10 @@ class UserProfileAdmin(admin.ModelAdmin):
             'consultant': 'info'
         }
         color = role_colors.get(obj.role, 'secondary')
-        return format_html(
-            '<span class="badge bg-{}">{}</span>',
-            color,
-            obj.role.replace('_', ' ').title()
-        )
+        display_role = obj.role.replace('_', ' ').title() if obj.role else 'N/A'
+        return format_html('<span class="badge bg-{}">{}</span>', color, display_role)
 
     get_role_badge.short_description = '👔 Ruolo'
-    get_role_badge.admin_order_field = 'role'
 
     def get_plan_badge(self, obj):
         plan_colors = {
@@ -395,11 +407,7 @@ class UserProfileAdmin(admin.ModelAdmin):
             'enterprise': 'warning'
         }
         color = plan_colors.get(obj.plan, 'secondary')
-        return format_html(
-            '<span class="badge bg-{}">{}</span>',
-            color,
-            obj.plan.upper()
-        )
+        display_plan = obj.plan.upper() if obj.plan else 'N/A'
+        return format_html('<span class="badge bg-{}">{}</span>', color, display_plan)
 
     get_plan_badge.short_description = '💰 Piano'
-    get_plan_badge.admin_order_field = 'plan'
