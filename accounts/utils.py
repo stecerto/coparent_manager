@@ -1,5 +1,5 @@
 # accounts/utils.py
-from municipality_lookup import instance
+
 
 from accounts.models import UserProfile
 import codicefiscale
