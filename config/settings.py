@@ -85,6 +85,10 @@ INSTALLED_APPS = [
     'notifications',
     "django.contrib.humanize",
 ]
+STATICFILES_FINDERS = [
+    'django.contrib.staticfiles.finders.FileSystemFinder',
+    'django.contrib.staticfiles.finders.AppDirectoriesFinder',  # ✅ Questo trova i file di django_select2
+]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
