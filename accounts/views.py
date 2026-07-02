@@ -869,51 +869,164 @@ def comune_delete_view(request, pk):
     })
 
 
+# accounts/views.py
+
+from django.contrib.admin.views.decorators import staff_member_required
+from django.shortcuts import redirect, render
+from django.contrib import messages
+from accounts.forms import ComuneForm, ComuneImportForm
+from accounts.models import Comune
+from django.db import transaction
+import json
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 @staff_member_required
 def comuni_import_view(request):
-    """Importa comuni da file JSON"""
+    """Importa comuni da file JSON ottimizzato per Render"""
     if request.method == 'POST':
         form = ComuneImportForm(request.POST, request.FILES)
         if form.is_valid():
             json_file = request.FILES['json_file']
 
             try:
+                # ✅ Leggi il file JSON
                 data = json.load(json_file)
 
                 if not isinstance(data, list):
                     messages.error(request, "❌ Il file JSON deve contenere una lista di comuni")
                     return redirect('accounts:comuni_admin')
 
-                imported = 0
+                logger.info(f"📂 Inizio importazione: {len(data)} record nel file")
+
+                # ✅ Statistiche
+                total = len(data)
+                created = 0
+                updated = 0
+                skipped = 0
                 errors = 0
 
-                for item in data:
-                    try:
-                        nome = item.get('nome', '').strip()
-                        codice = item.get('codice_catastale', '').strip().upper()
-                        provincia = item.get('provincia', '').strip().upper()
+                # ✅ Usa transazione per performance e rollback automatico
+                with transaction.atomic():
+                    # Pre-fetch tutti i codici esistenti per evitare query multiple
+                    existing_codes = set(
+                        Comune.objects.values_list('codice_catastale', flat=True)
+                    )
 
-                        if nome and codice:
-                            Comune.objects.update_or_create(
-                                codice_catastale=codice,
-                                defaults={
+                    # Prepara liste per bulk operations
+                    comuni_to_create = []
+                    comuni_to_update = []
+
+                    for idx, item in enumerate(data, 1):
+                        try:
+                            nome = item.get('nome', '').strip()
+                            codice = item.get('codice_catastale', '').strip().upper()
+                            provincia = item.get('provincia', '').strip().upper()
+
+                            # Validazione
+                            if not nome or not codice:
+                                skipped += 1
+                                continue
+
+                            if len(codice) != 4:
+                                logger.warning(f"⚠️ Record {idx} saltato: codice non valido ({codice})")
+                                skipped += 1
+                                continue
+
+                            # ✅ Controlla se esiste già
+                            if codice in existing_codes:
+                                # Aggiorna
+                                comuni_to_update.append({
+                                    'codice_catastale': codice,
                                     'nome': nome,
                                     'provincia': provincia
-                                }
-                            )
-                            imported += 1
-                    except Exception as e:
-                        logger.error(f"Errore import comune: {e}")
-                        errors += 1
+                                })
+                                updated += 1
+                            else:
+                                # Crea
+                                comuni_to_create.append(
+                                    Comune(
+                                        nome=nome,
+                                        codice_catastale=codice,
+                                        provincia=provincia
+                                    )
+                                )
+                                created += 1
 
+                            # ✅ Progress logging ogni 1000 record
+                            if idx % 1000 == 0:
+                                logger.info(f"  ... processati {idx}/{total} record")
+
+                        except Exception as e:
+                            logger.error(f"❌ Errore record {idx}: {e}")
+                            errors += 1
+
+                    # ✅ Bulk create (molto più veloce di update_or_create)
+                    if comuni_to_create:
+                        logger.info(f"📝 Creazione di {len(comuni_to_create)} nuovi comuni...")
+                        Comune.objects.bulk_create(
+                            comuni_to_create,
+                            ignore_conflicts=True,
+                            batch_size=1000
+                        )
+
+                    # ✅ Bulk update
+                    if comuni_to_update:
+                        logger.info(f"📝 Aggiornamento di {len(comuni_to_update)} comuni esistenti...")
+                        for comune_data in comuni_to_update:
+                            Comune.objects.filter(
+                                codice_catastale=comune_data['codice_catastale']
+                            ).update(
+                                nome=comune_data['nome'],
+                                provincia=comune_data['provincia']
+                            )
+
+                # ✅ Report finale
+                total_in_db = Comune.objects.count()
+
+                logger.info("=" * 60)
+                logger.info("📊 REPORT IMPORTAZIONE")
+                logger.info("=" * 60)
+                logger.info(f"✅ Totale record nel JSON: {total}")
+                logger.info(f"✅ Nuovi comuni creati:    {created}")
+                logger.info(f"✅ Comuni aggiornati:      {updated}")
+                logger.info(f"⚠️  Record saltati:         {skipped}")
+                logger.info(f"❌ Errori:                  {errors}")
+                logger.info(f"✅ Totale comuni nel DB:   {total_in_db}")
+                logger.info("=" * 60)
+
+                # Messaggio di successo dettagliato
                 messages.success(
                     request,
-                    f"✅ Import completato: {imported} comuni importati, {errors} errori"
+                    f"✅ Import completato! "
+                    f"Creati: {created} | Aggiornati: {updated} | "
+                    f"Saltati: {skipped} | Errori: {errors} | "
+                    f"Totale nel DB: {total_in_db}"
                 )
 
-            except json.JSONDecodeError:
-                messages.error(request, "❌ File JSON non valido")
+                # ✅ Verifica comuni noti
+                test_comuni = ['H501', 'F205', 'F839', 'L219', 'A662', 'G273']
+                missing = []
+                for codice in test_comuni:
+                    if not Comune.objects.filter(codice_catastale=codice).exists():
+                        missing.append(codice)
+
+                if missing:
+                    logger.warning(f"⚠️ Comuni noti mancanti: {missing}")
+                    messages.warning(
+                        request,
+                        f"⚠️ Alcuni comuni noti non sono stati importati: {', '.join(missing)}"
+                    )
+                else:
+                    logger.info("✅ Tutti i comuni noti presenti")
+
+            except json.JSONDecodeError as e:
+                logger.error(f"❌ File JSON non valido: {e}")
+                messages.error(request, f"❌ File JSON non valido: {e}")
             except Exception as e:
+                logger.error(f"❌ Errore durante l'import: {e}", exc_info=True)
                 messages.error(request, f"❌ Errore durante l'import: {e}")
 
         return redirect('accounts:comuni_admin')
