@@ -84,6 +84,7 @@ INSTALLED_APPS = [
     'documents',
     'notifications',
     "django.contrib.humanize",
+	'django_select2',
 ]
 STATICFILES_FINDERS = [
     'django.contrib.staticfiles.finders.FileSystemFinder',
