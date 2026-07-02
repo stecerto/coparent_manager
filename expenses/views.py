@@ -831,19 +831,45 @@ def admin_required(view_func):
 @admin_required
 @staff_member_required
 def categories_list(request):
-    categories = ExpenseCategory.objects.select_related("group").all()
-    return render(request, "expenses/categories/list.html", {"categories": categories})
+    """Lista tutte le categorie di spesa"""
+    from .models import ExpenseCategory
+
+    # ✅ CORRETTO: usa display_name invece di name
+    categories = ExpenseCategory.objects.filter(is_active=True).order_by('display_name')
+
+    return render(request, "expenses/categories/category_list.html", {
+        "categories": categories,
+        "title": "Gestione Categorie Spese"
+    })
 
 from django.shortcuts import redirect
 from .forms import ExpenseCategoryForm
 
+
 @staff_member_required
 def category_create(request):
-    form = ExpenseCategoryForm(request.POST or None)
-    if form.is_valid():
-        category = form.save()
-        return redirect("categories_list")
-    return render(request, "expenses/categories/form.html", {"form": form})
+    """Crea una nuova categoria di spesa"""
+
+    if request.method == "POST":
+        form = ExpenseCategoryForm(request.POST)
+
+        if form.is_valid():
+            category = form.save()
+            messages.success(
+                request,
+                f"✅ Categoria '{category.name}' creata con successo!"
+            )
+            return redirect("expenses:categories_list")
+        else:
+            messages.error(request, "⚠️ Correggi gli errori nel form")
+    else:
+        form = ExpenseCategoryForm()
+
+    return render(request, "expenses/categories/category_form.html", {
+        "form": form,
+        "title": "Nuova Categoria",
+        "action": "Crea"
+    })
 
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -878,22 +904,24 @@ def category_update(request, pk):
         )
         return redirect("categories_list")
 
-    return render(request, "expenses/categories/form.html", {"form": form, "category": old_category})
+    return render(request, "expenses/categories/category_form.html", {"form": form, "category": old_category})
+
 
 @staff_member_required
 def category_delete(request, pk):
+    """Elimina categoria (soft delete)"""
     category = get_object_or_404(ExpenseCategory, pk=pk)
-    category.is_active = False
-    category.valid_to = timezone.now()
-    category.save()
 
-    ExpenseCategoryHistory.objects.create(
-        category=category,
-        action="deleted",
-        old_name=category.display_name,
-        changed_by=request.user
-    )
-    return redirect("categories_list")
+    if request.method == "POST":
+        # ✅ Soft delete: disattiva invece di eliminare
+        category.is_active = False
+        category.save()
+        messages.success(request, f"🗑️ Categoria '{category.display_name}' disattivata")
+        return redirect("expenses:categories_list")
+
+    return render(request, "expenses/categories/category_confirm_delete.html", {
+        "category": category
+    })
 
 
 @login_required

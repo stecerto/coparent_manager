@@ -238,9 +238,9 @@
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><a class="dropdown-item" href="{% url 'admin:index' %}">📊 Dashboard Admin</a></li>
                         <li><a class="dropdown-item" href="{% url 'accounts:comuni_admin' %}">🏙️ Gestione Comuni</a></li>
-                        <li><a class="dropdown-item" href="{% url 'expenses:category_list' %}">💰 Categorie Spese</a></li>
+                        <li><a class="dropdown-item" href="{% url 'expenses:categories_list' %}">💰 Categorie Spese</a></li>
                         <li><hr class="dropdown-divider"></li>
-                        <li><a class="dropdown-item" href="{% url 'admin:auth_user_changelist' %}">👥 Utenti</a></li>
+                        <li><a class="dropdown-item" href="{% url 'admin:accounts_user_changelist' %}">👥 Utenti</a></li>
                     </ul>
                 </li>
                 {% endif %}

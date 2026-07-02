@@ -350,7 +350,7 @@ def setup_view(request):
                 profile.birth_place = ""
 
             # FORZA CF SOLO SE DATI PRESENTI
-            if profile.birth_place_code and profile.birth_date:
+            if not is_professional and profile.birth_place_code and profile.birth_date:
                 profile.codice_fiscale = generate_cf(
                     profile.user.first_name,
                     profile.user.last_name,

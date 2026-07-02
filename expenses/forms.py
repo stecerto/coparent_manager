@@ -12,17 +12,12 @@ class ExpenseCategoryForm(forms.ModelForm):
     class Meta:
         model = ExpenseCategory
 
-        fields = [
-            "group",
-            "display_name",
-            "color",
-            "is_active"
-        ]
+        fields = ['display_name', 'slug', 'color', 'group', 'is_active']
 
         widgets = {
-            "color": forms.TextInput(
-                attrs={"type": "color"}
-            )
+            'display_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'slug': forms.TextInput(attrs={'class': 'form-control'}),
+            'color': forms.TextInput(attrs={'class': 'form-control', 'type': 'color'}),
         }
 
 

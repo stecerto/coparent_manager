@@ -246,39 +246,41 @@ form + .card.border-danger {
                 {{ field|as_crispy_field }}
             {% endfor %}
 
-            <!-- ✅ CAMPO CODICE FISCALE (readonly, auto-calcolato) -->
-            <div class="mt-4 p-3 bg-light rounded" style="border-left: 4px solid #667eea;">
-                <label class="form-label fw-bold">
-                    <i class="bi bi-calculator me-2"></i>
-                    Codice Fiscale
-                    <span id="cf-status-badge" class="badge bg-secondary ms-2" style="display: none;">
-                        In attesa
-                    </span>
-                </label>
-                <div class="input-group">
-                    <input
-                        type="text"
-                        id="codice_fiscale_display"
-                        class="form-control font-monospace"
-                        readonly
-                        placeholder="In compilazione automatica..."
-                        value="{{ form_profile.instance.codice_fiscale|default:'' }}"
-                        style="text-transform: uppercase; letter-spacing: 1px;"
-                    >
-                    <button
-                        type="button"
-                        class="btn btn-outline-secondary"
-                        id="btn-recalc-cf"
-                        title="Ricalcola manualmente"
-                    >
-                        <i class="bi bi-arrow-clockwise"></i>
-                    </button>
+            {% if not is_professional %}
+                <!-- ✅ CAMPO CODICE FISCALE (readonly, auto-calcolato) -->
+                <div class="mt-4 p-3 bg-light rounded" style="border-left: 4px solid #667eea;">
+                    <label class="form-label fw-bold">
+                        <i class="bi bi-calculator me-2"></i>
+                        Codice Fiscale
+                        <span id="cf-status-badge" class="badge bg-secondary ms-2" style="display: none;">
+                            In attesa
+                        </span>
+                    </label>
+                    <div class="input-group">
+                        <input
+                            type="text"
+                            id="codice_fiscale_display"
+                            class="form-control font-monospace"
+                            readonly
+                            placeholder="In compilazione automatica..."
+                            value="{{ form_profile.instance.codice_fiscale|default:'' }}"
+                            style="text-transform: uppercase; letter-spacing: 1px;"
+                        >
+                        <button
+                            type="button"
+                            class="btn btn-outline-secondary"
+                            id="btn-recalc-cf"
+                            title="Ricalcola manualmente"
+                        >
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
+                    <small class="text-muted mt-1 d-block">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Il codice fiscale viene calcolato automaticamente appena inserisci data di nascita, comune e genere
+                    </small>
                 </div>
-                <small class="text-muted mt-1 d-block">
-                    <i class="bi bi-info-circle me-1"></i>
-                    Il codice fiscale viene calcolato automaticamente appena inserisci data di nascita, comune e genere
-                </small>
-            </div>
+            {% endif %}
 
         </div>
     </div>
@@ -551,6 +553,7 @@ form + .card.border-danger {
 
 {% block extra_js %}
 {{ form_profile.media.js }}
+{% if not is_professional %}
 <script>
     document.addEventListener("DOMContentLoaded", function () {
 
@@ -600,5 +603,5 @@ form + .card.border-danger {
 });
 </script>
 
-
+{% endif %}
 {% endblock %}

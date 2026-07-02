@@ -210,8 +210,30 @@ class UserProfileForm(forms.ModelForm):
 
         logger.info(f"🔍 UserProfileForm: role = '{role}'")
 
-        # ✅ RIMOSSO: Caricamento statico da JSON
-        # Select2 ora usa AJAX per caricare dinamicamente dal DB
+        # ✅ CARICA COMUNI DAL DATABASE
+        from accounts.models import Comune
+
+        try:
+            comuni = Comune.objects.all().order_by('nome')
+            comuni_choices = [('', 'Cerca e seleziona comune...')]
+
+            for comune in comuni:
+                label = f"{comune.nome} ({comune.codice_catastale}) - {comune.provincia}"
+                comuni_choices.append((comune.codice_catastale, label))
+
+            if 'birth_place_code' in self.fields:
+                self.fields['birth_place_code'].choices = comuni_choices
+                self.fields['birth_place_code'].label = "Comune di nascita"
+                logger.info(f"✅ Caricati {len(comuni_choices)} comuni dal database")
+
+        except Exception as e:
+            logger.error(f"❌ Errore caricamento comuni dal DB: {e}")
+            if 'birth_place_code' in self.fields:
+                self.fields['birth_place_code'].choices = [
+                    ('', 'Cerca e seleziona comune...'),
+                    ('H501', 'Roma (H501) - RM'),
+                    ('F205', 'Milano (F205) - MI'),
+                ]
 
         # =========================
         # 👔 LOGICA PER RUOLO
@@ -219,9 +241,17 @@ class UserProfileForm(forms.ModelForm):
         is_professional = role in ['lawyer', 'mediator', 'consultant']
 
         if is_professional:
+            # ✅ PROFESSIONISTI: Rimuovi dati anagrafici personali
             if 'birth_place' in self.fields:
                 del self.fields['birth_place']
+            if 'birth_place_code' in self.fields:
+                del self.fields['birth_place_code']
+            if 'birth_date' in self.fields:
+                del self.fields['birth_date']
+            if 'gender' in self.fields:
+                del self.fields['gender']
 
+            # Campi obbligatori per professionisti
             self.fields['firm_name'].required = True
             self.fields['partita_iva'].required = True
             self.fields['phone'].required = True
@@ -237,13 +267,15 @@ class UserProfileForm(forms.ModelForm):
             self.fields['phone'].help_text = "Per contatti urgenti con assistiti"
 
         else:
+            # ✅ GENITORI: Rimuovi dati aziendali
             if 'firm_name' in self.fields:
                 del self.fields['firm_name']
             if 'partita_iva' in self.fields:
                 del self.fields['partita_iva']
 
+            # Campi obbligatori per genitori
             if 'birth_place_code' in self.fields:
-                self.fields['birth_place_code'].required = True
+                self.fields['birth_place_code'].required = True  # ✅ CORRETTO: True, non False!
                 self.fields['birth_place_code'].label = "Comune di nascita *"
 
             self.fields['phone'].required = True
