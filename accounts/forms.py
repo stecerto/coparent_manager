@@ -290,3 +290,46 @@ class UserProfileForm(forms.ModelForm):
         cleaned_data["birth_place_code"] = code.upper().strip()
 
         return cleaned_data
+
+# accounts/forms.py - AGGIUNGI in fondo al file
+
+from django import forms
+from accounts.models import Comune
+
+
+class ComuneForm(forms.ModelForm):
+    """Form per gestire i comuni"""
+    class Meta:
+        model = Comune
+        fields = ['nome', 'codice_catastale', 'provincia']
+        widgets = {
+            'nome': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Nome del comune'
+            }),
+            'codice_catastale': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Codice catastale (es: H501)',
+                'maxlength': '4',
+                'style': 'text-transform: uppercase;'
+            }),
+            'provincia': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Provincia (es: RM)',
+                'maxlength': '2',
+                'style': 'text-transform: uppercase;'
+            }),
+        }
+        labels = {
+            'nome': 'Nome Comune',
+            'codice_catastale': 'Codice Catastale',
+            'provincia': 'Provincia',
+        }
+
+
+class ComuneImportForm(forms.Form):
+    """Form per importare comuni da JSON"""
+    json_file = forms.FileField(
+        label='File JSON',
+        help_text='Seleziona il file JSON con i comuni'
+    )

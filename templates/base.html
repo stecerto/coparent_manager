@@ -47,7 +47,7 @@
     </style>
 </head>
 
-<body class="{% if user.profile.role in 'lawyer_a,lawyer_b' %}bg-light{% endif %}">
+<body class="{% if user.is_authenticated and user.profile.role in 'lawyer_a,lawyer_b' %}bg-light{% endif %}">
 
 <!-- 🖼️ BRAND BANNER -->
 <header class="brand-banner py-4 bg-white border-bottom">
@@ -86,8 +86,8 @@
     {% endif %}
 {% endif %}
 
-<!-- 🔹 NAVBAR DINAMICA PER RUOLO -->
-<nav class="navbar navbar-expand-lg {% if user.profile.role in 'lawyer_a,lawyer_b' %}bg-white{% else %}bg-light{% endif %} shadow-sm">
+<!-- 🔹 NAVBAR DINAMICA PER RUOLO - SOSTITUISCI l'intera sezione navbar -->
+<nav class="navbar navbar-expand-lg {% if user.is_authenticated and user.profile.role in 'lawyer_a,lawyer_b' %}bg-white{% else %}bg-light{% endif %} shadow-sm">
     <div class="container">
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse"
                 data-bs-target="#mainMenu" aria-controls="mainMenu"
@@ -106,8 +106,9 @@
                         <span id="notifBadge" class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.65rem; display: none;"></span>
                     </a>
                     <ul class="dropdown-menu p-0" style="min-width: 320px; max-width: 90vw; max-height: 400px; overflow-y: auto; left: 0 !important; right: auto !important; z-index: 1060 !important;">
-                        <div class="d-flex justify-content-between align-items-center">
-                                <strong class="small">🔔 Notifiche</strong>
+                        <li class="dropdown-header d-flex justify-content-between align-items-center">
+                            <strong class="small">🔔 Notifiche</strong>
+                            <div>
                                 <button id="markAllReadBtn" class="btn btn-link btn-sm p-0 text-decoration-none small">Segna tutte</button>
                                 <button id="deleteAllBtn" class="btn btn-link btn-sm p-0 text-decoration-none small text-danger">🗑️ Svuota</button>
                             </div>
@@ -128,7 +129,7 @@
 
                 <!-- 🏠 Home dinamica per ruolo -->
                 <li class="nav-item">
-                    {% if user.profile.role in "lawyer_a,lawyer_b" %}
+                    {% if user.is_authenticated and user.profile.role in "lawyer_a,lawyer_b" %}
                         <a class="nav-link {% if request.resolver_match.url_name == 'lawyer_home' %}active{% endif %}"
                            href="{% url 'lawyer_home' %}">🏠 Home Studio</a>
                     {% else %}
@@ -138,7 +139,7 @@
                 </li>
 
                 <!-- 🧭 Menu Genitori -->
-                {% if user.is_authenticated and user.profile.role not in "lawyer_a,lawyer_b, consultant, mediator" %}
+                {% if user.is_authenticated and user.profile.role not in "lawyer_a,lawyer_b,consultant,mediator" %}
                     {% if is_setup_complete or request.resolver_match.url_name in "setup,summary,invite_member" %}
                         <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'family_dashboard' %}active{% endif %} {% if user.profile.is_expired or user.profile.is_suspended %}disabled-sub{% endif %}"
@@ -186,7 +187,6 @@
                             </ul>
                         </li>
 
-
                         <!-- ❓ Centro Assistenza -->
                         <li class="nav-item">
                             <a class="nav-link" href="{% url 'help' %}" title="Centro Assistenza">
@@ -198,17 +198,15 @@
                 {% endif %}
 
                 <!-- ⚖️ Menu Professionisti (Avvocato, Mediatore, Consulente) -->
-                {% if user.profile.is_professional %}
+                {% if user.is_authenticated and user.profile.is_professional %}
                     <li class="nav-item">
-                        {# ✅ FUORI dal contesto: Dashboard professionale con routing intelligente #}
-                            <a class="nav-link {% if request.resolver_match.url_name == 'professional_dashboard' %}active{% endif %}"
-                               href="{% url 'families:professional_dashboard' %}">
-                                📊 Pannello Studio
-                            </a>
-
+                        <a class="nav-link {% if request.resolver_match.url_name == 'professional_dashboard' %}active{% endif %}"
+                           href="{% url 'families:professional_dashboard' %}">
+                            📊 Pannello Studio
+                        </a>
                     </li>
 
-                    {% if user.is_authenticated and user.profile.role in 'lawyer,mediator,consultant' %}
+                    {% if user.profile.role in 'lawyer,mediator,consultant' %}
                         <!-- 📅 Calendario Studio -->
                         <li class="nav-item dropdown me-2">
                             <a class="nav-link dropdown-toggle" href="#" id="calDropdownPro" role="button" data-bs-toggle="dropdown">
@@ -231,10 +229,21 @@
                     {% endif %}
                 {% endif %}
 
-
-
-
-
+                <!-- 🔧 MENU ADMIN (solo superuser) -->
+                {% if user.is_authenticated and user.is_superuser %}
+                <li class="nav-item dropdown me-2">
+                    <a class="nav-link dropdown-toggle text-danger" href="#" id="adminDropdown" role="button" data-bs-toggle="dropdown">
+                        🔧 Admin
+                    </a>
+                    <ul class="dropdown-menu dropdown-menu-end">
+                        <li><a class="dropdown-item" href="{% url 'admin:index' %}">📊 Dashboard Admin</a></li>
+                        <li><a class="dropdown-item" href="{% url 'accounts:comuni_admin' %}">🏙️ Gestione Comuni</a></li>
+                        <li><a class="dropdown-item" href="{% url 'expenses:category_list' %}">💰 Categorie Spese</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item" href="{% url 'admin:auth_user_changelist' %}">👥 Utenti</a></li>
+                    </ul>
+                </li>
+                {% endif %}
 
                 <!-- 💳 Piano & Impostazioni -->
                 {% if user.is_authenticated %}
@@ -253,7 +262,7 @@
                         <a class="nav-link {% if user.profile.is_expired or user.profile.is_suspended %}disabled-sub{% endif %}"
                            href="{% url 'families:setup' %}"
                            {% if user.profile.is_expired or user.profile.is_suspended %}title="⚠️ Impostazioni bloccate: rinnova l'abbonamento"{% endif %}>
-                            ⚙️ {% if user.profile.role in "lawyer_a,lawyer_b, consultant, mediator" %}Setup Studio{% else %}Impostazioni{% endif %}
+                            ⚙️ {% if user.profile.role in "lawyer_a,lawyer_b,consultant,mediator" %}Setup Studio{% else %}Impostazioni{% endif %}
                         </a>
                     </li>
                     <li class="nav-item"><a class="nav-link text-danger" href="{% url 'accounts:logout' %}">Logout</a></li>

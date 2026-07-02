@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Gestione Comuni - Admin{% endblock %}
+
+{% block extra_css %}
+<style>
+.table-comuni td, .table-comuni th {
+    vertical-align: middle;
+}
+.search-box {
+    max-width: 400px;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+
+    <!-- Header -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h1 class="h3 fw-bold mb-0">
+                <i class="bi bi-gear-fill text-primary me-2"></i>
+                Gestione Comuni
+            </h1>
+            <p class="text-muted mb-0">Amministrazione database comuni italiani</p>
+        </div>
+        <div>
+            <a href="{% url 'accounts:comuni_import' %}" class="btn btn-outline-primary me-2">
+                <i class="bi bi-upload me-1"></i> Importa JSON
+            </a>
+            <a href="{% url 'admin:index' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-arrow-left me-1"></i> Torna all'Admin
+            </a>
+        </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-geo-alt-fill fs-2 text-primary me-3"></i>
+                        <div>
+                            <h6 class="text-muted mb-0">Totale Comuni</h6>
+                            <h3 class="mb-0">{{ total_comuni }}</h3>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Ricerca e Aggiungi -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-body">
+            <div class="row g-3">
+                <!-- Ricerca -->
+                <div class="col-md-6">
+                    <form method="get" class="d-flex">
+                        <input
+                            type="text"
+                            name="q"
+                            class="form-control me-2"
+                            placeholder="Cerca per nome, codice o provincia..."
+                            value="{{ query }}"
+                        >
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-search"></i>
+                        </button>
+                        {% if query %}
+                        <a href="{% url 'accounts:comuni_admin' %}" class="btn btn-outline-secondary ms-2">
+                            <i class="bi bi-x"></i>
+                        </a>
+                        {% endif %}
+                    </form>
+                </div>
+
+                <!-- Aggiungi Nuovo -->
+                <div class="col-md-6">
+                    <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addComuneModal">
+                        <i class="bi bi-plus-circle me-1"></i> Aggiungi Comune
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista Comuni -->
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-comuni mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Nome</th>
+                            <th>Codice Catastale</th>
+                            <th>Provincia</th>
+                            <th class="text-end">Azioni</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for comune in comuni %}
+                        <tr>
+                            <td>
+                                <strong>{{ comune.nome }}</strong>
+                            </td>
+                            <td>
+                                <code class="bg-light px-2 py-1 rounded">{{ comune.codice_catastale }}</code>
+                            </td>
+                            <td>
+                                <span class="badge bg-secondary">{{ comune.provincia }}</span>
+                            </td>
+                            <td class="text-end">
+                                <a href="{% url 'accounts:comune_edit' comune.pk %}"
+                                   class="btn btn-sm btn-outline-primary me-1"
+                                   title="Modifica">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'accounts:comune_delete' comune.pk %}"
+                                   class="btn btn-sm btn-outline-danger"
+                                   title="Elimina">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted py-4">
+                                <i class="bi bi-inbox fs-1 d-block mb-2"></i>
+                                Nessun comune trovato
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Paginazione -->
+        {% if comuni.has_other_pages %}
+        <div class="card-footer">
+            <nav>
+                <ul class="pagination mb-0 justify-content-center">
+                    {% if comuni.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ comuni.previous_page_number }}{% if query %}&q={{ query }}{% endif %}">
+                            <i class="bi bi-chevron-left"></i> Prec
+                        </a>
+                    </li>
+                    {% endif %}
+
+                    <li class="page-item active">
+                        <span class="page-link">
+                            Pagina {{ comuni.number }} di {{ comuni.paginator.num_pages }}
+                        </span>
+                    </li>
+
+                    {% if comuni.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ comuni.next_page_number }}{% if query %}&q={{ query }}{% endif %}">
+                            Succ <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<!-- Modal Aggiungi Comune -->
+<div class="modal fade" id="addComuneModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="post" action="{% url 'accounts:comune_add' %}">
+                {% csrf_token %}
+                <div class="modal-header">
+                    <h5 class="modal-title">
+                        <i class="bi bi-plus-circle me-2"></i>Aggiungi Nuovo Comune
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Nome Comune *</label>
+                        <input type="text" name="nome" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Codice Catastale *</label>
+                        <input type="text" name="codice_catastale" class="form-control"
+                               maxlength="4" required style="text-transform: uppercase;">
+                        <small class="text-muted">Es: H501 per Roma</small>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Provincia *</label>
+                        <input type="text" name="provincia" class="form-control"
+                               maxlength="2" required style="text-transform: uppercase;">
+                        <small class="text-muted">Es: RM</small>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Annulla</button>
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-check-circle me-1"></i> Salva
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

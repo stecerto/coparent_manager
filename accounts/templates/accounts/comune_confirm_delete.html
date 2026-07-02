@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}Elimina Comune - Admin{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-exclamation-triangle me-2"></i>Conferma Eliminazione
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-3">
+                        Sei sicuro di voler eliminare il comune 
+                        <strong>"{{ comune.nome }}"</strong> ({{ comune.codice_catastale }})?
+                    </p>
+                    <p class="text-danger small">
+                        <i class="bi bi-info-circle me-1"></i>
+                        Questa azione non può essere annullata.
+                    </p>
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-between">
+                            <a href="{% url 'accounts:comuni_admin' %}" class="btn btn-secondary">
+                                <i class="bi bi-arrow-left me-1"></i> Annulla
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-trash me-1"></i> Elimina
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

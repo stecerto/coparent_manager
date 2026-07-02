@@ -366,13 +366,27 @@ def delete_account(request):
 # LOGIN
 # =========================
 
-@ratelimit(key='ip', rate='10m', method='POST', block=True)
+# accounts/views.py
+
+from django_ratelimit.decorators import ratelimit
+
+
+@ratelimit(key='ip', rate='10/m', method='POST', block=True)
 def login_view(request):
+    """
+    View login con gestione completa:
+    - Rate limiting (10 tentativi/minuto per IP)
+    - Gestione account inattivi
+    - Accettazione inviti pendenti
+    - Controllo stato abbonamento
+    - Redirect intelligente per ruolo
+    """
+
+    # ✅ Cattura parametri dalla URL (pricing page)
     url_token = request.GET.get("invite_token")
     if url_token:
         request.session['pending_invite_token'] = url_token
 
-    # ✅ CATTURA role/plan dalla URL (pricing page) e salva in sessione
     role_from_url = request.GET.get("role", "").strip().lower()
     plan_from_url = request.GET.get("plan", "").strip().lower()
 
@@ -381,171 +395,121 @@ def login_view(request):
     if role_from_url and role_from_url in ["parent", "lawyer", "mediator", "consultant"]:
         request.session["registration_role"] = role_from_url
 
-    if request.method == "POST":
-        form = AuthenticationForm(request, data=request.POST)
+    # ✅ GET: Mostra form
+    if request.method != "POST":
+        form = AuthenticationForm()
+        context = {
+            "form": form,
+            "failed_attempts": request.session.get('failed_login_attempts', 0)
+        }
+        return render(request, "accounts/login.html", context)
 
-        # 👉 prima separiamo login valido vs non valido
-        if form.is_valid():
-            user = form.get_user()
+    # ✅ POST: Processa login
+    form = AuthenticationForm(request, data=request.POST)
 
-            login(request, user)
-            return redirect("home")
-
-        # ❗ SOLO QUI siamo sicuri che login è fallito
-
+    # ❌ Login fallito
+    if not form.is_valid():
         email = request.POST.get("username", "").strip()
         user = User.objects.filter(email=email).first()
 
-        # ✔ CASO 1: utente esiste ma NON attivo
+        # Caso 1: Utente esiste ma non attivo
         if user and not user.is_active:
             request.session['inactive_user_email'] = user.email
-
             messages.warning(
                 request,
                 "⚠️ Il tuo account non è attivo. Controlla la tua email o richiedi nuovo link."
             )
             return redirect('accounts:account_inactive')
 
-        # ✔ CASO 2: credenziali sbagliate REALI
+        # Caso 2: Credenziali sbagliate
+        attempts = request.session.get('failed_login_attempts', 0) + 1
+        request.session['failed_login_attempts'] = attempts
         messages.error(request, "Credenziali non valide. Riprova.")
 
         context = {
             "form": form,
-            "failed_attempts": request.session.get('failed_login_attempts', 0) + 1
+            "failed_attempts": attempts
         }
-        request.session['failed_login_attempts'] = context["failed_attempts"]
-
         return render(request, "accounts/login.html", context)
 
-        # Form valido → procedi con login normale
-        user = form.get_user()
+    # ✅ Login riuscito
+    user = form.get_user()
+    login(request, user)
 
-        # ✅ 2. LOGIN PRIMA DEL CONTROLLO
-        login(request, user)
+    # Resetta contatore tentativi falliti
+    if 'failed_login_attempts' in request.session:
+        del request.session['failed_login_attempts']
 
-        # ✅ RESETTA il contatore dei tentativi falliti al login riuscito
-        if 'failed_login_attempts' in request.session:
-            del request.session['failed_login_attempts']
+    # ✅ GESTIONE INVITO PENDENTE (priorità massima)
+    pending_token = request.session.pop("pending_invite_token", None)
+    if pending_token:
+        from families.models import Invitation
+        from families.services.invitation_service import accept_invitation
 
-        # ✅ 3. CONTROLLO STATO ABBONAMENTO (Robusto: controlla sia profile che subscription)
-        profile = getattr(user, 'profile', None)
-        subscription = getattr(user, 'subscription', None)
-
-        is_suspended = False
-        is_expired = False
-        days_left = 0
-
-        # Priorità al nuovo modello UserProfile
-        if profile:
-            is_suspended = getattr(profile, 'is_suspended', False) or getattr(profile, 'payment_status',
-                                                                              '') == 'suspended'
-            is_expired = getattr(profile, 'is_expired', False)
-            if hasattr(profile, 'days_until_expiration') and profile.days_until_expiration is not None:
-                days_left = profile.days_until_expiration
-        # Fallback al modello PaymentSubscription (se ancora in uso)
-        elif subscription:
-            is_suspended = subscription.status == 'suspended'
-            is_expired = subscription.is_expired
-            if subscription.grace_period_end:
-                days_left = max(0, (subscription.grace_period_end - timezone.now()).days)
-
-        # Se sospeso o scaduto, reindirizza alla pagina prezzi con messaggio
-        if is_suspended:
-            messages.error(
-                request,
-                "🚫 Il tuo account è sospeso per mancato pagamento. Rinnova l'abbonamento per riattivare l'accesso."
+        try:
+            invitation = Invitation.objects.select_related('family').get(
+                token=pending_token,
+                status="pending"
             )
-            return redirect('core:pricing')
 
-        elif is_expired:
-            messages.warning(
-                request,
-                f"⏰ Il tuo abbonamento è scaduto. Hai ancora {days_left} giorni di periodo di grazia prima della sospensione. Rinnova ora."
-            )
-            return redirect('core:pricing')
+            accept_invitation(invitation, user)
 
-        # 🔑 GESTIONE INVITO PENDENTE (priorità massima!)
-        pending_token = request.session.pop("pending_invite_token", None)
-        if pending_token:
-            from families.models import Invitation
-            from families.services.invitation_service import accept_invitation
-
-            try:
-                invitation = Invitation.objects.select_related('family').get(
-                    token=pending_token,
-                    status="pending"
+            if invitation.family:
+                messages.success(
+                    request,
+                    f"✅ Sei stato aggiunto a '{invitation.family.name}' come {invitation.get_role_display()}"
                 )
+            else:
+                messages.success(request, "✅ Invito accettato! La tua famiglia è stata creata.")
 
-                # ✅ Accetta l'invito (local import per evitare dipendenza circolare a livello di modulo)
-                accept_invitation(invitation, user)
+            # Redirect in base al ruolo
+            profile = getattr(user, 'profile', None)
+            if profile and profile.role in ['lawyer', 'mediator', 'consultant']:
+                return redirect('lawyer_home')
+            return redirect('home')
 
-                # Messaggio appropriato
-                if invitation.family:
-                    messages.success(request,
-                                     f"✅ Sei stato aggiunto a '{invitation.family.name}' come {invitation.get_role_display()}")
-                else:
-                    messages.success(request,
-                                     f"✅ Invito accettato! La tua famiglia è stata creata.")
+        except Invitation.DoesNotExist:
+            messages.warning(request, "⚠️ Invito non valido o già utilizzato")
+        except Exception as e:
+            logger.error(f"Errore accettazione invito {pending_token}: {e}")
+            messages.error(request, "⚠️ Si è verificato un errore tecnico. Contatta il supporto.")
 
-                # ✅ REDIRECT IMMEDIATO alla home corretta
-                profile = getattr(user, 'profile', None)
-                if profile and profile.role in ['lawyer', 'mediator', 'consultant']:
-                    return redirect('lawyer_home')
-                return redirect('home')
+    # ✅ CONTROLLO PROFILO
+    profile = getattr(user, 'profile', None)
+    if not profile:
+        return redirect('families:setup')
 
-            except Invitation.DoesNotExist:
-                messages.warning(request, "⚠️ Invito non valido o già utilizzato")
-            except Exception as e:
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.error(f"Errore accettazione invito {pending_token}: {e}")
-                messages.error(request, "⚠️ Si è verificato un errore tecnico. Contatta il supporto.")
+    # ✅ APPLICA RUOLO/PIANO DA SESSIONE (se profilo incompleto)
+    saved_role = request.session.pop("registration_role", None)
+    saved_plan = request.session.pop("registration_plan", None)
 
-        # ✅ SE NON C'È INVITO PENDENTE, procedi con i controlli normali
-        profile = getattr(user, 'profile', None)
-        if not profile:
-            return redirect('families:setup')
+    if saved_role and not profile.role:
+        role_map = {
+            "parent": "parent_a",
+            "lawyer": "lawyer_a",
+            "mediator": "mediator",
+            "consultant": "consultant",
+        }
+        profile.role = role_map.get(saved_role, "parent_a")
 
-        # ✅ APPLICA RUOLO/PIANO DA SESSIONE se il profilo è incompleto
-        saved_role = request.session.pop("registration_role", None)
-        saved_plan = request.session.pop("registration_plan", None)
+    if saved_plan and hasattr(profile, "plan"):
+        profile.plan = saved_plan
+        profile.plan_started_at = timezone.now()
+        profile.save()
 
-        if saved_role and not profile.role:
-            role_map = {
-                "parent": "parent_a",
-                "lawyer": "lawyer_a",
-                "mediator": "mediator",
-                "consultant": "consultant",
-            }
-            profile.role = role_map.get(saved_role, "parent_a")
+    # ✅ REDIRECT IN BASE AL RUOLO
+    # Professionisti
+    if profile.role in ['lawyer', 'mediator', 'consultant']:
+        if profile.setup_complete:
+            return redirect('lawyer_home')
+        return redirect('families:summary')
 
-        if saved_plan and hasattr(profile, "plan"):
-            profile.plan = saved_plan
-            profile.plan_started_at = timezone.now()
-            profile.save()
+    # Genitori
+    if not profile.setup_complete:
+        return redirect('families:summary')
 
-        # 🎯 1. AVVOCATI / MEDIATORI / CONSULENTI
-        if profile.role in ['lawyer', 'mediator', 'consultant']:
-            if profile.setup_complete:
-                return redirect('home')
-            return redirect('families:summary')
-
-        # 🎯 2. GENITORI
-        if not profile.setup_complete:
-            return redirect('families:summary')
-
-        # ✅ Tutto ok → redirect alla home (che smisterà in base al ruolo)
-        return redirect('home')
-
-    else:
-        form = AuthenticationForm()
-
-    # ✅ PASSA il contatore al template
-    context = {
-        "form": form,
-        "failed_attempts": request.session.get('failed_login_attempts', 0)
-    }
-    return render(request, "accounts/login.html", context)
+    # ✅ Tutto ok → home
+    return redirect('home')
 
 
 # =========================
@@ -806,4 +770,154 @@ def search_comuni_ajax(request):
 
     return JsonResponse({'results': results})
 
+
+# accounts/views.py - AGGIUNGI queste funzioni
+
+from django.contrib.admin.views.decorators import staff_member_required
+from django.shortcuts import get_object_or_404, redirect
+from django.contrib import messages
+from accounts.forms import ComuneForm, ComuneImportForm
+from accounts.models import Comune
+import json
+
+
+@staff_member_required
+def comuni_admin_view(request):
+    """
+    Pagina di gestione comuni (solo per admin).
+    Visualizza, aggiunge, modifica e rimuove comuni.
+    """
+    # Ricerca
+    query = request.GET.get('q', '').strip()
+
+    if query:
+        comuni = Comune.objects.filter(
+            models.Q(nome__icontains=query) |
+            models.Q(codice_catastale__icontains=query) |
+            models.Q(provincia__icontains=query)
+        ).order_by('nome')
+    else:
+        # Paginazione
+        from django.core.paginator import Paginator
+        comuni_list = Comune.objects.all().order_by('nome')
+        paginator = Paginator(comuni_list, 100)  # 100 per pagina
+        page = request.GET.get('page')
+        comuni = paginator.get_page(page)
+
+    # Form per nuovo comune
+    form = ComuneForm() if request.method != 'POST' else ComuneForm(request.POST)
+
+    context = {
+        'comuni': comuni,
+        'form': form,
+        'query': query,
+        'total_comuni': Comune.objects.count(),
+    }
+
+    return render(request, 'accounts/comuni_admin.html', context)
+
+
+@staff_member_required
+def comune_add_view(request):
+    """Aggiungi nuovo comune"""
+    if request.method == 'POST':
+        form = ComuneForm(request.POST)
+        if form.is_valid():
+            comune = form.save()
+            messages.success(request, f"✅ Comune '{comune.nome}' aggiunto con successo!")
+            return redirect('accounts:comuni_admin')
+        else:
+            messages.error(request, "⚠️ Correggi gli errori nel form")
+    return redirect('accounts:comuni_admin')
+
+
+@staff_member_required
+def comune_edit_view(request, pk):
+    """Modifica comune esistente"""
+    comune = get_object_or_404(Comune, pk=pk)
+
+    if request.method == 'POST':
+        form = ComuneForm(request.POST, instance=comune)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"✅ Comune '{comune.nome}' aggiornato con successo!")
+            return redirect('accounts:comuni_admin')
+        else:
+            messages.error(request, "⚠️ Correggi gli errori nel form")
+    else:
+        form = ComuneForm(instance=comune)
+
+    return render(request, 'accounts/comune_edit.html', {
+        'form': form,
+        'comune': comune
+    })
+
+
+@staff_member_required
+def comune_delete_view(request, pk):
+    """Elimina comune"""
+    comune = get_object_or_404(Comune, pk=pk)
+
+    if request.method == 'POST':
+        nome = comune.nome
+        comune.delete()
+        messages.success(request, f"🗑️ Comune '{nome}' eliminato con successo!")
+        return redirect('accounts:comuni_admin')
+
+    return render(request, 'accounts/comune_confirm_delete.html', {
+        'comune': comune
+    })
+
+
+@staff_member_required
+def comuni_import_view(request):
+    """Importa comuni da file JSON"""
+    if request.method == 'POST':
+        form = ComuneImportForm(request.POST, request.FILES)
+        if form.is_valid():
+            json_file = request.FILES['json_file']
+
+            try:
+                data = json.load(json_file)
+
+                if not isinstance(data, list):
+                    messages.error(request, "❌ Il file JSON deve contenere una lista di comuni")
+                    return redirect('accounts:comuni_admin')
+
+                imported = 0
+                errors = 0
+
+                for item in data:
+                    try:
+                        nome = item.get('nome', '').strip()
+                        codice = item.get('codice_catastale', '').strip().upper()
+                        provincia = item.get('provincia', '').strip().upper()
+
+                        if nome and codice:
+                            Comune.objects.update_or_create(
+                                codice_catastale=codice,
+                                defaults={
+                                    'nome': nome,
+                                    'provincia': provincia
+                                }
+                            )
+                            imported += 1
+                    except Exception as e:
+                        logger.error(f"Errore import comune: {e}")
+                        errors += 1
+
+                messages.success(
+                    request,
+                    f"✅ Import completato: {imported} comuni importati, {errors} errori"
+                )
+
+            except json.JSONDecodeError:
+                messages.error(request, "❌ File JSON non valido")
+            except Exception as e:
+                messages.error(request, f"❌ Errore durante l'import: {e}")
+
+        return redirect('accounts:comuni_admin')
+
+    form = ComuneImportForm()
+    return render(request, 'accounts/comuni_import.html', {'form': form})
 

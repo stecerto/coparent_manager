@@ -48,5 +48,12 @@ urlpatterns = [
              template_name="accounts/password_reset_complete.html"
          ),
          name="password_reset_complete"),
+
+# Gestione comuni (solo admin)
+    path('admin/comuni/', views.comuni_admin_view, name='comuni_admin'),
+    path('admin/comuni/add/', views.comune_add_view, name='comune_add'),
+    path('admin/comuni/<int:pk>/edit/', views.comune_edit_view, name='comune_edit'),
+    path('admin/comuni/<int:pk>/delete/', views.comune_delete_view, name='comune_delete'),
+    path('admin/comuni/import/', views.comuni_import_view, name='comuni_import'),
 ]
 
