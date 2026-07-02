@@ -927,7 +927,11 @@ def confirm_invitation_view(request, token):
 
 # _______________________________________________________________________________________
 
+# myapp/views.py
+import logging
 
+logger = logging.getLogger(__name__)
+ 
 
 @login_required
 @transaction.atomic
