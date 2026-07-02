@@ -67,63 +67,83 @@ def validate_cf(cf):
     except Exception:
         return False
 
-import json
-import os
-from django.conf import settings
 
-COMUNI_CACHE = None
-
+# accounts/utils.py - SOSTITUISCI le funzioni esistenti
 
 def load_comuni_json():
     """
-    Carica il file comuni_cf.json UNA SOLA VOLTA (cache in memoria)
+    Carica i comuni italiani dal database.
+    Mantiene la stessa signature per retrocompatibilità.
+
+    Returns:
+        list: Lista di dizionari con chiavi 'nome', 'codice_catastale', 'provincia'
     """
-    global COMUNI_CACHE
-
-    if COMUNI_CACHE is not None:
-        return COMUNI_CACHE
-
-    path = os.path.join(
-        settings.BASE_DIR,
-        "accounts",
-        "data",
-        "comuni_cf.json"
-    )
+    from accounts.models import Comune
 
     try:
-        with open(path, "r", encoding="utf-8") as f:
-            COMUNI_CACHE = json.load(f)
-            return COMUNI_CACHE
+        comuni = list(Comune.objects.values('nome', 'codice_catastale', 'provincia'))
+        logger.info(f"✅ Caricati {len(comuni)} comuni dal database")
+        return comuni
     except Exception as e:
-        print(f"Errore caricamento comuni: {e}")
-        COMUNI_CACHE = []
+        logger.error(f"❌ Errore caricamento comuni dal DB: {e}")
         return []
 
-def search_municipality(query):
+
+def search_comuni(query, limit=50):
     """
-    Cerca un comune per nome o codice catastale.
+    Cerca comuni per nome, codice catastale o provincia usando il database.
+
+    Args:
+        query: Stringa da cercare (min 2 caratteri)
+        limit: Numero massimo di risultati (default 50)
+
+    Returns:
+        list: Lista di dizionari con 'id' e 'text' (formato Select2)
     """
+    from accounts.models import Comune
+    from django.db.models import Q
+
+    query = query.strip()
+
+    if len(query) < 2:
+        return []
+
     try:
-        # Prova come codice catastale
-        if len(query) == 4 and query.isalpha():
-            # Non c'è funzione diretta, ma encode_birthplace accetta codici
-            try:
-                result = codicefiscale.encode_birthplace(query.upper())
-                if result:
-                    return [{"code": result, "name": query.upper()}]
-            except Exception:
-                pass
+        # Cerca in nome, codice o provincia
+        comuni = Comune.objects.filter(
+            Q(nome__icontains=query) |
+            Q(codice_catastale__icontains=query) |
+            Q(provincia__icontains=query)
+        )[:limit]
 
-        # Cerca per nome
-        try:
-            code = codicefiscale.encode_birthplace(query)
-            if code:
-                return [{"code": code, "name": query}]
-        except Exception:
-            pass
+        results = []
+        for comune in comuni:
+            results.append({
+                'id': comune.codice_catastale,
+                'text': f"{comune.nome} ({comune.codice_catastale}) - {comune.provincia}"
+            })
 
-        return []
-
+        return results
     except Exception as e:
-        logger.error(f"Errore ricerca comune: {e}")
+        logger.error(f"❌ Errore ricerca comuni: {e}")
         return []
+
+
+def get_comune_name(codice_catastale):
+    """
+    Ottiene il nome del comune dato il codice catastale.
+
+    Args:
+        codice_catastale: Codice catastale (es: "H501")
+
+    Returns:
+        str: Nome del comune o stringa vuota se non trovato
+    """
+    from accounts.models import Comune
+
+    try:
+        comune = Comune.objects.filter(codice_catastale=codice_catastale).first()
+        return comune.nome if comune else ""
+    except Exception as e:
+        logger.error(f"❌ Errore ricerca comune per codice {codice_catastale}: {e}")
+        return ""

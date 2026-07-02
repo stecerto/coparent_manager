@@ -786,61 +786,24 @@ import os
 from django.conf import settings
 from pathlib import Path
 
+# accounts/views.py - SOSTITUISCI la funzione
+
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET
+from accounts.utils import search_comuni
+
 
 @require_GET
 def search_comuni_ajax(request):
     """Endpoint AJAX per ricerca comuni (usato da Select2)"""
-    query = request.GET.get('q', '').strip().lower()
+    query = request.GET.get('q', '').strip()
 
     logger.info(f"🔍 Ricerca comuni: query='{query}'")
 
-    if len(query) < 2:
-        return JsonResponse({'results': []})
+    results = search_comuni(query, limit=50)
 
-    try:
-        # ✅ Percorso al file JSON
-        json_path = Path(settings.BASE_DIR) / "accounts" / "data" / "comuni_cf.json"
+    logger.info(f"✅ Trovati {len(results)} risultati per '{query}'")
 
-        logger.info(f"📂 Path JSON: {json_path}")
-
-        if not os.path.exists(json_path):
-            logger.error(f"❌ File non trovato: {json_path}")
-            return JsonResponse({
-                'results': [],
-                'error': 'File comuni non trovato'
-            })
-
-        with open(json_path, 'r', encoding='utf-8') as f:
-            comuni_data = json.load(f)
-
-        logger.info(f"✅ Caricati {len(comuni_data)} comuni")
-
-        # Filtra comuni che contengono la query
-        results = []
-        for comune in comuni_data:
-            nome = comune.get('nome', '').lower()
-            codice = comune.get('codice_catastale', '').lower()
-            provincia = comune.get('provincia', '').lower()
-
-            if query in nome or query in codice or query in provincia:
-                results.append({
-                    'id': comune['codice_catastale'],
-                    'text': f"{comune['nome']} ({comune['codice_catastale']}) - {comune.get('provincia', '')}"
-                })
-
-                # Limita a 50 risultati per performance
-                if len(results) >= 50:
-                    break
-
-        logger.info(f"✅ Trovati {len(results)} risultati per '{query}'")
-
-        return JsonResponse({'results': results})
-
-    except Exception as e:
-        logger.error(f"❌ Errore ricerca comuni: {e}", exc_info=True)
-        return JsonResponse({
-            'results': [],
-            'error': str(e)
-        }, status=500)
+    return JsonResponse({'results': results})
 
 

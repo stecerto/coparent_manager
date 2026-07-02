@@ -143,10 +143,14 @@ class UserForm(forms.ModelForm):
 
 from django import forms
 from django_select2.forms import Select2Widget
-from .models import UserProfile
+from accounts.models import UserProfile
 import logging
 
 logger = logging.getLogger(__name__)
+
+# accounts/forms.py - MODIFICA il widget in UserProfileForm
+
+from django_select2.forms import Select2Widget
 
 
 class UserProfileForm(forms.ModelForm):
@@ -180,7 +184,7 @@ class UserProfileForm(forms.ModelForm):
                 choices=[('', 'Seleziona...'), ('M', 'Maschio'), ('F', 'Femmina')],
                 attrs={'class': 'form-select'}
             ),
-            # ✅ MODIFICATO: Select2Widget con URL AJAX
+            # ✅ Select2 con AJAX
             'birth_place_code': Select2Widget(
                 attrs={
                     'data-placeholder': 'Digita per cercare il comune...',
@@ -196,23 +200,18 @@ class UserProfileForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
-        # 1. Estrai role PRIMA di super()
         role = kwargs.pop('role', None)
-
-        # 2. CHIAMA super() SUBITO
         super().__init__(*args, **kwargs)
 
-        # Blindatura: se role non è passato, prendilo dall'istanza
         if not role and self.instance and hasattr(self.instance, 'role'):
             role = self.instance.role
 
-        # Normalizza il ruolo
         role = str(role).strip().lower().replace('_a', '').replace('_b', '') if role else ''
 
         logger.info(f"🔍 UserProfileForm: role = '{role}'")
 
-        # ✅ RIMOSSO: Caricamento statico 7902 comuni (troppo pesante)
-        # Select2 ora usa AJAX per caricare dinamicamente
+        # ✅ RIMOSSO: Caricamento statico da JSON
+        # Select2 ora usa AJAX per caricare dinamicamente dal DB
 
         # =========================
         # 👔 LOGICA PER RUOLO

@@ -223,6 +223,21 @@ class UserProfile(models.Model):
         if self.birth_place_code and len(self.birth_place_code) != 4:
             raise ValidationError("Il codice catastale non è valido.")
 
+
+class Comune(models.Model):
+    """Modello per comuni italiani con codice catastale"""
+    nome = models.CharField(max_length=100, db_index=True)
+    codice_catastale = models.CharField(max_length=4, unique=True, db_index=True)
+    provincia = models.CharField(max_length=2, db_index=True)
+
+    class Meta:
+        verbose_name = "Comune"
+        verbose_name_plural = "Comuni"
+        ordering = ['nome']
+
+    def __str__(self):
+        return f"{self.nome} ({self.codice_catastale}) - {self.provincia}"
+
 '''
     def clean(self):
         """🔒 Blocca modifica del telefono dopo la creazione"""
